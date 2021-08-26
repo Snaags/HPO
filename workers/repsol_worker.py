@@ -26,7 +26,7 @@ via random search using [KerasTuner](https://github.com/keras-team/keras-tuner).
 def compute(hyperparameter,budget = 1):
   TRAIN_SPLIT = 0.7
   train_files = []
-  files = os.listdir("/home/snaags/scripts/datasets/repsol_np")
+  files = os.listdir("/home/cmackinnon/scripts/repsol_np")
   for i in range(int(len(files)*TRAIN_SPLIT)):
     train_files.append(files.pop(random.randint(0,len(files)-1)))
   train_dataset = Train_repsol(train_files,hyperparameter["window_size"])
@@ -34,7 +34,6 @@ def compute(hyperparameter,budget = 1):
   test_dataset = Test_repsol(files,hyperparameter["window_size"])
   num_classes =  train_dataset.get_n_classes()
   
-  print(hyperparameter)
   batch_size = 64
   #augmentation_weights = [hyperparameter["jitter_weight"], hyperparameter["scaling_weight"], hyperparameter["rotation_weight"],
   #        hyperparameter["permutation_weight"], hyperparameter["magnitude_weight"], hyperparameter["time_weight"],hyperparameter["window_weight"]]
@@ -45,6 +44,10 @@ def compute(hyperparameter,budget = 1):
   test_dataloader = torch.utils.data.DataLoader( test_dataset, batch_size=batch_size, 
                                  drop_last=True,pin_memory=True)
   model = Model(input_size = ( train_dataset.features,  train_dataset.window),output_size =  num_classes,hyperparameters = hyperparameter)
+
+
+
+  torch.cuda.set_device(1)
   model = model.cuda()
   
   """
@@ -74,28 +77,20 @@ def compute(hyperparameter,budget = 1):
   total_label_normals = 0
   for epoch in range(epochs):
     for i, (samples, labels) in enumerate( train_dataloader):
-      #samples = augmentation(samples,  augmentations, augmentation_weights)
       samples = samples.cuda(non_blocking=True)
       labels = labels.cuda(non_blocking=True)
   
       # zero the parameter gradients
       optimizer.zero_grad()
       outputs = model(samples.float())
-      #total_label_faults += (labels == 1 ).sum()
-      #total_label_normals += (labels == 0 ).sum()
-  
       # forward + backward + optimize
   
       outputs = outputs
       labels = labels.long()
-      #labels = labels.unsqueeze(-1)
       loss = criterion(outputs, labels)
       loss.backward()
       optimizer.step()
       if i%50 == 0:
-        ##hl logging
-        #print("Faults: ", total_label_faults)
-        #print("Non-Faults: ", total_label_normals)
         acc += cal_acc(convert_label_max_only(outputs), labels.cpu().detach().numpy())
         acc = acc/2
         if acc > peak_acc:
@@ -128,28 +123,11 @@ def compute(hyperparameter,budget = 1):
             if l == p:
               recall_correct += 1
   
-        if i % 100 == 0:
-          print("Recall: ", recall_correct/recall_total)
-          print("Acc: ",correct/total) 
-          print("total faults: ", recall_total) 
-          print("total faults correct: ", recall_correct) 
   print() 
   print("Accuracy: ", "%.4f" % ((correct/total)*100), "%")
   print("Recall: ", "%.4f" % ((recall_correct/recall_total)*100), "%")
   
-  def plot(output_values):
-    c_list = []
-    for i in range(output_values.shape[0]):
-      if output_values[i]: 
-        c_list.append("g")
-      else:
-        c_list.append( "r")
-      if i %100==0:
-        print(i , output_values.shape[0])
-    import matplotlib.pyplot as plt 
-    plt.plot( test_dataset.y, c = c_list)
-  
-    plt.show()
+  torch.cuda.empty_cache()
   return (correct/total) 
   
   

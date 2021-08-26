@@ -51,11 +51,13 @@ def train_and_eval_population(worker, population, sample_batch, train = None, te
   for model in population:
     configs.append(model.arch())
   
-    with Pool(processes = sample_batch) as pool:
-        results = pool.map(worker, configs)
-        pool.close()
-        torch.cuda.empty_cache()
-        pool.join()
+  with Pool(processes = sample_batch,maxtasksperchild = 1) as pool:
+      results = pool.map(worker, configs)
+      torch.cuda.empty_cache()
+      pool.close()
+      torch.cuda.empty_cache()
+      pool.join()
+      torch.cuda.empty_cache()
 
   for mod,result in zip(population,results):
     mod.accuracy = result
@@ -71,7 +73,6 @@ def Mutate(cs, parent_model : Model) -> Model:
         operation_list.append(parameter[-6])
     
     return operation_list[random.randint(0,len(operation_list)-1)]
-        
     
   def op_mutation(model: Model, operation_number : int) -> Model:
     parameter_name = "normal_cell_1_ops_"+operation_number+"_type"
@@ -85,8 +86,7 @@ def Mutate(cs, parent_model : Model) -> Model:
     print("New operation: ", model.arch()[parameter_name])
     return model
  
-  def hidden_state_mutation(model : Model, operation_number : int) -> Model:
-   
+  def hidden_state_mutation(parent : Model, operation_number : int) -> Model:
     #Select 1 of the inputs at random
     parameter_name = "normal_cell_1_ops_"+operation_number+"_input_"+str(random.randint(1,2))
     old_op = model.arch()[parameter_name] 
@@ -105,6 +105,7 @@ def Mutate(cs, parent_model : Model) -> Model:
     print("New operation: ", model.arch()[parameter_name])
     return model
 
+  return random.choice([op_mutation, hidden_state_mutation])(model ,select_operation(model))    
 
 
 def regularized_evolution(configspace, worker , cycles, population_size, sample_size, sample_batch_size):
@@ -158,7 +159,6 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
       parent = max(sample, key=lambda i: i.accuracy)
 
       # Create the child model and store it.
-      child = Model()
       child = Mutate(CS,parent)
       children.append(child)
 
@@ -191,9 +191,9 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
 
 
 def main(worker, configspace):
-  pop_size = 64
+  pop_size = 100
   evaluations = 500
-  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size = 10, sample_batch_size = 2)
+  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =24, sample_batch_size = 8)
   Architectures = []
   accuracy_scores = []
   generations = list(range(evaluations))

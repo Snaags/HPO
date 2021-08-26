@@ -103,7 +103,7 @@ class Test_BTC(BTC):
 
 class repsol(Dataset):
   def __init__(self, window_size, files : list , augmentations):
-    path = "/home/snaags/scripts/datasets/repsol_np/"
+    path = "/home/cmackinnon/scripts/repsol_np/"
     data = []
     self.x_index_address = {}
     self.y_index_address = {}
