@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import Dataset
 import random 
 from sklearn.preprocessing import StandardScaler
-from utils.time_series_augmentation import permutation , magnitude_warp, time_warp, window_slice, jitter, scaling, rotation
+from HPO.utils.time_series_augmentation import permutation , magnitude_warp, time_warp, window_slice, jitter, scaling, rotation
 def none(x):
   return x
 class TEPS(Dataset):

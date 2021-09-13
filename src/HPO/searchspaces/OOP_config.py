@@ -3,7 +3,7 @@ import ConfigSpace.hyperparameters as CSH
 import os
 import csv
 import time 
-from utils.ConfigStruct import Parameter, Cumulative_Integer_Struct, LTP_Parameter 
+from HPO.utils.ConfigStruct import Parameter, Cumulative_Integer_Struct, LTP_Parameter 
 
 """	TODO
 Seperate Pooling and Convolution Layers

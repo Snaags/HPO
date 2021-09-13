@@ -2,16 +2,16 @@ import numpy as np
 import time
 import os 
 import matplotlib.pyplot as plt
-from utils.model_constructor import Model
+from HPO.utils.model_constructor import Model
 import pandas as pd
 import torch
-from data.datasets import Test_TEPS_split , Train_TEPS_split
+from HPO.data.datasets import Test_TEPS_split , Train_TEPS_split
 import torch.nn as nn
 import torch
 import random
-from utils.time_series_augmentation import permutation , magnitude_warp, time_warp
-from utils.time_series_augmentation_torch import jitter, scaling, rotation
-
+from HPO.utils.time_series_augmentation import permutation , magnitude_warp, time_warp
+from HPO.utils.time_series_augmentation_torch import jitter, scaling, rotation
+from HPO.utils import weight_freezing as wf
 
 
 
@@ -57,7 +57,6 @@ def compute(hyperparameter,budget = 10, in_model = None):
     n_iter = max_iter
   epochs = budget
   print("Memory reported as memory_allocated: ",torch.cuda.memory_reserved(0))
-  import utils.weight_freezing as wf
   wf.freeze_normal_cells(model)
 
   optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["lr"])

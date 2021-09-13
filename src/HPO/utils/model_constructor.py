@@ -1,4 +1,4 @@
-import utils.ops1d as ops
+import HPO.utils.ops1d as ops
 import random
 #hyperparameter processing
 from operator import itemgetter 

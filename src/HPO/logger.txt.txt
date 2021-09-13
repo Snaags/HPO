@@ -1,0 +1,11 @@
+1631550278.4080038
+Input Size: torch.Size([128, 52, 193])
+After in_conv: torch.Size([128, 56, 193])
+Data after Normal Cell 0: torch.Size([128, 56, 193])
+Data after Reduction Cell 0: torch.Size([128, 56, 97])
+Data after Normal Cell 1: torch.Size([128, 56, 97])
+Data after Reduction Cell 1: torch.Size([128, 56, 49])
+Data after Normal Cell 2: torch.Size([128, 56, 49])
+Size of x after cells: torch.Size([128, 56, 49])
+Size of x after gap: torch.Size([128, 56, 1])
+Size of dense input: 56

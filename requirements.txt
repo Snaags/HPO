@@ -2,8 +2,10 @@ torch >= 1.9.0
 nummpy >= 1.19
 pandas >= 1.2.2
 matplotlib >= 3.3.4
-nasbench301 0.3
-nas-bench-201 2.1
+nasbench301 >= 0.3
+nas-bench-201 >= 2.1
 nats-bench
 sklearn
+configspace
 scipy
+tqdm

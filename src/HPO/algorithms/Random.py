@@ -1,7 +1,9 @@
 from multiprocessing import Pool
-from utils.visualisation import plot_scores
+from HPO.utils.visualisation import plot_scores
 import csv
-def main(worker, configspace):
+from ConfigSpace import ConfigurationSpace
+
+def main(worker, configspace : ConfigurationSpace):
   TOTAL_EVALUATIONS = 500
   cores = 1
   pop = []

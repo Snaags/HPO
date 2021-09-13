@@ -5,7 +5,7 @@ from multiprocessing import Pool
 
 class ResourceDevice:
 	def __init__(self):
-		
+		pass
 
 
 class CudaDevice(ResourceDevice):
@@ -32,8 +32,8 @@ class ResourceManager:
 			return True
 
 
-	def check_availible_resources(self)
-
+	def check_availible_resources(self):
+		pass
 
 
 
@@ -42,6 +42,7 @@ class CudaMemoryManager(ResourceManager):
 		self.num_gpu
 
 	def Monitor(self):
+		pass
 
 class algorithm:
 
@@ -63,25 +64,25 @@ class algorithm:
 
 		self.init_gpu_manager()
 
-	def resource_check
-
+	def resource_check(self):
+		pass
 	def gpu_device_memory_check(self, device_id):
-	
+		pass	
 	def allocate_gpu(self):
-
-	def estimate_model_memory(self,)
-
+		pass
+	def estimate_model_memory(self):
+		pass
 	def train_and_evaluate(self,configurations):
-
+		pass
 		
 
-		with Pool(self.cores, maxtasksperchild =  1 ) as p:
+		#with Pool(self.cores, maxtasksperchild =  1 ) as p:
 			
 
 		#Should handle allocation to gpu
 
 	def _train(self, config, device_id):
-
+		pass
 
 	def random_architecture_sample(self, cs, num : int = 1) -> list:
 		if num > 1:
@@ -94,4 +95,5 @@ class algorithm:
 		#
 		#
 		#
+		pass
 		
