@@ -5,6 +5,8 @@ matplotlib >= 3.3.4
 nasbench301 >= 0.3
 nas-bench-201 >= 2.1
 nats-bench
+pytest
+pytest-cov
 sklearn
 configspace
 scipy

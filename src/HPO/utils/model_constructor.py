@@ -21,12 +21,14 @@ class DataShapeLogger:
     MyFile.close()
 
 class Model(nn.Module):
-  def __init__(self, input_size, output_size, hyperparameters):
+  def __init__(self, input_size, output_size, hyperparameters, one_fc_layer = False):
     super(Model,self).__init__()
+    self.one_fc_layer = one_fc_layer
     self.log_flag = True
     self.logger = DataShapeLogger("logger.txt")
     self.hyperparameters = hyperparameters  
     self.channels = hyperparameters["channels"]
+    self.outputs = output_size
     self.normal_cells = nn.ModuleList()
     self.reduction_cells = nn.ModuleList()
     self.p = hyperparameters["p"]
@@ -36,15 +38,27 @@ class Model(nn.Module):
     self.gap = ops.AdaAvgPool() 
     self.fc_list = nn.ModuleList()
     channels = self.channels
-    while channels > 2*output_size:
-      self.fc_list.append(nn.Linear(channels,channels//2))
-      self.fc_list.append(nn.ReLU())
-      channels = channels // 2
+    if self.one_fc_layer == True:
+      while channels > 2*output_size:
+        self.fc_list.append(nn.Linear(channels,channels//2))
+        self.fc_list.append(nn.ReLU())
+        channels = channels // 2
     self.fc = nn.Linear(channels, output_size)
     self.outact = nn.Softmax(dim = 1)
 
   def reset_stem(self,in_features : int):
     self.in_conv = ops.StdConv(in_features, self.channels)
+
+  def reset_fc(self, output_size : int ):
+    self.fc_list = nn.ModuleList()
+    channels = self.channels
+    if self.one_fc_layer == True:
+      while channels > 2*output_size:
+        self.fc_list.append(nn.Linear(channels,channels//2))
+        self.fc_list.append(nn.ReLU())
+        channels = channels // 2
+    self.fc = nn.Linear(channels, output_size)
+
   def _build_dict(self,parameters : dict, keyword : str):
     _dictionary = dict()
     keyword_length = len(keyword)
@@ -84,8 +98,9 @@ class Model(nn.Module):
         x = self.reduction_cells[i](x)
     x = self.gap(x)
     x = x.squeeze()
-    for i in self.fc_list:
-      x = i(x)
+    if self.one_fc_layer == True:
+      for i in self.fc_list:
+        x = i(x)
     x = self.fc(x)
     #x = self.outact(x)
     return x  
@@ -112,11 +127,7 @@ class Model(nn.Module):
     return x  
 
   def forward(self,x):
-    if self.log_flag == True:
-      self.log_flag = False
-      return self._forward_log(x)
-    else:
-      return self._forward(x)
+    return self._forward(x)
 
 class Ops(nn.Module):
   def __init__(self, parameters, channels_in,channels_out, p):
@@ -238,7 +249,6 @@ class Ops(nn.Module):
         #print("Size After operation: ", x.size())
       else:
         #x = self.dropout(x)
-        #print("Size Before operation: ", x.size())
         x = i(x)
         #print("Size After operation: ", x.size())
     #if self.multicompute:

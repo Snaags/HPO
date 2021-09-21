@@ -7,7 +7,7 @@ import collections
 import random
 import matplotlib.pyplot as plt 
 import numpy as np
-from utils.visualisation import plot_scores
+from HPO.utils.visualisation import plot_scores
 ###Tounament Selection/Aging Selection
   #
   #parameters:
@@ -191,9 +191,9 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
 
 
 def main(worker, configspace):
-  pop_size = 10
-  evaluations = 50
-  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =10, sample_batch_size = 1)
+  pop_size = 100
+  evaluations = 1000
+  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =25, sample_batch_size = 3)
   Architectures = []
   accuracy_scores = []
   generations = list(range(evaluations))

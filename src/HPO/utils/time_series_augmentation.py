@@ -3,12 +3,7 @@ from tqdm import tqdm
 import time
 import torch
 
-def time_test(func, n = 100, batch_size = 10 , window_length = 1000, features = 27):
-    start = time.time()
-    x = np.random.rand(batch_size, window_length, features)
-    for i in range(n):
-        out = func(x)
-    print("Total time for ",func.__name__,": ", time.time()- start , " Seconds")
+
       
 def jitter(x, sigma=0.03):
     # https://arxiv.org/pdf/1706.00527.pdf
@@ -78,7 +73,7 @@ def time_warp(x, sigma=0.2, knot=4):
             ret[i,:,dim] = np.interp(orig_steps, np.clip(scale*time_warp, 0, x.shape[1]-1), pat[:,dim]).T
     return ret
 
-def window_slice(x, reduce_ratio=0.9):
+def window_slice(x, reduce_ratio=0.85):
     # https://halshs.archives-ouvertes.fr/halshs-01357973/document
     target_len = np.ceil(reduce_ratio*x.shape[1]).astype(int)
     if target_len >= x.shape[1]:

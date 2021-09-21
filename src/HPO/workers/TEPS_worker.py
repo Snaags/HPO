@@ -16,7 +16,7 @@ from HPO.utils import weight_freezing as wf
 
 
   
-def compute(hyperparameter,budget = 10, in_model = None):
+def compute(hyperparameter,budget = 1, in_model = None):
   ###Configuration###
   DATASET_PATH = "/home/snaags/scripts/datasets/TEPS/split"
   #torch.cuda.set_device(1) #Set cuda Device
@@ -33,7 +33,7 @@ def compute(hyperparameter,budget = 10, in_model = None):
   test_dataset = Test_TEPS_split(test_files,hyperparameter["window_size"])
   num_classes =  train_dataset.get_n_classes()
   
-  batch_size = 128
+  batch_size = 64
   train_dataloader = torch.utils.data.DataLoader( train_dataset, batch_size=batch_size,
     shuffle = True,drop_last=True,pin_memory=True)
   test_dataloader = torch.utils.data.DataLoader( test_dataset, batch_size=batch_size,shuffle = True, 
@@ -51,7 +51,7 @@ def compute(hyperparameter,budget = 10, in_model = None):
   """
   
   ###Training Configuration
-  max_iter = 10000
+  max_iter = 1000
   n_iter =  train_dataset.get_n_samples()/batch_size
   if max_iter < n_iter:
     n_iter = max_iter
@@ -130,11 +130,11 @@ def compute(hyperparameter,budget = 10, in_model = None):
 
 
   torch.cuda.empty_cache()
-  from workers.repsol_worker import compute as _compute
+  from HPO.workers.repsol_worker import compute as _compute
   repsol_res =_compute(hyperparameter, 1, model.train())
   print("REPSOL Accuracy: {}".format(repsol_res))
 
-  return (correct/total) ,repsol_res , torch.cuda.memory_allocated(device)
+  return (correct/total) ,repsol_res 
   
   
 

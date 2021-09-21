@@ -2,18 +2,18 @@ import numpy as np
 import time
 import os 
 import matplotlib.pyplot as plt
-from utils.model_constructor import Model
+from HPO.utils.model_constructor import Model
 import pandas as pd
 import torch
-from data.datasets import Test_repsol , Train_repsol
+from HPO.data.datasets import Test_repsol , Train_repsol
 import torch.nn as nn
 from torch import Tensor
 from torch.utils.data import DataLoader
 import random
-from utils.time_series_augmentation import permutation , magnitude_warp, time_warp
-from utils.time_series_augmentation_torch import jitter, scaling, rotation
+from HPO.utils.time_series_augmentation import permutation , magnitude_warp, time_warp
+from HPO.utils.time_series_augmentation_torch import jitter, scaling, rotation
 from HPO.utils.worker_helper import train_model
-
+from HPO.utils.weight_freezing import freeze_all_cells
   
 def compute(hyperparameter,budget = 2, in_model = None):
   DATASET_PATH = "/home/snaags/scripts/datasets/repsol_np"
@@ -28,17 +28,20 @@ def compute(hyperparameter,budget = 2, in_model = None):
   test_dataset = Test_repsol(files,hyperparameter["window_size"])
 
   num_classes =  train_dataset.get_n_classes()
-  batch_size = 32
+  batch_size = 64
   train_dataloader = DataLoader( train_dataset, batch_size=batch_size,
     shuffle = True,drop_last=True,pin_memory=True)
 
   test_dataloader = DataLoader( test_dataset, batch_size=batch_size, 
                                  drop_last=True,pin_memory=True)
   if in_model == None:
-    model = Model(input_size = ( train_dataset.features,  train_dataset.window),output_size =  num_classes,hyperparameters = hyperparameter)
+    model = Model(input_size = ( train_dataset.features,  train_dataset.window ) ,output_size =  num_classes,hyperparameters = hyperparameter)
   else:
     model = in_model
     model.reset_stem(train_dataset.features)  
+    model.reset_fc(2)
+    model = freeze_all_cells( model )
+
   model = model.cuda()
 
 
@@ -49,8 +52,6 @@ def compute(hyperparameter,budget = 2, in_model = None):
   
   ###Training Configuration
   train_model(model , hyperparameter, train_dataloader , budget)
-  print(" Loss: ","%.2f" % loss.item(), "Accuracy: ","%.2f" % acc )
-    
   with torch.no_grad(): #disable back prop to test the model
     model = model.eval()
     correct = 1
