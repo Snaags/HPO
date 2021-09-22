@@ -258,7 +258,7 @@ class TEPS_split(Dataset):
     return self.n_samples
 
   def __len__(self):
-    return self.n_samples - self.n_samples%self.window
+    return self.n_samples -1  
 
 
 class Train_TEPS_split(TEPS_split):

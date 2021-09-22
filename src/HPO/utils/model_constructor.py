@@ -20,8 +20,46 @@ class DataShapeLogger:
     MyFile.write('\n')
     MyFile.close()
 
+class DynamicLayer(nn.Module):
+  ##Allows for training data batches from datasets with differing numbers of features to be used in the same epoch
+  def __init__(self, channels, layer_type):
+    super(DynamicLayer,self).__init__()
+    self.channels = channels
+    self.stem_list = nn.ModuleList()
+    self.layer_type = layer_type
+    self.stem_index = []
+  def forward(self, x):
+    features = x.shape[1]
+    if features not in self.stem_index:
+      self.stem_list.append(self.layer_type(features , self.channels ).cuda())
+      self.stem_index.append(features)
+    self.last_stem = features
+    return self.stem_list[self.stem_index.index(features)](x)
+
+
+class DynamicStem(DynamicLayer):
+  def __init__(self , channels ):
+    super().__init__( channels , ops.StdConv)
+
+class DynamicFC(nn.Module):
+  def __init__(self , channels, output_dict  , dynamicStem):
+    super(DynamicFC,self).__init__()
+    self.channels = channels
+    self.stem_list = nn.ModuleList()
+    self.layer_type = nn.Linear
+    self.stem_index = []
+    self.output_dict = output_dict
+    self.dynamicStem = dynamicStem
+  def forward(self, x):
+    features = self.dynamicStem.last_stem
+    if features not in self.stem_index:
+      self.stem_list.append( self.layer_type( self.channels , self.output_dict[features] ).cuda() )
+      self.stem_index.append( features )
+    return self.stem_list[self.stem_index.index(features)](x)
+
+
 class Model(nn.Module):
-  def __init__(self, input_size, output_size, hyperparameters, one_fc_layer = False):
+  def __init__(self, input_size, output_size, hyperparameters, one_fc_layer = False , dynamicStem = True , dynamicFC = True , output_dict = None):
     super(Model,self).__init__()
     self.one_fc_layer = one_fc_layer
     self.log_flag = True
@@ -29,11 +67,16 @@ class Model(nn.Module):
     self.hyperparameters = hyperparameters  
     self.channels = hyperparameters["channels"]
     self.outputs = output_size
+    if output_dict != None:
+      self.output_dict = output_dict
     self.normal_cells = nn.ModuleList()
     self.reduction_cells = nn.ModuleList()
     self.p = hyperparameters["p"]
     self.layers = hyperparameters["layers"]
-    self.in_conv = ops.StdConv(input_size[0], self.channels)
+    if dynamicStem == True:
+      self.in_conv = DynamicStem(self.channels)
+    else:
+      self.in_conv = ops.StdConv(input_size[0], self.channels)
     self.build_cells(hyperparameters)
     self.gap = ops.AdaAvgPool() 
     self.fc_list = nn.ModuleList()
@@ -43,7 +86,13 @@ class Model(nn.Module):
         self.fc_list.append(nn.Linear(channels,channels//2))
         self.fc_list.append(nn.ReLU())
         channels = channels // 2
-    self.fc = nn.Linear(channels, output_size)
+
+    if output_dict != None:
+      self.output_dict = output_dict
+      self.fc = DynamicFC(self.channels , output_dict, self.in_conv)
+
+    else:
+      self.fc = nn.Linear(channels, output_size)
     self.outact = nn.Softmax(dim = 1)
 
   def reset_stem(self,in_features : int):

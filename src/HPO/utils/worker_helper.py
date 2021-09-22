@@ -14,7 +14,6 @@ def collate_fn_padd(batch):
     assume it takes in images rather than arbitrary tensors.
     '''
     ## get sequence lengths
-
     lengths = torch.tensor([ t[0].shape[1] for t in batch ])    ## padd
     batch_samples = [ torch.transpose(t[0],0,1) for t in batch ]
     batch_samples = torch.nn.utils.rnn.pad_sequence(batch_samples ,batch_first = True)
@@ -59,9 +58,9 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   if "c1" in hyperparameter:
     criterion = nn.CrossEntropyLoss(torch.Tensor([1, hyperparameter["c1"]]))
   criterion = nn.CrossEntropyLoss()
- 
+  epoch = 0
   peak_acc = 0
-  for epoch in range(epochs):
+  while epoch < epochs:
     total = 0
     correct = 0
     for i, (samples, labels) in enumerate( dataloader ):
@@ -84,3 +83,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
       optimizer.step()
       if i %10 == 0:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter)
+    epoch += 1 
+    #dataloader.set_iterator()
+  print()
+  print("Num epochs: {}".format(epoch))

@@ -14,29 +14,45 @@ from HPO.utils.time_series_augmentation import permutation , magnitude_warp, tim
 from HPO.utils.time_series_augmentation_torch import jitter, scaling, rotation
 from HPO.utils.worker_helper import train_model, collate_fn_padd
 from HPO.utils.weight_freezing import freeze_all_cells
-  
-def compute(hyperparameter,budget = 4, in_model = None , train_dataset = None):
-  if train_dataset == None:
-    train_dataset = Train_repsol_full(hyperparameter["window_size"], augmentations = True)
+from HPO.data.supersets import SuperSet 
+from HPO.data.datasets import Test_TEPS_split , Train_TEPS_split
 
-  test_dataset = Test_repsol_full(hyperparameter["window_size"])
-
-  num_classes =  train_dataset.get_n_classes()
+def compute(hyperparameter,budget = 10, in_model = None):
   batch_size = 4
-  train_dataloader = DataLoader( train_dataset, batch_size=batch_size,
+  repsol_train_dataset = Train_repsol_full(hyperparameter["window_size"], augmentations = True)
+  repsol_test_dataset = Test_repsol_full(hyperparameter["window_size"])
+
+  repsol_train_dataloader = DataLoader( repsol_train_dataset, batch_size=batch_size,
     shuffle = True,drop_last=True,pin_memory=True , collate_fn = collate_fn_padd)
 
-
-  test_dataloader = DataLoader( test_dataset, batch_size=batch_size, 
+  test_dataloader = DataLoader( repsol_test_dataset, batch_size=batch_size, 
                                  drop_last=True,pin_memory=True, collate_fn = collate_fn_padd)
-  if in_model == None:
-    model = Model(input_size = ( train_dataset.features, ) ,output_size =  num_classes,hyperparameters = hyperparameter)
 
-  else:
-    model = in_model
-    model.reset_stem(train_dataset.features)  
-    model.reset_fc(2)
-    model = freeze_all_cells( model )
+
+
+
+  DATASET_PATH = "/home/snaags/scripts/datasets/TEPS/split"
+  TEPS_test_files = []
+  TEPS_train_files = []
+  files = os.listdir(DATASET_PATH)
+  for i in files:
+    if "training" in i:
+      TEPS_train_files.append(i)
+    else:
+      TEPS_test_files.append(i)
+  TEPS_train_dataset = Train_TEPS_split(TEPS_train_files,hyperparameter["window_size"])
+  TEPS_test_dataset = Test_TEPS_split(TEPS_test_files,hyperparameter["window_size"])
+  num_classes =  TEPS_train_dataset.get_n_classes()
+  
+   
+  TEPS_train_dataloader = torch.utils.data.DataLoader( TEPS_train_dataset, batch_size=batch_size,
+    shuffle = True,drop_last=True,pin_memory=True)
+
+
+  train_dataloader = SuperSet([TEPS_train_dataloader , repsol_train_dataloader])
+
+  output_dict = {27 : 2 , 52 : TEPS_train_dataset.get_n_classes()}
+  model = Model(input_size = ( 27, ) ,output_size =  num_classes,hyperparameters = hyperparameter , output_dict = output_dict)
 
   model = model.cuda()
 
@@ -80,11 +96,9 @@ def compute(hyperparameter,budget = 4, in_model = None , train_dataset = None):
   
 
 if __name__ == "__main__":
-  dataset = Train_repsol_full(100, augmentations = True)
   while True:
 
     hyperparameter = {'c1_weight': 4.929843596057779, 'channels': 41, 'layers': 3, 'lr': 0.001, 'normal_cell_1_num_ops': 1, 'normal_cell_1_ops_1_input_1': 0, 'normal_cell_1_ops_1_input_2': 0, 'normal_cell_1_ops_1_type': 'SepConv3', 'normal_cell_1_ops_2_input_1': 1, 'normal_cell_1_ops_2_input_2': 1, 'normal_cell_1_ops_2_type': 'AvgPool5', 'normal_cell_1_ops_3_input_1': 0, 'normal_cell_1_ops_3_input_2': 2, 'normal_cell_1_ops_3_type': 'AvgPool7', 'normal_cell_1_ops_4_input_1': 0, 'normal_cell_1_ops_4_input_2': 1, 'normal_cell_1_ops_4_type': 'SepConv5', 'normal_cell_1_ops_5_input_1': 0, 'normal_cell_1_ops_5_input_2': 2, 'normal_cell_1_ops_5_type': 'Identity', 'normal_cell_1_ops_6_input_1': 0, 'normal_cell_1_ops_6_input_2': 4, 'normal_cell_1_ops_6_type': 'StdConv', 'normal_cell_1_ops_7_input_1': 0, 'normal_cell_1_ops_7_input_2': 4, 'normal_cell_1_ops_7_type': 'Conv5', 'normal_cell_1_ops_8_input_1': 2, 'normal_cell_1_ops_8_input_2': 7, 'normal_cell_1_ops_8_type': 'Conv3', 'normal_cell_1_ops_9_input_1': 5, 'normal_cell_1_ops_9_input_2': 8, 'normal_cell_1_ops_9_type': 'StdConv', 'num_conv': 1, 'num_re': 1, 'p': 0.05, 'reduction_cell_1_num_ops': 1, 'reduction_cell_1_ops_1_input_1': 0, 'reduction_cell_1_ops_1_input_2': 0, 'reduction_cell_1_ops_1_type': 'FactorizedReduce', 'window_size': 231}
     hyperparameter = {'c1_weight': 2.120752508120108, 'channels': 41, 'layers': 5, 'lr': 0.001, 'normal_cell_1_num_ops': 9, 'normal_cell_1_ops_1_input_1': 0, 'normal_cell_1_ops_1_input_2': 0, 'normal_cell_1_ops_1_type': 'MaxPool5', 'normal_cell_1_ops_2_input_1': 0, 'normal_cell_1_ops_2_input_2': 0, 'normal_cell_1_ops_2_type': 'StdConv', 'normal_cell_1_ops_3_input_1': 1, 'normal_cell_1_ops_3_input_2': 1, 'normal_cell_1_ops_3_type': 'SepConv5', 'normal_cell_1_ops_4_input_1': 0, 'normal_cell_1_ops_4_input_2': 0, 'normal_cell_1_ops_4_type': 'Conv5', 'normal_cell_1_ops_5_input_1': 0, 'normal_cell_1_ops_5_input_2': 0, 'normal_cell_1_ops_5_type': 'Conv3', 'normal_cell_1_ops_6_input_1': 1, 'normal_cell_1_ops_6_input_2': 2, 'normal_cell_1_ops_6_type': 'MaxPool7', 'normal_cell_1_ops_7_input_1': 5, 'normal_cell_1_ops_7_input_2': 4, 'normal_cell_1_ops_7_type': 'Identity', 'normal_cell_1_ops_8_input_1': 4, 'normal_cell_1_ops_8_input_2': 6, 'normal_cell_1_ops_8_type': 'SepConv7', 'normal_cell_1_ops_9_input_1': 2, 'normal_cell_1_ops_9_input_2': 1, 'normal_cell_1_ops_9_type': 'AvgPool7', 'num_conv': 1, 'num_re': 1, 'p': 0.05, 'reduction_cell_1_num_ops': 1, 'reduction_cell_1_ops_1_input_1': 0, 'reduction_cell_1_ops_1_input_2': 0, 'reduction_cell_1_ops_1_type': 'FactorizedReduce', 'window_size': 152} 
-    hyperparameter = {'c1_weight': 1.120752508120108, 'channels': 41, 'layers': 5, 'lr': 0.001, 'normal_cell_1_num_ops': 9, 'normal_cell_1_ops_1_input_1': 0, 'normal_cell_1_ops_1_input_2': 0, 'normal_cell_1_ops_1_type': 'MaxPool5', 'normal_cell_1_ops_2_input_1': 0, 'normal_cell_1_ops_2_input_2': 0, 'normal_cell_1_ops_2_type': 'StdConv', 'normal_cell_1_ops_3_input_1': 1, 'normal_cell_1_ops_3_input_2': 1, 'normal_cell_1_ops_3_type': 'SepConv5', 'normal_cell_1_ops_4_input_1': 0, 'normal_cell_1_ops_4_input_2': 0, 'normal_cell_1_ops_4_type': 'Conv5', 'normal_cell_1_ops_5_input_1': 0, 'normal_cell_1_ops_5_input_2': 0, 'normal_cell_1_ops_5_type': 'Conv3', 'normal_cell_1_ops_6_input_1': 1, 'normal_cell_1_ops_6_input_2': 2, 'normal_cell_1_ops_6_type': 'MaxPool7', 'normal_cell_1_ops_7_input_1': 5, 'normal_cell_1_ops_7_input_2': 4, 'normal_cell_1_ops_7_type': 'Identity', 'normal_cell_1_ops_8_input_1': 4, 'normal_cell_1_ops_8_input_2': 6, 'normal_cell_1_ops_8_type': 'SepConv7', 'normal_cell_1_ops_9_input_1': 2, 'normal_cell_1_ops_9_input_2': 1, 'normal_cell_1_ops_9_type': 'AvgPool7', 'num_conv': 1, 'num_re': 1, 'p': 0.05, 'reduction_cell_1_num_ops': 1, 'reduction_cell_1_ops_1_input_1': 0, 'reduction_cell_1_ops_1_input_2': 0, 'reduction_cell_1_ops_1_type': 'FactorizedReduce', 'window_size': 152} 
-    compute(hyperparameter , train_dataset = dataset)
+    compute(hyperparameter)
 
