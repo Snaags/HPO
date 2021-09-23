@@ -59,7 +59,7 @@ class DynamicFC(nn.Module):
 
 
 class Model(nn.Module):
-  def __init__(self, input_size, output_size, hyperparameters, one_fc_layer = False , dynamicStem = True , dynamicFC = True , output_dict = None):
+  def __init__(self, input_size, output_size, hyperparameters, one_fc_layer = False , dynamicStem = False , dynamicFC = False , output_dict = None):
     super(Model,self).__init__()
     self.one_fc_layer = one_fc_layer
     self.log_flag = True
@@ -72,6 +72,7 @@ class Model(nn.Module):
     self.normal_cells = nn.ModuleList()
     self.reduction_cells = nn.ModuleList()
     self.p = hyperparameters["p"]
+    self.dropout = nn.Dropout(p = self.p)
     self.layers = hyperparameters["layers"]
     if dynamicStem == True:
       self.in_conv = DynamicStem(self.channels)
@@ -87,7 +88,7 @@ class Model(nn.Module):
         self.fc_list.append(nn.ReLU())
         channels = channels // 2
 
-    if output_dict != None:
+    if output_dict != None and dynamicFC != False:
       self.output_dict = output_dict
       self.fc = DynamicFC(self.channels , output_dict, self.in_conv)
 
@@ -147,10 +148,12 @@ class Model(nn.Module):
         x = self.reduction_cells[i](x)
     x = self.gap(x)
     x = x.squeeze()
+    x = self.dropout(x)
     if self.one_fc_layer == True:
       for i in self.fc_list:
         x = i(x)
     x = self.fc(x)
+
     #x = self.outact(x)
     return x  
 
@@ -187,7 +190,6 @@ class Ops(nn.Module):
     self.multicompute = False
     self.p = p
     self.input = []
-    #self.dropout = nn.Dropout(p = 0.2)
     for i in parameters:
       if i == "type":
         self.op = parameters[i]

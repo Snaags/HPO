@@ -357,53 +357,75 @@ class Test_TEPS_split_binary(TEPS_split_binary):
 
 
 class repsol_full(Dataset):
-  def __init__(self, window_size, files : list, path_dir : str, augmentations):
+  def __init__(self, augmentations_num, files : list, path_dir : str, augmentations):
     path = "/home/snaags/scripts/datasets/"+path_dir
     data = []
+    self.path ="/home/snaags/scripts/datasets/"
+    self.aug_path = self.path + "repsol_augmented/"
     self.x_index_address = {}
     self.y_index_address = {}
+    gen_augs = False
     augmentations_per_batch = 2
     #index_list sum()
     if augmentations == True:
       self.non_warp_augmentations =[jitter, scaling, rotation, permutation ]
       self.warp_augmentations = [magnitude_warp, time_warp, window_slice]
     for i in files:
+
       data.append(np.reshape(np.load(path+i),(-1,28)))
     self.current_index = 0
     use_all = True
-    multi_aug = 100
+    multi_aug = augmentations_num
 
   
-    for batch in data:
+    for datapoint, batch in enumerate(data):
       batch_x = batch[:,1:]
       batch_y = batch[:,0]
       self.add_to_dataset(batch_x,batch_y)
       
       if augmentations:
-        if use_all == True:
-          for _ in range(multi_aug):
-            x = batch_x.reshape(1,batch_x.shape[0],batch_x.shape[1])
-            augs = self.warp_augmentations +self.non_warp_augmentations
-            for i in range(len(augs)):
-                x = augs.pop(random.randint(0,len(augs) -1))(x)
-            self.add_to_dataset(x.reshape(*x.shape[1:]),batch_y)
+        if gen_augs == True:
+          if use_all == True:
+            for _ in range(multi_aug):
+              x = batch_x.reshape(1,batch_x.shape[0],batch_x.shape[1])
+              augs = self.warp_augmentations +self.non_warp_augmentations
+              for i in range(len(augs)):
+                  x = augs.pop(random.randint(0,len(augs) -1))(x)
+              #self.save_2_file(x.reshape(*x.shape[1:]),batch_y , datapoint , _)
+              self.add_to_dataset(x.reshape(*x.shape[1:]),batch_y)
+          else:
+            for i in range(augmentations_per_batch):
+              augmentations_for_current_batch = []
+              temp_augmentation_list = self.non_warp_augmentations.copy()
+              augmentations_for_current_batch.append(random.choice(self.warp_augmentations))
+              x = batch_x.reshape(1,batch_x.shape[0],batch_x.shape[1])
+              while len(augmentations_for_current_batch) < 3:
+                augmentations_for_current_batch.append(temp_augmentation_list.pop(random.randint(0,len(temp_augmentation_list)-1)))
+        
+                for augmentation_function in augmentations_for_current_batch:
+                  x = augmentation_function(x)
+                self.add_to_dataset(x.reshape(*x.shape[1:]),batch_y)
         else:
-          for i in range(augmentations_per_batch):
-            augmentations_for_current_batch = []
-            temp_augmentation_list = self.non_warp_augmentations.copy()
-            augmentations_for_current_batch.append(random.choice(self.warp_augmentations))
-            x = batch_x.reshape(1,batch_x.shape[0],batch_x.shape[1])
-            while len(augmentations_for_current_batch) < 3:
-              augmentations_for_current_batch.append(temp_augmentation_list.pop(random.randint(0,len(temp_augmentation_list)-1)))
-      
-            for augmentation_function in augmentations_for_current_batch:
-              x = augmentation_function(x)
-            self.add_to_dataset(x.reshape(*x.shape[1:]),batch_y)
-
+          self.load_augmentations(datapoint , multi_aug) 
     
     self.n_samples = self.current_index #* len(self.augmentations)
     self.features = 27
     self.n_classes = 2
+
+  def save_2_file(self, x,y, datapoint , aug_num):
+    arr = np.zeros((x.shape[0],x.shape[1]+ 1))
+    arr[:,0] = y
+    arr[:,1:] = x
+    np.save(self.path+"repsol_augmented/{}-{}".format(datapoint, aug_num), arr)
+
+  def load_augmentations( self, sample_index , augmentation_num ):
+    for i in range(augmentation_num):
+      batch = np.load(self.aug_path+"{}-{}.npy".format(sample_index, i))
+
+      batch_x = batch[:,1:]
+      batch_y = batch[:,0]
+      self.add_to_dataset(batch_x,batch_y)
+
   def add_to_dataset(self,x,y):
 
     self.x_index_address[self.current_index] = torch.from_numpy(x.reshape(x.shape[1], x.shape[0]))
@@ -433,16 +455,84 @@ class repsol_full(Dataset):
 
 class Train_repsol_full(repsol_full):
 
-  def __init__(self, window_size = 200, augmentations = True): 
+  def __init__(self, augmentations_num = 200, augmentations = True): 
     path = "/home/snaags/scripts/datasets/repsol_train"
     train_files = os.listdir(path)
     path_dir = "repsol_train/"
-    super().__init__(window_size, train_files,path_dir, augmentations)
+    super().__init__(augmentations_num, train_files,path_dir, augmentations)
 
 class Test_repsol_full(repsol_full):
 
-  def __init__(self, window_size = 200, augmentations = False): 
+  def __init__(self, augmentations_num = 200, augmentations = False): 
     path = "/home/snaags/scripts/datasets/repsol_test"
     test_files = os.listdir(path)
     path_dir = "repsol_test/"
-    super().__init__(window_size, test_files ,path_dir, augmentations)
+    super().__init__(augmentations_num, test_files ,path_dir, augmentations)
+
+class repsol_unlabeled(Dataset):
+  def __init__(self, window_size = 1000):
+    self.soft_labels = False
+    path = "/home/snaags/scripts/datasets/repsol_unlabeled/"
+    data = []
+    self.index_address = {}
+
+    files = os.listdir(path)
+
+    for i in files:
+      data.append(np.reshape(np.load(path+i),(-1,27)))
+    self.current_index = 0
+
+
+  
+    for batch in data:
+      count = window_size
+      if batch.shape[0] != 0:
+        while batch.shape[0] - count > window_size:
+          self.add_to_dataset(batch[count-window_size:count,:])
+          count += window_size
+
+      
+    
+    self.n_samples = self.current_index #* len(self.augmentations)
+    self.features = 27
+    self.n_classes = 2
+  def add_to_dataset(self,x):
+    
+    self.index_address[self.current_index] = torch.from_numpy(x.reshape(x.shape[1], x.shape[0]))
+    self.current_index += 1 
+
+  def add_labels(self , y):
+    self.y_index_address = {}
+    current_index = 0
+    for y_s in y:
+      self.y_index_address[current_index] = torch.from_numpy(y_s)
+      current_index += 1 
+    if current_index != self.current_index:
+      raise ValueError("Incorrect number of labels")
+    self.soft_labels = True
+
+
+  def set_window_size(self, window_size):
+    self.window = window_size
+
+  def __getitem__(self, index):
+    #index_address keys are the first usable index in a batch for the window size
+    #this means the index
+    if self.soft_labels == False:
+      x = self.index_address[index]
+      return x 
+    else:
+      x = self.index_address[index]
+      x = self.y_index_address[index]
+      return x, y
+  
+  def get_n_classes(self):
+    return self.n_classes
+  def get_n_samples(self):
+    return self.n_samples
+
+  def __len__(self):
+    return self.n_samples 
+
+
+

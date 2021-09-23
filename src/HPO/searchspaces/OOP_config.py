@@ -77,12 +77,13 @@ def init_config():
   """
     ###Training Configuration###
     ###Optimiser###
-  lr =CSH.Constant(name = "lr",			value = 0.001)
-  p =CSH.Constant(name = "p",			value = 0.05 )
-  window_size = CSH.UniformIntegerHyperparameter(name = "window_size", lower = 150, upper = 250)
-  channels = CSH.UniformIntegerHyperparameter(name = "channels", lower = 20 ,upper = 60)
-  layers = CSH.UniformIntegerHyperparameter(name = "layers", lower = 3, upper = 6)
-  c1 = CSH.UniformFloatHyperparameter(name = "c1_weight" , lower = 2,upper = 5)
+  lr =CSH.UniformFloatHyperparameter(name = "lr",			lower = 0.00001  ,upper = 0.05)
+  p =CSH.UniformFloatHyperparameter(name = "p",			lower = 0.01 ,upper = 0.3 )
+  epochs = CSH.UniformIntegerHyperparameter(name = "epochs", lower = 1, upper = 10)
+  augmentations = CSH.UniformIntegerHyperparameter(name = "augmentations", lower = 10, upper = 500)
+  channels = CSH.UniformIntegerHyperparameter(name = "channels", lower = 20 ,upper = 100)
+  layers = CSH.UniformIntegerHyperparameter(name = "layers", lower = 3, upper = 12)
+  c1 = CSH.UniformFloatHyperparameter(name = "c1_weight" , lower = 1,upper = 5)
     ###Topology Definition]###
 
   hp_list = [
@@ -96,6 +97,8 @@ def init_config():
         #magnitude_weight ,
         #time_weight ,
         #window_weight ,
+        epochs,
+        augmentations,
         channels,
         lr,
         p,
