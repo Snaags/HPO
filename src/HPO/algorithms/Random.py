@@ -1,5 +1,6 @@
 from multiprocessing import Pool
 from HPO.utils.visualisation import plot_scores
+from HPO.workers.repeat_worker import worker_wrapper
 import csv
 from ConfigSpace import ConfigurationSpace
 
@@ -8,7 +9,7 @@ def main(worker, configspace : ConfigurationSpace):
   cores = 1
   pop = []
   scores = [] 
-
+  worker = worker_wrapper(worker, 5)
   if cores == 1:
     results = []
     completed_configs = []

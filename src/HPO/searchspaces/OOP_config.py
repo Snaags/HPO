@@ -79,17 +79,16 @@ def init_config():
     ###Optimiser###
   lr =CSH.UniformFloatHyperparameter(name = "lr",			lower = 0.00001  ,upper = 0.05)
   p =CSH.UniformFloatHyperparameter(name = "p",			lower = 0.01 ,upper = 0.3 )
-  epochs = CSH.UniformIntegerHyperparameter(name = "epochs", lower = 1, upper = 10)
-  augmentations = CSH.UniformIntegerHyperparameter(name = "augmentations", lower = 10, upper = 500)
-  channels = CSH.UniformIntegerHyperparameter(name = "channels", lower = 20 ,upper = 100)
-  layers = CSH.UniformIntegerHyperparameter(name = "layers", lower = 3, upper = 12)
+  epochs = CSH.UniformIntegerHyperparameter(name = "epochs", lower = 2, upper = 4)
+  augmentations = CSH.UniformIntegerHyperparameter(name = "augmentations", lower = 50, upper = 150)
+  channels = CSH.UniformIntegerHyperparameter(name = "channels", lower = 20 ,upper = 30)
+  layers = CSH.UniformIntegerHyperparameter(name = "layers", lower = 3, upper = 6)
   c1 = CSH.UniformFloatHyperparameter(name = "c1_weight" , lower = 1,upper = 5)
     ###Topology Definition]###
 
   hp_list = [
         #c0,
         c1,
-        window_size,
         #jitter_weight ,
         #scaling_weight ,
         #rotation_weight ,

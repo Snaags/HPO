@@ -18,12 +18,13 @@ from HPO.utils.files import save_obj
   
 def compute(hyperparameter,budget = 4, in_model = None , train_dataset = None):
   if train_dataset == None:
-    train_dataset = Train_repsol_full(hyperparameter["window_size"], augmentations = True)
+    train_dataset = Train_repsol_full(hyperparameter["augmentations"], augmentations = True)
 
-  test_dataset = Test_repsol_full(hyperparameter["window_size"])
+
+  test_dataset = Test_repsol_full()
 
   num_classes =  train_dataset.get_n_classes()
-  batch_size = 4
+  batch_size = 16
   train_dataloader = DataLoader( train_dataset, batch_size=batch_size,
     shuffle = True,drop_last=True,pin_memory=True , collate_fn = collate_fn_padd)
 
@@ -48,7 +49,7 @@ def compute(hyperparameter,budget = 4, in_model = None , train_dataset = None):
   """
   
   ###Training Configuration
-  train_model(model , hyperparameter, train_dataloader , budget, batch_size)
+  train_model(model , hyperparameter, train_dataloader , hyperparameter["epochs"], batch_size)
   with torch.no_grad(): #disable back prop to test the model
     model = model.eval()
     correct = 1
@@ -78,7 +79,7 @@ def compute(hyperparameter,budget = 4, in_model = None , train_dataset = None):
   torch.save(model.state_dict() , model_zoo+"-Acc-{}-Rec-{}".format(correct/total, recall_correct/recall_total))
   save_obj( hyperparameter , model_zoo+"hps/"+"-Acc-{}-Rec-{}".format(correct/total, recall_correct/recall_total) )
   torch.cuda.empty_cache()
-  return min([(correct/total), recall_correct/recall_total])
+  return [(correct/total), recall_correct/recall_total]
   
   
 
