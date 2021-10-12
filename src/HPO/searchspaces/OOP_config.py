@@ -79,11 +79,11 @@ def init_config():
     ###Optimiser###
   lr =CSH.UniformFloatHyperparameter(name = "lr",			lower = 0.00001  ,upper = 0.05)
   p =CSH.UniformFloatHyperparameter(name = "p",			lower = 0.01 ,upper = 0.3 )
-  epochs = CSH.UniformIntegerHyperparameter(name = "epochs", lower = 2, upper = 4)
-  augmentations = CSH.UniformIntegerHyperparameter(name = "augmentations", lower = 50, upper = 150)
-  channels = CSH.UniformIntegerHyperparameter(name = "channels", lower = 20 ,upper = 30)
-  layers = CSH.UniformIntegerHyperparameter(name = "layers", lower = 3, upper = 6)
-  c1 = CSH.UniformFloatHyperparameter(name = "c1_weight" , lower = 1,upper = 5)
+  epochs = CSH.UniformIntegerHyperparameter(name = "epochs", lower = 1, upper = 8)
+  augmentations = CSH.UniformIntegerHyperparameter(name = "augmentations", lower = 40, upper = 300)
+  channels = CSH.UniformIntegerHyperparameter(name = "channels", lower = 10,upper = 100)
+  layers = CSH.UniformIntegerHyperparameter(name = "layers", lower = 2, upper = 8)
+  c1 = CSH.UniformFloatHyperparameter(name = "c1_weight" , lower = 1,upper = 3)
     ###Topology Definition]###
 
   hp_list = [

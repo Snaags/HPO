@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 def collate_fn_padd(batch):
     '''
     Padds batch of variable length
-
+    
     note: it converts things ToTensor manually here since the ToTensor transform
     assume it takes in images rather than arbitrary tensors.
     '''
@@ -69,7 +69,9 @@ def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tens
 
 
 
-def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, batch_size : int):
+def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, batch_size : int, cuda_device = None):
+  if cuda_device == None:
+    cuda_device = torch.cuda.current_device()
   n_iter = len(dataloader) 
   optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["lr"])
   if "c1" in hyperparameter:
@@ -83,19 +85,17 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
     for i, (samples, labels) in enumerate( dataloader ):
       # zero the parameter gradients
       optimizer.zero_grad()
-
-    
-      samples = samples.cuda(non_blocking=True)
-      labels = labels.cuda(non_blocking=True)
+      samples = samples.cuda(non_blocking=True, device = cuda_device)
+      labels = labels.cuda(non_blocking=True, device = cuda_device)
       if batch_size > 1:
         labels = labels.long().view( batch_size  )
       else:
         labels = labels.long().view( 1 )
-      outputs = model(samples.float())
+      outputs = model(samples.float()).cuda(device = cuda_device)
       # forward + backward + optimize
       if batch_size == 1:
         outputs = outputs.view(batch_size,outputs.shape[0])
-      loss = criterion(outputs, labels)
+      loss = criterion(outputs, labels).cuda(device = cuda_device)
       loss.backward()
       optimizer.step()
       if i %10 == 0:

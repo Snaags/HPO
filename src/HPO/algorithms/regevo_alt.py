@@ -8,6 +8,7 @@ import random
 import matplotlib.pyplot as plt 
 import numpy as np
 from HPO.utils.visualisation import plot_scores
+from HPO.algorithms.algorithm_utils import train_eval 
 ###Tounament Selection/Aging Selection
   #
   #parameters:
@@ -30,36 +31,36 @@ from HPO.utils.visualisation import plot_scores
 #
 
 
-
 class Model:
-  def __init__(self):
+  def __init__(self, cs):
     self._arch = None
     self.accuracy = 0
+    self.cs = cs
 
   def set_arch(self, arch):
     self._arch = arch
-  
+  def exchange_one( key : str ):
+    new_hp = self.cs.sample_configuration().get_dictionary()[key]
+    
+    print("Old value: {}").format(self._arch.get_dictionary()[key])
+    self._arch[key] = new_hp
+    print("New value: {}").format(self._arch.get_dictionary()[key])
+    
+
   def set_value(self, name, value):
     self._arch[name] = value
   def get_params(self):
     return list(self.arch().keys())
   def arch(self):
-    return self._arch.get_dictionary()
+    return self._arch
 
-def train_and_eval_population(worker, population, sample_batch, train = None, test= None):
+def train_and_eval_population(worker, population, sample_batch, train):
   configs = []
   for model in population:
     configs.append(model.arch())
   
-  with Pool(processes = sample_batch,maxtasksperchild = 1) as pool:
-      results = pool.map(worker, configs)
-      torch.cuda.empty_cache()
-      pool.close()
-      torch.cuda.empty_cache()
-      pool.join()
-      torch.cuda.empty_cache()
-
-  for mod,result in zip(population,results):
+  acc , _rec , _config = train.eval( configs )
+  for mod,result in zip(population, acc):
     mod.accuracy = result
 
 def Mutate(cs, parent_model : Model) -> Model:
@@ -85,7 +86,14 @@ def Mutate(cs, parent_model : Model) -> Model:
     print("Old operation: ", old_op)
     print("New operation: ", model.arch()[parameter_name])
     return model
- 
+  
+  def cont_mutation( model : Model , operation_number : int ):
+    op_list = ["lr","augmentations" , "c1" , "epochs" , "layers" , "channels", "p" ]
+    model.exchange_one(random.choice(op_list))
+    return model
+    
+    
+     
   def hidden_state_mutation(parent : Model, operation_number : int) -> Model:
     #Select 1 of the inputs at random
     parameter_name = "normal_cell_1_ops_"+operation_number+"_input_"+str(random.randint(1,2))
@@ -105,7 +113,7 @@ def Mutate(cs, parent_model : Model) -> Model:
     print("New operation: ", model.arch()[parameter_name])
     return model
 
-  return random.choice([op_mutation, hidden_state_mutation])(model ,select_operation(model))    
+  return random.choice([op_mutation, hidden_state_mutation , cont_mutation])(model ,select_operation(model))    
 
 
 def regularized_evolution(configspace, worker , cycles, population_size, sample_size, sample_batch_size):
@@ -128,14 +136,15 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
   history = []  # Not used by the algorithm, only used to report results.
 
   CS = configspace
+  train = train_eval( worker, sample_batch_size, "RegEvo.csv"  )
   # Initialize the population with random models.
   while len(population) < population_size:
-    model = Model()
+    model = Model( CS )
     model.set_arch( CS.sample_configuration() )
     population.append(model)
     history.append(model)
 
-  train_and_eval_population(worker, population, sample_batch_size)
+  train_and_eval_population(worker, population, sample_batch_size, train )
 
   # Carry out evolution in cycles. Each cycle produces a model and removes
   # another.
@@ -182,18 +191,14 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
       for i in history:
         accuracy_scores.append(i.accuracy)
 
-      with open("RegEvo.csv", "w") as csvfile:
-        writer = csv.writer(csvfile)
-        for i in history:
-          writer.writerow([i.accuracy,i.arch()]) 
       plot_scores(accuracy_scores)
   return history
 
 
 def main(worker, configspace):
-  pop_size = 100
-  evaluations = 1000
-  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =25, sample_batch_size = 3)
+  pop_size = 30
+  evaluations = 50
+  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =25, sample_batch_size = 9)
   Architectures = []
   accuracy_scores = []
   generations = list(range(evaluations))

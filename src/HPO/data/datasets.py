@@ -358,9 +358,9 @@ class Test_TEPS_split_binary(TEPS_split_binary):
 
 class repsol_full(Dataset):
   def __init__(self, augmentations_num, files : list, path_dir : str, augmentations):
-    path = "/home/snaags/scripts/datasets/"+path_dir
+    path = "{}/scripts/datasets/".format(os.environ["HOME"])+path_dir
     data = []
-    self.path ="/home/snaags/scripts/datasets/"
+    self.path ="{}/scripts/datasets/".format(os.environ["HOME"])
     self.aug_path = self.path + "repsol_augmented/"
     self.x_index_address = {}
     self.y_index_address = {}
@@ -456,7 +456,7 @@ class repsol_full(Dataset):
 class Train_repsol_full(repsol_full):
 
   def __init__(self, augmentations_num = 200, augmentations = True): 
-    path = "/home/snaags/scripts/datasets/repsol_train"
+    path = "{}/scripts/datasets/repsol_train".format(os.environ["HOME"])
     train_files = os.listdir(path)
     path_dir = "repsol_train/"
     super().__init__(augmentations_num, train_files,path_dir, augmentations)
@@ -464,7 +464,7 @@ class Train_repsol_full(repsol_full):
 class Test_repsol_full(repsol_full):
 
   def __init__(self, augmentations_num = 200, augmentations = False): 
-    path = "/home/snaags/scripts/datasets/repsol_test"
+    path = "{}/scripts/datasets/repsol_test".format(os.environ["HOME"])
     test_files = os.listdir(path)
     path_dir = "repsol_test/"
     super().__init__(augmentations_num, test_files ,path_dir, augmentations)
@@ -472,7 +472,7 @@ class Test_repsol_full(repsol_full):
 class repsol_unlabeled(Dataset):
   def __init__(self, window_size = 1000):
     self.soft_labels = False
-    path = "/home/snaags/scripts/datasets/repsol_unlabeled/"
+    path = "{}/scripts/datasets/repsol_unlabeled".format(os.environ["HOME"])
     data = []
     self.index_address = {}
 
