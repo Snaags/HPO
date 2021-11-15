@@ -39,12 +39,12 @@ class Model:
 
   def set_arch(self, arch):
     self._arch = arch
-  def exchange_one( key : str ):
+  def exchange_one( self , key : str ):
     new_hp = self.cs.sample_configuration().get_dictionary()[key]
     
-    print("Old value: {}").format(self._arch.get_dictionary()[key])
+    print("Old value: {}".format(self._arch.get_dictionary()[key]))
     self._arch[key] = new_hp
-    print("New value: {}").format(self._arch.get_dictionary()[key])
+    print("New value: {}".format(self._arch.get_dictionary()[key]))
     
 
   def set_value(self, name, value):
@@ -88,7 +88,7 @@ def Mutate(cs, parent_model : Model) -> Model:
     return model
   
   def cont_mutation( model : Model , operation_number : int ):
-    op_list = ["lr","augmentations" , "c1" , "epochs" , "layers" , "channels", "p" ]
+    op_list = ["lr","augmentations" , "c1_weight" , "epochs" , "layers" , "channels", "T_0", "T_mult", "batch_size" ]
     model.exchange_one(random.choice(op_list))
     return model
     
@@ -172,7 +172,7 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
       children.append(child)
 
     else:
-      train_and_eval_population(worker, children, sample_batch_size)
+      train_and_eval_population(worker, children, sample_batch_size, train)
       for i in children:
         population.append(i)
         history.append(i)
@@ -196,9 +196,9 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
 
 
 def main(worker, configspace):
-  pop_size = 30
-  evaluations = 50
-  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =25, sample_batch_size = 9)
+  pop_size = 100
+  evaluations = 2500
+  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =25, sample_batch_size = 15)
   Architectures = []
   accuracy_scores = []
   generations = list(range(evaluations))
@@ -217,7 +217,6 @@ def main(worker, configspace):
   indexs = accuracy_scores.index(max(accuracy_scores))
   print("Best accuracy: ", accuracy_scores[indexs])
   print("Best Hyperparameters: ", Architectures[indexs]())
-  print("True Validation Score: ",worker.validate(Architectures[indexs]()))
 
 
 

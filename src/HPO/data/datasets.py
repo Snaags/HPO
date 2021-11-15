@@ -357,33 +357,34 @@ class Test_TEPS_split_binary(TEPS_split_binary):
 
 
 class repsol_full(Dataset):
-  def __init__(self, augmentations_num, files : list, path_dir : str, augmentations, sections : list):
+
+  def __init__(self, augmentations_num, files : list, path_dir : str, augmentations, gen_augs = False):
     path = "{}/scripts/datasets/".format(os.environ["HOME"])+path_dir
     data = []
     self.path ="{}/scripts/datasets/".format(os.environ["HOME"])
     self.aug_path = self.path + "repsol_augmented/"
     self.x_index_address = {}
     self.y_index_address = {}
-    gen_augs = False
     augmentations_per_batch = 2
     #index_list sum()
     if augmentations == True:
-      self.non_warp_augmentations =[jitter, scaling, rotation, permutation ]
-      self.warp_augmentations = [magnitude_warp, time_warp, window_slice]
+      self.non_warp_augmentations =[jitter, scaling ,permutation]
+      self.warp_augmentations = [time_warp,magnitude_warp, window_slice]
     for i in files:
-      for section in sections:
-        if section in i: 
-          data.append(np.reshape(np.load(path+i),(-1,28)))
-    self.current_index = 0
+      data.append(np.reshape(np.load(path+i),(-1,28)))
+    self.current_index = -1
     use_all = True
     multi_aug = augmentations_num
-
+    self.aug_source_dict = {} 
   
+    self.real_samples = len(data)
+    print(self.real_samples)
     for datapoint, batch in enumerate(data):
       batch_x = batch[:,1:]
       batch_y = batch[:,0]
       self.add_to_dataset(batch_x,batch_y)
-      
+      self.real_data_index = self.current_index
+      self.aug_source_dict[self.real_data_index] = []
       if augmentations:
         if gen_augs == True:
           if use_all == True:
@@ -394,6 +395,8 @@ class repsol_full(Dataset):
                   x = augs.pop(random.randint(0,len(augs) -1))(x)
               #self.save_2_file(x.reshape(*x.shape[1:]),batch_y , datapoint , _)
               self.add_to_dataset(x.reshape(*x.shape[1:]),batch_y)
+              print("augment {} completed at sample: {}".format(self.current_index, datapoint), end = "\r")
+              self.aug_source_dict[self.real_data_index].append(self.current_index)
           else:
             for i in range(augmentations_per_batch):
               augmentations_for_current_batch = []
@@ -427,6 +430,9 @@ class repsol_full(Dataset):
       batch_y = batch[:,0]
       self.add_to_dataset(batch_x,batch_y)
 
+  def get_linked(self, idx):
+    return self.aug_source_dict[idx]
+
   def add_to_dataset(self,x,y):
 
     self.x_index_address[self.current_index] = torch.from_numpy(x.reshape(x.shape[1], x.shape[0]))
@@ -447,6 +453,9 @@ class repsol_full(Dataset):
   
   def get_n_classes(self):
     return self.n_classes
+  
+  def get_n_features(self):
+    return self.features
   def get_n_samples(self):
     return self.n_samples
 
@@ -469,6 +478,14 @@ class Test_repsol_full(repsol_full):
     test_files = os.listdir(path)
     path_dir = "repsol_test/"
     super().__init__(augmentations_num, test_files ,path_dir, augmentations, sections)
+
+class Mixed_repsol_full(repsol_full):
+
+  def __init__(self, augmentations = 171, augmentations_on = True): 
+    path = "{}/scripts/datasets/repsol_mixed".format(os.environ["HOME"])
+    test_files = os.listdir(path)
+    path_dir = "repsol_mixed/"
+    super().__init__(augmentations, test_files ,path_dir, augmentations_on , gen_augs= True)
 
 class repsol_unlabeled(Dataset):
   def __init__(self, window_size = 500):
@@ -537,3 +554,68 @@ class repsol_unlabeled(Dataset):
 
 
 
+class repsol_feature(Dataset):
+  def __init__(self,name):
+    self.path = "{}/scripts/datasets/repsol_features/".format(os.environ["HOME"])
+    self.data = np.load(self.path+name)
+      
+    self.n_classes = 2
+    self.n_samples = self.data.shape[0]
+    self.n_features = self.data.shape[1] - 1
+
+  def __getitem__(self, index):
+    #index_address keys are the first usable index in a batch for the window size
+    #this means the index
+    x = self.data[index,1:]
+    y = self.data[index,0]
+    return x , y
+  
+  def get_n_classes(self):
+    return self.n_classes
+  
+  def get_n_features(self):
+    return self.n_features
+
+  def get_n_samples(self):
+    return self.n_samples
+  
+  def __len__(self):
+    return self.n_samples 
+    
+
+
+class Train_repsol_feature(repsol_feature):
+  def __init__(self): 
+    super().__init__("train_selected.npy")
+
+class Test_repsol_feature(repsol_feature):
+  def __init__(self): 
+    super().__init__("test_selected.npy")
+
+class Mixed_repsol_feature(repsol_feature):
+  def __init__(self): 
+    super().__init__("full_selected.npy")
+
+
+class Subset(Dataset):
+    """
+    Subset of a dataset at specified indices.
+    Arguments:
+        dataset (Dataset): The whole Dataset
+        indices (sequence): Indices in the whole set selected for subset
+    """
+    def __init__(self, dataset, indices):
+        self.dataset = dataset
+        self.indices = indices
+
+    def __len__(self):
+        if self.indices.shape == ():
+            return 1
+        else:
+            return len(self.indices)
+    def get_n_classes(self):
+      return self.dataset.get_n_classes()
+    def get_n_features(self):
+      return self.dataset.get_n_features()
+    def __getitem__(self, idx):
+        return self.dataset[self.indices[idx]]

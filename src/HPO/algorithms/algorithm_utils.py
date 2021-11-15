@@ -4,7 +4,7 @@ import csv
 from pynvml import *
 def assign_gpu():
   nvmlInit()
-  max_memory = 2500000000
+  max_memory = 1500000000
   count = nvmlDeviceGetCount()  
   gpu_list = []
   for i in range(count):
@@ -27,15 +27,18 @@ class train_eval:
     self.gpu_slots = multiprocessing.Queue()
     self.num_worker = num_worker
     self.results = multiprocessing.Queue()
-    self.processes = []
-    self.acc_list = []
-    self.recall_list = []
-    self.config_list = []
+    self.acc_list_full = []
+    self.recall_list_full = []
+    self.config_list_full = []
     self.filename = filename
     self.worker = worker
 
   def eval(self, population ):
+    self.acc_list = []
+    self.recall_list = []
+    self.config_list = []
        
+    self.processes = []
     gpu = assign_gpu()
     
     for i in population:
@@ -70,9 +73,12 @@ class train_eval:
     in_pop_dict_list = []
     for i in in_pop:
       in_pop_dict_list.append(i.get_dictionary())
+    print("Length of pop {}".format(len(in_pop)))
+    print("Length of accuracy list  {}".format(len(self.acc_list)))
+    print("Length of accuracy full list  {}".format(len(self.acc_list_full)))
     for i in self.config_list:
-      out_acc.append(in_pop_dict_list.index(i)) 
-      out_recall.append(in_pop_dict_list.index(i)) 
+      out_acc.append(self.acc_list[in_pop_dict_list.index(i)])
+      out_recall.append(self.recall_list[in_pop_dict_list.index(i)]) 
     return out_acc , out_recall , in_pop_dict_list
        
  
@@ -82,10 +88,13 @@ class train_eval:
       self.acc_list.append(out[1])
       self.recall_list.append(out[2])
       self.config_list.append(out[0])
-      print("Number of models evaluated: ", len(self.acc_list))
+      self.acc_list_full.append(out[1])
+      self.recall_list_full.append(out[2])
+      self.config_list_full.append(out[0])
+      print("Number of models evaluated: ", len(self.acc_list_full))
       with open(self.filename, "w") as csvfile:
         writer = csv.writer(csvfile)
-        for acc , recall , config in zip(self.acc_list , self.recall_list , self.config_list):
+        for acc , recall , config in zip(self.acc_list_full , self.recall_list_full , self.config_list_full):
           writer.writerow([acc, recall , config]) 
   
 

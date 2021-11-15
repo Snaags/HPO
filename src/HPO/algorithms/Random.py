@@ -6,8 +6,10 @@ from HPO.algorithms.algorithm_utils import train_eval
 
 def main(worker, configspace : ConfigurationSpace):
   
+
   TOTAL_EVALUATIONS = 10
   cores = 1
+
   train = train_eval( worker , cores , filename = "Random.csv")
   configs = configspace.sample_configuration(TOTAL_EVALUATIONS)
   scores ,recall , pop= train.eval(configs)

@@ -1,2 +1,4 @@
 src/HPO/model_zoo/*
 *.swp
+*.csv
+*.png
