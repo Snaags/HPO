@@ -98,7 +98,8 @@ class Model(nn.Module):
 
   def reset_stem(self,in_features : int):
     self.in_conv = ops.StdConv(in_features, self.channels)
-
+  def get_channels(self):
+    return self.channels
   def reset_fc(self, output_size : int ):
     self.fc_list = nn.ModuleList()
     channels = self.channels
@@ -152,7 +153,6 @@ class Model(nn.Module):
     if self.one_fc_layer == True:
       for i in self.fc_list:
         x = i(x)
-    x = self.fc(x)
 
     #x = self.outact(x)
     return x  
@@ -179,7 +179,8 @@ class Model(nn.Module):
     return x  
 
   def forward(self,x):
-    return self._forward(x)
+    x=self._forward(x)
+    return self.fc(x)
 
 class Ops(nn.Module):
   def __init__(self, parameters, channels_in,channels_out, p):

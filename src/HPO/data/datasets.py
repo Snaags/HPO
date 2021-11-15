@@ -357,7 +357,7 @@ class Test_TEPS_split_binary(TEPS_split_binary):
 
 
 class repsol_full(Dataset):
-  def __init__(self, augmentations_num, files : list, path_dir : str, augmentations):
+  def __init__(self, augmentations_num, files : list, path_dir : str, augmentations, sections : list):
     path = "{}/scripts/datasets/".format(os.environ["HOME"])+path_dir
     data = []
     self.path ="{}/scripts/datasets/".format(os.environ["HOME"])
@@ -371,8 +371,9 @@ class repsol_full(Dataset):
       self.non_warp_augmentations =[jitter, scaling, rotation, permutation ]
       self.warp_augmentations = [magnitude_warp, time_warp, window_slice]
     for i in files:
-
-      data.append(np.reshape(np.load(path+i),(-1,28)))
+      for section in sections:
+        if section in i: 
+          data.append(np.reshape(np.load(path+i),(-1,28)))
     self.current_index = 0
     use_all = True
     multi_aug = augmentations_num
@@ -455,24 +456,24 @@ class repsol_full(Dataset):
 
 class Train_repsol_full(repsol_full):
 
-  def __init__(self, augmentations_num = 200, augmentations = True): 
+  def __init__(self, augmentations_num = 200, augmentations = True , sections = [ "1A", "1B", "1C"]): 
     path = "{}/scripts/datasets/repsol_train".format(os.environ["HOME"])
     train_files = os.listdir(path)
     path_dir = "repsol_train/"
-    super().__init__(augmentations_num, train_files,path_dir, augmentations)
+    super().__init__(augmentations_num, train_files,path_dir, augmentations , sections)
 
 class Test_repsol_full(repsol_full):
 
-  def __init__(self, augmentations_num = 200, augmentations = False): 
+  def __init__(self, augmentations_num = 200, augmentations = False , sections = [ "1A", "1B", "1C" ]): 
     path = "{}/scripts/datasets/repsol_test".format(os.environ["HOME"])
     test_files = os.listdir(path)
     path_dir = "repsol_test/"
-    super().__init__(augmentations_num, test_files ,path_dir, augmentations)
+    super().__init__(augmentations_num, test_files ,path_dir, augmentations, sections)
 
 class repsol_unlabeled(Dataset):
-  def __init__(self, window_size = 1000):
+  def __init__(self, window_size = 500):
     self.soft_labels = False
-    path = "{}/scripts/datasets/repsol_unlabeled".format(os.environ["HOME"])
+    path = "{}/scripts/datasets/repsol_unlabeled/".format(os.environ["HOME"])
     data = []
     self.index_address = {}
 

@@ -87,7 +87,9 @@ def window_slice(x, reduce_ratio=0.85):
             ret[i,:,dim] = np.interp(np.linspace(0, target_len, num=x.shape[1]), np.arange(target_len), pat[starts[i]:ends[i],dim]).T
     return ret
 
-
+def crop(x):
+  ratio = random.random()/2
+  return x
 if __name__ == "__main__":
     funcs = [jitter, scaling, rotation, permutation , magnitude_warp, time_warp, window_slice]
     for i in funcs:

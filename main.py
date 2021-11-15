@@ -1,4 +1,4 @@
-from HPO.algorithms.regevo_alt import main as  _algorithm
+from HPO.algorithms.Random import main as  _algorithm
 from HPO.workers.repsol_worker_full import compute as _worker
 
 from HPO.searchspaces.OOP_config import init_config as _config

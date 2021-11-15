@@ -79,8 +79,8 @@ def init_config():
     ###Optimiser###
   lr =CSH.UniformFloatHyperparameter(name = "lr",			lower = 0.00001  ,upper = 0.05)
   p =CSH.UniformFloatHyperparameter(name = "p",			lower = 0.01 ,upper = 0.3 )
-  epochs = CSH.UniformIntegerHyperparameter(name = "epochs", lower = 1, upper = 8)
-  augmentations = CSH.UniformIntegerHyperparameter(name = "augmentations", lower = 40, upper = 300)
+  epochs = CSH.UniformIntegerHyperparameter(name = "epochs", lower = 1, upper = 2)
+  augmentations = CSH.UniformIntegerHyperparameter(name = "augmentations", lower = 40, upper = 200)
   channels = CSH.UniformIntegerHyperparameter(name = "channels", lower = 10,upper = 100)
   layers = CSH.UniformIntegerHyperparameter(name = "layers", lower = 2, upper = 8)
   c1 = CSH.UniformFloatHyperparameter(name = "c1_weight" , lower = 1,upper = 3)

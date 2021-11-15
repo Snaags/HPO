@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from .._internally_replaced_utils import load_state_dict_from_url
 
 
 __all__ = [
@@ -33,20 +32,22 @@ model_urls = {
     "wide_resnet101_2": "https://download.pytorch.org/models/wide_resnet101_2-32ee1156.pth",
 }
 
-
-def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv1d:
+def conv(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1, kernel = 3) -> nn.Conv1d:
     """3x3 convolution with padding"""
     return nn.Conv1d(
         in_planes,
         out_planes,
-        kernel_size=3,
+        kernel_size=kernel,
         stride=stride,
-        padding=dilation,
+        padding="same",
         groups=groups,
         bias=False,
         dilation=dilation,
     )
 
+
+def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv1d:
+  return conv(in_planes, out_planes, stride, groups, dilation , kernel = 3 )
 
 def conv1x1(in_planes: int, out_planes: int, stride: int = 1) -> nn.Conv1d:
     """1x1 convolution"""
@@ -66,6 +67,7 @@ class BasicBlock(nn.Module):
         base_width: int = 64,
         dilation: int = 1,
         norm_layer: Optional[Callable[..., nn.Module]] = None,
+        kernel = 3
     ) -> None:
         super(BasicBlock, self).__init__()
         if norm_layer is None:
@@ -75,10 +77,10 @@ class BasicBlock(nn.Module):
         if dilation > 1:
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
-        self.conv1 = conv3x3(inplanes, planes, stride)
+        self.conv1 = conv(inplanes, planes, stride, kernel = kernel)
         self.bn1 = norm_layer(planes)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(planes, planes)
+        self.conv2 = conv(planes, planes, kernel = kernel)
         self.bn2 = norm_layer(planes)
         self.downsample = downsample
         self.stride = stride
@@ -165,7 +167,7 @@ class ResNet(nn.Module):
         self,
         block: Type[Union[BasicBlock, Bottleneck]],
         layers: List[int],
-        num_classes: int = 1000,
+        num_classes: int = 2,
         zero_init_residual: bool = False,
         groups: int = 1,
         width_per_group: int = 64,
@@ -174,7 +176,7 @@ class ResNet(nn.Module):
     ) -> None:
         super(ResNet, self).__init__()
         if norm_layer is None:
-            norm_layer = nn.BatchNorm2d
+            norm_layer = nn.BatchNorm1d
         self._norm_layer = norm_layer
 
         self.inplanes = 64
@@ -190,21 +192,20 @@ class ResNet(nn.Module):
             )
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv1 = nn.Conv1d(27, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.maxpool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
+        self.layer1 = self._make_layer(block, 64, layers[0], kernel = 8)
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=1, dilate=replace_stride_with_dilation[0] , kernel = 5)
+        self.layer3 = self._make_layer(block, 128, layers[2], stride=1, dilate=replace_stride_with_dilation[1], kernel = 3)
+        self.avgpool = nn.AdaptiveAvgPool1d((1))
+        self.fc = nn.Linear(128 * block.expansion, num_classes)
 
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
+            if isinstance(m, nn.Conv1d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
-            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+            elif isinstance(m, (nn.BatchNorm1d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
@@ -225,6 +226,7 @@ class ResNet(nn.Module):
         blocks: int,
         stride: int = 1,
         dilate: bool = False,
+        kernel = 3
     ) -> nn.Sequential:
         norm_layer = self._norm_layer
         downsample = None
@@ -241,8 +243,7 @@ class ResNet(nn.Module):
         layers = []
         layers.append(
             block(
-                self.inplanes, planes, stride, downsample, self.groups, self.base_width, previous_dilation, norm_layer
-            )
+                self.inplanes, planes, stride, downsample, self.groups, self.base_width, previous_dilation, norm_layer, kernel = kernel)
         )
         self.inplanes = planes * block.expansion
         for _ in range(1, blocks):
@@ -254,6 +255,7 @@ class ResNet(nn.Module):
                     base_width=self.base_width,
                     dilation=self.dilation,
                     norm_layer=norm_layer,
+                    kernel = kernel
                 )
             )
 
@@ -269,7 +271,6 @@ class ResNet(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
-        x = self.layer4(x)
 
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
@@ -305,7 +306,7 @@ def resnet18(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    return _resnet("resnet18", BasicBlock, [2, 2, 2, 2], pretrained, progress, **kwargs)
+    return _resnet("resnet18", BasicBlock, [3, 3, 3], pretrained, progress, **kwargs)
 
 
 

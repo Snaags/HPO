@@ -1,11 +1,50 @@
-
+import random
 import torch
 import torch.nn as nn
 import numpy as np
 from torch import Tensor
 from HPO.utils.model_constructor import Model
 from torch.utils.data import DataLoader
+from HPO.utils.time_series_augmentation import jitter, scaling , rotation, permutation, magnitude_warp, time_warp, window_slice
 
+class WeightTest:
+  def __init__(self, model):
+    self.count_dict = {}
+    self.model = model
+    for name, param in self.model.named_parameters():
+      if 'weight' in name:
+        self.count_dict[name] = 0
+  def step(self):
+    for name, param in self.model.named_parameters():
+      if ('weight' in name) and (name != "nets.0.fc.weight"):
+        print("Name: {}".format(name))
+        temp = torch.zeros(param.grad.shape)
+        temp[param.grad != 0] += 1
+        self.count_dict[name] += temp
+        print("Weight {} updates: {}".format(name, min(self.count_dict[name])))
+
+class BarlowTwins(nn.Module):
+  def __init__(self, model):
+     super().__init__()
+     layers = []
+     self.nets = nn.ModuleList()
+     self.nets.append(model)
+     self.model = model
+     size = model.get_channels()
+     for i in range(2):
+         if i ==0:
+           layers.append(nn.Linear(size, size*4, bias=False))
+         else:
+           layers.append(nn.Linear(size*4, size*4, bias=False))
+         layers.append(nn.BatchNorm1d(size*4))
+         layers.append(nn.ReLU(inplace=True))
+     layers.append(nn.Linear(size*4, size*4, bias=False))
+     self.projector = nn.Sequential(*layers)
+     self.nets.append(self.projector)
+  def forward(self , x): 
+    x = self.nets[0]._forward(x)
+    x = self.nets[1](x)
+    return x
 def collate_fn_padd(batch):
     '''
     Padds batch of variable length
@@ -77,6 +116,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   if "c1" in hyperparameter:
     criterion = nn.CrossEntropyLoss(torch.Tensor([1, hyperparameter["c1"]]))
   criterion = nn.CrossEntropyLoss()
+  weight_test = WeightTest(model)
   epoch = 0
   peak_acc = 0
   while epoch < epochs:
@@ -104,3 +144,79 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
     #dataloader.set_iterator()
   print()
   print("Num epochs: {}".format(epoch))
+
+
+
+def train_model_bt(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, batch_size : int, cuda_device = None, validation_set = None):
+  if cuda_device == None:
+    cuda_device = torch.cuda.current_device()
+  n_iter = len(dataloader) 
+  bt = BarlowTwins(model).cuda(device = cuda_device)
+  optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["lr"])
+  criterion = barlow_twins
+  epoch = 0
+  weight_test = WeightTest(bt)
+  peak_acc = 0
+  while epoch < epochs:
+    for i, samples in enumerate( dataloader ):
+      # zero the parameter gradients
+      optimizer.zero_grad()
+      loss = criterion(bt , samples, cuda_device = cuda_device)
+      # forward + backward + optimize
+      loss.backward()
+      #weight_test.step()
+      optimizer.step()
+      if i %10 == 0:
+        print("Epoch: {}/{} - Iteration: {}/{} - Loss: {} ".format(epoch , epochs,i, n_iter , loss.item()))
+    epoch += 1 
+    #dataloader.set_iterator()
+  print()
+  print("Num epochs: {}".format(epoch))
+
+
+
+def augment(x):
+  augs = [jitter, scaling ]
+  extra = [ rotation, permutation]# magnitude_warp, time_warp]
+  x = x.cpu().numpy()
+  for i in augs:
+    x = i(x)
+  for i in extra:
+    if random.random() > 0.3:
+      x = i(x)
+  return torch.Tensor(x)
+def barlow_twins(model, batch, cuda_device = None):
+  N = batch.shape[0] #Batch Size
+  lmbda = 0.005
+  #Generate Augmented
+  y_a = augment(batch)  
+  y_b = augment(batch)
+  
+  #Generate network embeddings
+  z_a = model(y_a.cuda(device = cuda_device))
+  z_b = model(y_b.cuda(device = cuda_device))
+  D = z_a.shape[1] #Output Dim
+
+  #Normalise
+  z_a_norm = (z_a - z_a.mean(axis = 0)) / z_a.std(axis = 0)
+  z_b_norm = (z_b - z_b.mean(axis = 0)) / z_b.std(axis = 0)
+
+  c = torch.matmul(z_a_norm.T , z_b_norm) / N
+  idn = torch.eye(D).cuda(device = cuda_device)
+  c_diff = torch.pow((c - idn), 2)
+  
+  #Seperate diag
+  c_diff_diag = torch.matmul(c_diff, idn)
+  c_diff_non_diag = torch.matmul( c_diff , torch.ones(D,D).cuda(device = cuda_device) - idn )
+  c_diff_non_diag = c_diff_non_diag * lmbda  
+  c_diff = c_diff_diag + c_diff_non_diag
+
+  loss = c_diff.sum()
+  
+  return loss
+
+
+
+
+
+
