@@ -63,8 +63,8 @@ def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tens
   if acc > peak_acc:
     peak_acc = acc
   # Save the canvas
-  print("Epoch (",str(epoch),"/",str(epochs), ")""Iteration(s) (", str(iteration),"/",str(n_iter), ") Loss: "
-    ,"%.2f" % loss, "Accuracy: ","%.2f" % acc ," Correct / Total : {} / {} ".format(correct , total),  end = '\r')
+  print("Epoch (",str(epoch),"/",str(epochs), ") Accuracy: ","%.2f" % acc, "Iteration(s) (", str(iteration),"/",str(n_iter), ") Loss: "
+    ,"%.2f" % loss," Correct / Total : {} / {} ".format(correct , total),  end = '\r')
   return correct ,total ,peak_acc
 
 
@@ -74,14 +74,20 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
     cuda_device = torch.cuda.current_device()
   n_iter = len(dataloader) 
   optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["lr"])
+  #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = hyperparameter["lr_step"])
+  scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0 = hyperparameter["T_0"] , T_mult = hyperparameter["T_mult"])
   if "c1" in hyperparameter:
     criterion = nn.CrossEntropyLoss(torch.Tensor([1, hyperparameter["c1"]]))
   criterion = nn.CrossEntropyLoss()
   epoch = 0
   peak_acc = 0
+
+  total = 0
+  correct = 0
   while epoch < epochs:
-    total = 0
-    correct = 0
+    if epoch % 3 == 0:
+      total = 0
+      correct = 0
     for i, (samples, labels) in enumerate( dataloader ):
       # zero the parameter gradients
       optimizer.zero_grad()
@@ -98,8 +104,10 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
       loss = criterion(outputs, labels).cuda(device = cuda_device)
       loss.backward()
       optimizer.step()
-      if i %10 == 0:
+      if i %5 == 0:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter)
+
+    scheduler.step()
     epoch += 1 
     #dataloader.set_iterator()
   print()

@@ -63,6 +63,7 @@ class Model(nn.Module):
     super(Model,self).__init__()
     self.one_fc_layer = one_fc_layer
     self.log_flag = True
+    self.p = 0
     self.logger = DataShapeLogger("logger.txt")
     self.hyperparameters = hyperparameters  
     self.channels = hyperparameters["channels"]
@@ -71,8 +72,6 @@ class Model(nn.Module):
       self.output_dict = output_dict
     self.normal_cells = nn.ModuleList()
     self.reduction_cells = nn.ModuleList()
-    self.p = hyperparameters["p"]
-    self.dropout = nn.Dropout(p = self.p)
     self.layers = hyperparameters["layers"]
     if dynamicStem == True:
       self.in_conv = DynamicStem(self.channels)
@@ -95,6 +94,8 @@ class Model(nn.Module):
     else:
       self.fc = nn.Linear(channels, output_size)
     self.outact = nn.Softmax(dim = 1)
+    self.outact_eval = nn.Softmax(dim = 0)
+    
 
   def reset_stem(self,in_features : int):
     self.in_conv = ops.StdConv(in_features, self.channels)
@@ -148,34 +149,29 @@ class Model(nn.Module):
         x = self.reduction_cells[i](x)
     x = self.gap(x)
     x = x.squeeze()
-    x = self.dropout(x)
+    if self.one_fc_layer == True:
+      for i in self.fc_list:
+        x = i(x)
+    x = self.fc(x)
+    if len(x.shape) == 1:
+      x = x.view(1, -1)
+    #x = self.outact(x)
+    return x  
+
+  def _forward_eval(self,x):
+    x = self.in_conv(x)
+    for i in range(self.layers):
+      x = self.normal_cells[i](x) 
+      if i != (self.layers -1):
+        x = self.reduction_cells[i](x)
+    x = self.gap(x)
+    x = x.squeeze()
     if self.one_fc_layer == True:
       for i in self.fc_list:
         x = i(x)
     x = self.fc(x)
 
-    #x = self.outact(x)
-    return x  
-
-  def _forward_log(self,x):
-    self.logger.log("Input Size: ", x.size())
-    x = self.in_conv(x)
-    self.logger.log("After in_conv: ", x.size() )
-    for i in range(self.layers):
-      x = self.normal_cells[i](x) 
-      self.logger.log("Data after Normal Cell ", str(i),": ",x.size())
-      if i != (self.layers -1):
-        x = self.reduction_cells[i](x)
-        self.logger.log("Data after Reduction Cell ", str(i),": ",x.size())
-    self.logger.log("Size of x after cells: ", x.size())
-    x = self.gap(x)
-    self.logger.log("Size of x after gap: ", x.size())
-    self.logger.log("Size of dense input: ", self.channels)
-    x = x.squeeze()
-    for i in self.fc_list:
-      x = i(x)
-    x = self.fc(x)
-    x = self.outact(x)
+    x = self.outact_eval(x)
     return x  
 
   def forward(self,x):

@@ -79,29 +79,34 @@ def init_config():
     ###Optimiser###
   lr =CSH.UniformFloatHyperparameter(name = "lr",			lower = 0.000001  ,upper = 0.05)
   p =CSH.UniformFloatHyperparameter(name = "p",			lower = 0.01 ,upper = 0.3 )
-  epochs = CSH.UniformIntegerHyperparameter(name = "epochs", lower = 1, upper = 3)
-  augmentations = CSH.UniformIntegerHyperparameter(name = "augmentations", lower = 5, upper = 200)
-  channels = CSH.UniformIntegerHyperparameter(name = "channels", lower = 10,upper = 100)
-  layers = CSH.UniformIntegerHyperparameter(name = "layers", lower = 2, upper = 8)
+  epochs = CSH.UniformIntegerHyperparameter(name = "epochs", lower = 1, upper = 150)
+  layers = CSH.UniformIntegerHyperparameter(name = "layers", lower = 1, upper = 4)
   c1 = CSH.UniformFloatHyperparameter(name = "c1_weight" , lower = 1,upper = 3)
-    ###Topology Definition]###
+  batch_size = CSH.UniformIntegerHyperparameter(name = "batch_size", lower = 2, upper = 16)
+  T_0 = CSH.UniformIntegerHyperparameter(name = "T_0", lower = 2, upper = 10)
+  T_mult = CSH.UniformIntegerHyperparameter(name = "T_mult", lower = 1, upper = 5)
 
+  layer_0 = CSH.UniformIntegerHyperparameter(name = "layer_0", lower = 2, upper = 30)
+  layer_1 = CSH.UniformIntegerHyperparameter(name = "layer_1", lower = 2, upper = 30)
+  layer_2 = CSH.UniformIntegerHyperparameter(name = "layer_2", lower = 2, upper = 30)
+  layer_3 = CSH.UniformIntegerHyperparameter(name = "layer_3", lower = 2, upper = 30)
+    ###Topology Definition]###
+  
   hp_list = [
-        #c0,
         c1,
-        #jitter_weight ,
-        #scaling_weight ,
-        #rotation_weight ,
-        #permutation_weight ,
-        #magnitude_weight ,
-        #time_weight ,
-        #window_weight ,
         epochs,
-        augmentations,
-        channels,
         lr,
         p,
-        layers]
+        layers,
+        T_0,
+        T_mult,
+        batch_size,
+        layer_0,
+        layer_1,
+        layer_2,
+        layer_3
+ 
+]
   cs.add_hyperparameters(hp_list)
   return cs
 

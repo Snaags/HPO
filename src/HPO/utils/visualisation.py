@@ -8,3 +8,6 @@ def plot_scores(accuracy_scores):
       plt.grid()
       plt.savefig("livelogging.png",dpi = 800)
       plt.clf()
+
+
+
