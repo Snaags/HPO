@@ -74,7 +74,7 @@ def time_warp(x, sigma=0.2, knot=4):
     return ret
 
 def window_slice(x, reduce_ratio=0.85):
-    # https://halshs.archives-ouvertes.fr/halshs-01357973/document
+    # https:timeit magic//halshs.archives-ouvertes.fr/halshs-01357973/document
     target_len = np.ceil(reduce_ratio*x.shape[1]).astype(int)
     if target_len >= x.shape[1]:
         return x
@@ -87,12 +87,62 @@ def window_slice(x, reduce_ratio=0.85):
             ret[i,:,dim] = np.interp(np.linspace(0, target_len, num=x.shape[1]), np.arange(target_len), pat[starts[i]:ends[i],dim]).T
     return ret
 
-def crop(x):
-  ratio = random.random()/2
-  return x
-if __name__ == "__main__":
-    funcs = [jitter, scaling, rotation, permutation , magnitude_warp, time_warp, window_slice]
-    for i in funcs:
+def window_warp(x, window_ratio=0.1, scales=[0.5, 2.]):
+    # https://halshs.archives-ouvertes.fr/halshs-01357973/document
+    warp_scales = np.random.choice(scales, x.shape[0])
 
-        time_test(i)
+    warp_size = np.ceil(window_ratio*x.shape[1]).astype(int)
+    window_steps = np.arange(warp_size)
+        
+    window_starts = np.random.randint(low=1, high=x.shape[1]-warp_size-1, size=(x.shape[0])).astype(int)
+    window_ends = (window_starts + warp_size).astype(int)
+            
+    ret = np.zeros_like(x)
+    for i, pat in enumerate(x):
+        for dim in range(x.shape[2]):
+            start_seg = pat[:window_starts[i],dim]
+            window_seg = np.interp(np.linspace(0, warp_size-1, num=int(warp_size*warp_scales[i])), window_steps, pat[window_starts[i]:window_ends[i],dim])
+            end_seg = pat[window_ends[i]:,dim]
+            warped = np.concatenate((start_seg, window_seg, end_seg))                
+            ret[i,:,dim] = np.interp(np.arange(x.shape[1]), np.linspace(0, x.shape[1]-1., num=warped.size), warped).T
+    return ret
+
+def window_warp(x, window_ratio=0.1, scales=[0.5, 2.]):
+    # https://halshs.archives-ouvertes.fr/halshs-01357973/document
+    warp_scales = np.random.choice(scales, x.shape[0]) #Scaling for each element in batch
+     
+    warp_size = np.ceil(window_ratio*x.shape[1]).astype(int) #get 0.1*window length
+    window_steps = np.arange(warp_size) #number of these steps 
+        
+    window_starts = np.random.randint(low=1, high=x.shape[1]-warp_size-1, size=(x.shape[0])).astype(int) #Makes array of random values of where to start warp for each batch sample
+    window_ends = (window_starts + warp_size).astype(int) #gets relative end points
+            
+    ret = np.zeros_like(x) #output array
+    for i, pat in enumerate(x): #loop through samples
+        for dim in range(x.shape[2]): # Loop through features
+            start_seg = pat[:window_starts[i],dim]
+
+            window_seg = np.interp(np.linspace(0, warp_size-1, num=int(warp_size*warp_scales[i])), window_steps, pat[window_starts[i]:window_ends[i],dim])
+
+            end_seg = pat[window_ends[i]:,dim]
+            warped = np.concatenate((start_seg, window_seg, end_seg))                
+            ret[i,:,dim] = np.interp(np.arange(x.shape[1]), np.linspace(0, x.shape[1]-1., num=warped.size), warped).T
+    return ret
+timer_set = 0
+def t():
+  global timer_set
+  print(time.time() - timer_set)
+  timer_set = time.time() 
+
+if __name__ == "__main__":
+    import timeit
+    
+    funcs = [jitter, scaling, rotation, permutation , window_warp]
+    batch_size = 512
+    window_length = 500
+    features = 27
+    x = np.random.rand(batch_size, window_length, features)
+
+    for func in funcs:
+      print("Total time for ",func.__name__,": ", timeit.timeit("{}(x)".format(func.__name__), "from __main__ import {}, {}".format(func.__name__, "x"), number = 1) , " Seconds")
           

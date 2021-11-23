@@ -201,6 +201,7 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 128, layers[2], stride=1, dilate=replace_stride_with_dilation[1], kernel = 3)
         self.avgpool = nn.AdaptiveAvgPool1d((1))
         self.fc = nn.Linear(128 * block.expansion, num_classes)
+        self.fcact = nn.Softmax(dim = 1)
 
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
@@ -218,7 +219,8 @@ class ResNet(nn.Module):
                     nn.init.constant_(m.bn3.weight, 0)  # type: ignore[arg-type]
                 elif isinstance(m, BasicBlock):
                     nn.init.constant_(m.bn2.weight, 0)  # type: ignore[arg-type]
-
+    def get_channels(self):
+      return 128
     def _make_layer(
         self,
         block: Type[Union[BasicBlock, Bottleneck]],
@@ -261,7 +263,7 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def _forward_impl(self, x: Tensor) -> Tensor:
+    def _forward(self, x: Tensor) -> Tensor:
         # See note [TorchScript super()]
         x = self.conv1(x)
         x = self.bn1(x)
@@ -274,12 +276,13 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
-        x = self.fc(x)
 
         return x
 
+
     def forward(self, x: Tensor) -> Tensor:
-        return self._forward_impl(x)
+        x = self._forward(x)
+        return self.fcact(self.fc(x))
 
 
 def _resnet(

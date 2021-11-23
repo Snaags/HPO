@@ -1,4 +1,6 @@
 import torch
+import random
+from torch.nn.functional import interpolate
 import time
 import numpy as np
 from operator import itemgetter
@@ -12,7 +14,7 @@ def time_test(func, n = 100, batch_size = 10 , window_length = 1000, features = 
     print("Total time for ",func.__name__,": ", time.time()- start , " Seconds")
 
 
-def jitter(x : torch.Tensor, sigma=0.03):
+def jitter(x : torch.Tensor, sigma=0.05):
     
     n = torch.distributions.normal.Normal(loc=0., scale=sigma)
     return torch.add(x,n.sample(x.shape))
@@ -96,29 +98,42 @@ def magnitude_warp(x : torch.Tensor, sigma=0.2, knot=4):
     return ret
 
 
-   # Example
-
- 
-
-
-
-
-    return x
-
-
-def time_warp(x : torch.Tensor, sigma=0.2, knot=4):
-
-    return x
-
-
-def window_slice(x : torch.Tensor, reduce_ratio=0.9):
-
-    return x
+def window_warp(x : torch.Tensor, ratios = [0.5, 2 ], num_warps = 5):
+  for i in range(num_warps):
+    start = random.randint(1, x.shape[2]-10) 
+    end = min([x.shape[2],start+random.randint(2, x.shape[2])])
+    out= interpolate(x[:,:,start:end], scale_factor = random.choice(ratios))
+    x = torch.cat((x[:,:,:start],out,x[:,:,end:]),dim = 2)
+  
+  return x
 
 if __name__ == "__main__":
 
+    from HPO.data.datasets import Test_repsol_full , Mixed_repsol_full
+    import torch.nn as nn
+    from torch import Tensor
+    from torch.utils.data import DataLoader
+    import random
+    from HPO.utils.time_series_augmentation import permutation , magnitude_warp, time_warp
+    from HPO.utils.time_series_augmentation_torch import jitter, scaling, rotation
+    from HPO.utils.worker_helper import train_model, collate_fn_padd
+    from HPO.utils.weight_freezing import freeze_all_cells
+    import timeit
+    import matplotlib.pyplot as plt
+    funcs = [jitter, scaling, rotation, permutation, window_warp]
+    batch_size = 512
+    window_length = 500
+    features = 27
+    train_dataset = Mixed_repsol_full(0, augmentations_on = False)
+    train_dataloader = DataLoader( train_dataset, batch_size=1,
+      shuffle = False,drop_last=True)
+    for s,l in train_dataloader:
+      x = s
+      break
+    for func in funcs:
+      print(x.shape)
+      plt.plot(x[0,10,:])
+      plt.plot(func(x)[0,10,:], alpha = 0.5)
+      plt.show()
+      print("Total time for ",func.__name__,": ", timeit.timeit("{}(x)".format(func.__name__), "from __main__ import {}, {}".format(func.__name__, "x"), number = 10) , " Seconds")
 
-    funcs = [jitter, scaling, rotation, permutation , magnitude_warp, time_warp, window_slice]
-    for i in funcs:
-
-        time_test(i)

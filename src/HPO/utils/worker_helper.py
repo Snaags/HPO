@@ -5,8 +5,8 @@ import numpy as np
 from torch import Tensor
 from HPO.utils.model_constructor import Model
 from torch.utils.data import DataLoader
-from HPO.utils.time_series_augmentation import jitter, scaling , rotation, permutation, magnitude_warp, time_warp, window_slice
-
+from HPO.utils.time_series_augmentation_torch import jitter, scaling , rotation, window_warp
+from HPO.utils.term_graph import print_graph
 class WeightTest:
   def __init__(self, model):
     self.count_dict = {}
@@ -81,7 +81,7 @@ def collate_fn_padd_x(batch):
     batch = torch.transpose(batch_samples , 1 , 2 )
     return batch
 
-def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tensor , epoch : int, epochs : int, correct :int , total : int , peak_acc : float , loss : Tensor, n_iter):
+def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tensor , epoch : int, epochs : int, correct :int , total : int , peak_acc : float , loss : Tensor, n_iter, loss_list = None):
   def cal_acc(y,t):
     correct = np.count_nonzero(y==t)
     total = len(t)
@@ -121,7 +121,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   weight_test = WeightTest(model)
   epoch = 0
   peak_acc = 0
-
+  loss_list = []
   total = 0
   correct = 0
   while epoch < epochs:
@@ -143,9 +143,10 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
         outputs = outputs.view(batch_size,outputs.shape[0])
       loss = criterion(outputs, labels).cuda(device = cuda_device)
       loss.backward()
+      loss_list.append(loss.item())
       optimizer.step()
       if i %5 == 0:
-        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter)
+        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list)
 
     scheduler.step()
     epoch += 1 
@@ -174,7 +175,7 @@ def train_model_bt(model : Model , hyperparameter : dict, dataloader : DataLoade
       loss.backward()
       #weight_test.step()
       optimizer.step()
-      if i %10 == 0:
+      if i %3 == 0:
         print("Epoch: {}/{} - Iteration: {}/{} - Loss: {} ".format(epoch , epochs,i, n_iter , loss.item()))
     epoch += 1 
     #dataloader.set_iterator()
@@ -184,15 +185,11 @@ def train_model_bt(model : Model , hyperparameter : dict, dataloader : DataLoade
 
 
 def augment(x):
-  augs = [jitter, scaling ]
-  extra = [ rotation, permutation]# magnitude_warp, time_warp]
-  x = x.cpu().numpy()
+  augs = [jitter, scaling, rotation, window_warp]
   for i in augs:
-    x = i(x)
-  for i in extra:
-    if random.random() > 0.3:
+    if random.random() > 0.7:
       x = i(x)
-  return torch.Tensor(x)
+  return x
 def barlow_twins(model, batch, cuda_device = None):
   N = batch.shape[0] #Batch Size
   lmbda = 0.005
@@ -201,8 +198,8 @@ def barlow_twins(model, batch, cuda_device = None):
   y_b = augment(batch)
   
   #Generate network embeddings
-  z_a = model(y_a.cuda(device = cuda_device))
-  z_b = model(y_b.cuda(device = cuda_device))
+  z_a = model(y_a.cuda(device = cuda_device).float())
+  z_b = model(y_b.cuda(device = cuda_device).float())
   D = z_a.shape[1] #Output Dim
 
   #Normalise
