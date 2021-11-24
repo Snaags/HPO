@@ -6,7 +6,6 @@ from torch import Tensor
 from HPO.utils.model_constructor import Model
 from torch.utils.data import DataLoader
 from HPO.utils.time_series_augmentation_torch import jitter, scaling , rotation, window_warp
-from HPO.utils.term_graph import print_graph
 class WeightTest:
   def __init__(self, model):
     self.count_dict = {}
