@@ -40,6 +40,7 @@ def config_space_2_DARTS(hyperparameters):
   reduce_concat = [x for x in range(2,len(normal)//2+2)]
   for n,r in zip(normal, reduce):
     if n[1] in normal_concat:
+      normal_concat.pop(normal_concat.index(n[1]))
     if r[1] in reduce_concat:
       reduce_concat.pop(reduce_concat.index(r[1]))
   normal = [tuple(x) for x in normal ]
