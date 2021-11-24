@@ -2,7 +2,8 @@ import numpy as np
 import time
 import os 
 import matplotlib.pyplot as plt
-from HPO.utils.model_constructor import Model
+from HPO.utils.model import NetworkMain
+from HPO.utils.DARTS_utils import config_space_2_DARTS
 from HPO.utils.FCN import FCN 
 import pandas as pd
 import torch
@@ -59,7 +60,7 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
   torch.cuda.set_device(cuda_device)
   print("Cuda Device Value: ", cuda_device)
 
-  batch_size = 2
+  batch_size = hyperparameter["batch_size"]
   
   # model = in_model
   # model.reset_stem(train_dataset.features)  
@@ -68,8 +69,9 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
   PRETRAIN = False
   LOAD = True
   pretrain_path = "pretrain"
+  gen = config_space_2_DARTS(hyperparameter)
   if PRETRAIN:
-    model = FCN(input_size = 27)
+    model = NetworkMain(27,hyperparameter["channels"],num_classes= 2 , layers = hyperparameter["layers"], auxiliary = False, genotype = gen)
     model = model.cuda(device = cuda_device)      
     if not LOAD:
       pretrain_path = "pretrain"
@@ -79,7 +81,7 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
       train_model_bt(model , hyperparameter, pretrain_dataloader , 10, batch_size = 128 , cuda_device = cuda_device)
       torch.save(model.state_dict(), pretrain_path)
 
-  kfold = KFold(n_splits = 10, shuffle = True)
+  kfold = KFold(n_splits = 6, shuffle = True)
   acc_full = [0,0]
   recall_full = [0,0]
   for fold,(train_idx,test_idx) in enumerate(kfold.split(dataset)):
@@ -96,7 +98,7 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
    
     #model = Model(input_size = ( dataset.get_n_features(), ) ,output_size = 2 ,hyperparameters = hyperparameter)
     if not PRETRAIN:
-      model = FCN(input_size = 27)
+      model = NetworkMain(27,hyperparameter["channels"],num_classes= 2 , layers = hyperparameter["layers"], auxiliary = False,drop_prob = hyperparameter["p"], genotype = gen)
       model = model.cuda(device = cuda_device)
     else:
       model.load_state_dict(torch.load(pretrain_path))

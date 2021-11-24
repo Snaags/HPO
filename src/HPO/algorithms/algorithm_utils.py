@@ -4,7 +4,7 @@ import csv
 from pynvml import *
 def assign_gpu():
   nvmlInit()
-  max_memory = 1500000000
+  max_memory = 3000000000
   count = nvmlDeviceGetCount()  
   gpu_list = []
   for i in range(count):
