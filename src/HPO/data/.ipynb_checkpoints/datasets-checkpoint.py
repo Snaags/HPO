@@ -385,15 +385,13 @@ class repsol_full(Dataset):
     if augmentations == True:
       self.non_warp_augmentations =[jitter, scaling ,permutation]
       self.warp_augmentations = [time_warp,magnitude_warp, window_slice]
-    self.device_track = {}
-    for c,i in enumerate(files):
-      self.device_track[c] = i[:2]
+    for i in files:
       data.append(np.reshape(np.load(path+i),(-1,28)))
     self.current_index = -1
     use_all = True
     multi_aug = augmentations_num
     self.aug_source_dict = {} 
-    self.last_batch = []
+  
     self.real_samples = len(data)
     print(self.real_samples)
     for datapoint, batch in enumerate(data):
@@ -433,12 +431,12 @@ class repsol_full(Dataset):
     self.features = 27
     self.n_classes = 2
 
-    
   def save_2_file(self, x,y, datapoint , aug_num):
     arr = np.zeros((x.shape[0],x.shape[1]+ 1))
     arr[:,0] = y
     arr[:,1:] = x
     np.save(self.path+"repsol_augmented/{}-{}".format(datapoint, aug_num), arr)
+
   def load_augmentations( self, sample_index , augmentation_num ):
     for i in range(augmentation_num):
       batch = np.load(self.aug_path+"{}-{}.npy".format(sample_index, i))
@@ -464,16 +462,10 @@ class repsol_full(Dataset):
     #this means the index
     x = self.x_index_address[index]
     y = self.y_index_address[index]
-    self.last_batch.append(index)   
+
 
     return x , y
   
-  def get_source(self):
-    sources = []
-    for i in self.last_batch:
-      sources.append(self.device_track[i])
-    self.last_batch = []
-    return sources
   def get_n_classes(self):
     return self.n_classes
   

@@ -153,7 +153,6 @@ class Model(nn.Module):
     if self.one_fc_layer == True:
       for i in self.fc_list:
         x = i(x)
-    x = self.fc(x)
     if len(x.shape) == 1:
       x = x.view(1, -1)
     #x = self.outact(x)
@@ -177,7 +176,7 @@ class Model(nn.Module):
 
   def forward(self,x):
     x=self._forward(x)
-    return self.fc(x)
+    return self.outact(self.fc(x))
 
 class Ops(nn.Module):
   def __init__(self, parameters, channels_in,channels_out, p):

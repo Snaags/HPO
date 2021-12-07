@@ -5,7 +5,7 @@ import numpy as np
 from torch import Tensor
 from HPO.utils.model_constructor import Model
 from torch.utils.data import DataLoader
-from HPO.utils.time_series_augmentation_torch import jitter, scaling , rotation, window_warp
+from HPO.utils.time_series_augmentation_torch import jitter, scaling , rotation, window_warp, crop
 class WeightTest:
   def __init__(self, model):
     self.count_dict = {}
@@ -106,8 +106,7 @@ def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tens
   return correct ,total ,peak_acc
 
 
-
-def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, batch_size : int, cuda_device = None):
+def train_model_aug(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, batch_size : int, cuda_device = None, augment_num = 2, graph = None):
   if cuda_device == None:
     cuda_device = torch.cuda.current_device()
   n_iter = len(dataloader) 
@@ -115,8 +114,9 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = hyperparameter["lr_step"])
   scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0 = hyperparameter["T_0"] , T_mult = hyperparameter["T_mult"])
   if "c1" in hyperparameter:
-    criterion = nn.CrossEntropyLoss(torch.Tensor([1, hyperparameter["c1"]]))
-  criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(torch.Tensor([1, hyperparameter["c1"]])).cuda()
+  else:
+    criterion = nn.CrossEntropyLoss()
   weight_test = WeightTest(model)
   epoch = 0
   peak_acc = 0
@@ -127,8 +127,14 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
     if epoch % 3 == 0:
       total = 0
       correct = 0
+    aug_list = []
+    aug_labels = []
     for i, (samples, labels) in enumerate( dataloader ):
-      # zero the parameter gradients
+      for i in range(augment_num):
+          aug_list.append(augment(samples))
+          aug_labels.append(labels)
+    
+    for i , (samples , labels) in enumerate(zip(aug_list , aug_labels)):
       optimizer.zero_grad()
       samples = samples.cuda(non_blocking=True, device = cuda_device)
       labels = labels.cuda(non_blocking=True, device = cuda_device)
@@ -145,7 +151,85 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
       loss_list.append(loss.item())
       optimizer.step()
       if i %5 == 0:
+        graph.put(loss_list)
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list)
+
+
+
+    scheduler.step()
+    epoch += 1 
+    #dataloader.set_iterator()
+  print()
+  print("Num epochs: {}".format(epoch))
+
+def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, batch_size : int, cuda_device = None, augment_on = 0, graph = None):
+  if cuda_device == None:
+    cuda_device = torch.cuda.current_device()
+  n_iter = len(dataloader) 
+  optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["lr"])
+  #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = hyperparameter["lr_step"])
+  scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0 = hyperparameter["T_0"] , T_mult = hyperparameter["T_mult"])
+  if "c1" in hyperparameter:
+    criterion = nn.CrossEntropyLoss(torch.Tensor([1, hyperparameter["c1"]]))
+  criterion = nn.CrossEntropyLoss(torch.Tensor([1, 2.2])).cuda(device = cuda_device)
+  weight_test = WeightTest(model)
+  epoch = 0
+  peak_acc = 0
+  loss_list = []
+  total = 0
+  correct = 0
+  while epoch < epochs:
+    if epoch % 3 == 0:
+      total = 0
+      correct = 0
+    aug_list = []
+    aug_labels = []
+    for i, (samples, labels) in enumerate( dataloader ):
+      for _ in range(augment_on):
+          aug_list.append(augment(samples))
+          aug_labels.append(labels)
+      # zero the parameter gradients
+      optimizer.zero_grad()
+      samples = samples.cuda(non_blocking=True, device = cuda_device)
+      labels = labels.cuda(non_blocking=True, device = cuda_device)
+      if batch_size > 1:
+        labels = labels.long().view( batch_size  )
+      else:
+        labels = labels.long().view( 1 )
+      outputs = model(samples.float()).cuda(device = cuda_device)
+      # forward + backward + optimize
+      if batch_size == 1:
+        outputs = outputs.view(batch_size,outputs.shape[0])
+      loss = criterion(outputs, labels).cuda(device = cuda_device)
+      loss.backward()
+      loss_list.append(loss.item())
+      optimizer.step()
+      if i %10 == 0:
+        if graph != None:
+          graph.put(loss_list)
+        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list)
+    
+    if augment_on == True:
+      for i , (samples , labels) in enumerate(zip(aug_list , aug_labels)):
+        optimizer.zero_grad()
+        samples = samples.cuda(non_blocking=True, device = cuda_device)
+        labels = labels.cuda(non_blocking=True, device = cuda_device)
+        if batch_size > 1:
+          labels = labels.long().view( batch_size  )
+        else:
+          labels = labels.long().view( 1 )
+        outputs = model(samples.float()).cuda(device = cuda_device)
+        # forward + backward + optimize
+        if batch_size == 1:
+          outputs = outputs.view(batch_size,outputs.shape[0])
+        loss = criterion(outputs, labels).cuda(device = cuda_device)
+        loss.backward()
+        loss_list.append(loss.item())
+        optimizer.step()
+        if i %5 == 0:
+          correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list)
+
+
 
     scheduler.step()
     epoch += 1 
@@ -155,7 +239,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
 
 
 
-def train_model_bt(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, batch_size : int, cuda_device = None, validation_set = None):
+def train_model_bt(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, batch_size : int, cuda_device = None, validation_set = None, graph = None):
   if cuda_device == None:
     cuda_device = torch.cuda.current_device()
   n_iter = len(dataloader) 
@@ -163,7 +247,8 @@ def train_model_bt(model : Model , hyperparameter : dict, dataloader : DataLoade
   optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["lr"])
   criterion = barlow_twins
   epoch = 0
-  weight_test = WeightTest(bt)
+  loss_list = []
+  #weight_test = WeightTest(bt)
   peak_acc = 0
   while epoch < epochs:
     for i, samples in enumerate( dataloader ):
@@ -172,9 +257,12 @@ def train_model_bt(model : Model , hyperparameter : dict, dataloader : DataLoade
       loss = criterion(bt , samples, cuda_device = cuda_device)
       # forward + backward + optimize
       loss.backward()
+      loss_list.append(loss.item())
       #weight_test.step()
       optimizer.step()
       if i %3 == 0:
+        if graph != None:
+          graph.put(loss_list)
         print("Epoch: {}/{} - Iteration: {}/{} - Loss: {} ".format(epoch , epochs,i, n_iter , loss.item()))
     epoch += 1 
     #dataloader.set_iterator()
@@ -184,9 +272,9 @@ def train_model_bt(model : Model , hyperparameter : dict, dataloader : DataLoade
 
 
 def augment(x):
-  augs = [jitter, scaling, rotation, window_warp]
+  augs = [jitter, scaling, window_warp]
   for i in augs:
-    if random.random() > 0.7:
+    if random.random() > 0.2:
       x = i(x)
   return x
 def barlow_twins(model, batch, cuda_device = None):

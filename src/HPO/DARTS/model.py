@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
-from HPO.utils.operations import *
+from operations import *
 from torch.autograd import Variable
-from HPO.utils.utils import drop_path
+from utils import drop_path
 
 
 class Cell(nn.Module):
@@ -13,6 +13,9 @@ class Cell(nn.Module):
   C : channels of k (i.e. current layer)
   reduction : boolean whether this layer is a reduction cell
   reduction_prev : boolean of whether the last cell was a reduction cell
+  
+  genotype indices seem to be used to select 
+
   """
   def __init__(self, genotype, C_prev_prev, C_prev, C, reduction, reduction_prev):
     super(Cell, self).__init__()
@@ -65,70 +68,6 @@ class Cell(nn.Module):
       s = h1 + h2
       states += [s]
     return torch.cat([states[i] for i in self._concat], dim=1)
-
-
-
-class NetworkMain(nn.Module):
-
-  def __init__(self, stem_channels ,C, num_classes, layers, auxiliary, drop_prob ,genotype):
-    super(NetworkMain, self).__init__()
-    self._layers = layers
-    self._auxiliary = auxiliary
-    self.drop_path_prob = drop_prob
-    #Stem Setup
-    stem_multiplier = 3
-    C_curr = stem_multiplier*C
-    self.stem = nn.Sequential(
-      nn.Conv1d(stem_channels, C_curr, 3, padding=1, bias=False),
-      nn.BatchNorm1d(C_curr)
-    )
-        
-    C_prev_prev, C_prev, C_curr = C_curr, C_curr, C #Initialising channels
-    self.cells = nn.ModuleList()
-    reduction_prev = False
-    
-    for i in range(layers):
-      if i %2 ==0 and i != layers: # Set as reduction layer if model is 1/3 or 2/3 through
-                                        # the network
-        C_curr *= 2 # double channels on reduction layer
-        reduction = True
-      else:
-        reduction = False
-      #Build cell
-      cell = Cell(genotype, C_prev_prev, C_prev, C_curr, reduction, reduction_prev)
-      reduction_prev = reduction
-      self.cells += [cell]
-      C_prev_prev, C_prev = C_prev, cell.multiplier*C_curr # Update channels
-      if i == 2*layers//3:
-        C_to_auxiliary = C_prev
-
-    if auxiliary:
-      self.auxiliary_head = AuxiliaryHeadCIFAR(C_to_auxiliary, num_classes)
-    self.global_pooling = nn.AdaptiveAvgPool1d(1)
-    self.c_out = C_prev
-    self.classifier = nn.Linear(C_prev, num_classes)
-  
-  def get_channels(self):
-    return self.c_out
-  def _forward(self, input):
-    logits_aux = None
-    s0 = s1 = self.stem(input)
-    for i, cell in enumerate(self.cells):
-      s0, s1 = s1, cell(s0, s1, self.drop_path_prob)
-      if i == 2*self._layers//3:
-        if self._auxiliary and self.training:
-          logits_aux = self.auxiliary_head(s1)
-    #print("size before pooling: {}".format(s1.shape))
-    out = self.global_pooling(s1)
-    return out.view(out.size(0),-1)
-
-  def forward(self, input):
-    out = self._forward(input)
-    logits = self.classifier(out)
-    return logits
-
-
-
 
 
 class AuxiliaryHeadCIFAR(nn.Module):

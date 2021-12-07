@@ -14,14 +14,14 @@ def time_test(func, n = 100, batch_size = 10 , window_length = 1000, features = 
     print("Total time for ",func.__name__,": ", time.time()- start , " Seconds")
 
 
-def jitter(x : torch.Tensor, sigma=0.05):
+def jitter(x : torch.Tensor, sigma=0.01):
     
     n = torch.distributions.normal.Normal(loc=0., scale=sigma)
     return torch.add(x,n.sample(x.shape))
 
 
 
-def scaling(x : torch.Tensor, sigma=0.1):
+def scaling(x : torch.Tensor, sigma=0.05):
 
     # https://arxiv.org/pdf/1706.00527.pdf
     n = torch.distributions.normal.Normal(loc=0., scale=sigma)
@@ -97,8 +97,16 @@ def magnitude_warp(x : torch.Tensor, sigma=0.2, knot=4):
 
     return ret
 
+def crop(x : torch.Tensor, crop_min = 0.85, crop_max = 0.95):
+  sig_len = x.shape[2]
+  length= random.uniform(crop_min,crop_max)
+  length = int(length * sig_len)
+  if random.choice([0,1]) == 1:
+    return  x[:,:,:length]
+  else:
+    return  x[:,:,(sig_len-length):]
 
-def window_warp(x : torch.Tensor, ratios = [0.5, 2 ], num_warps = 5):
+def window_warp(x : torch.Tensor, ratios = [0.5, 2 ], num_warps = 3):
   for i in range(num_warps):
     start = random.randint(1, x.shape[2]-10) 
     end = min([x.shape[2],start+random.randint(2, x.shape[2])])

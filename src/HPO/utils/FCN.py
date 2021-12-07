@@ -15,7 +15,7 @@ class layer(nn.Module):
 
 
 class FCN(nn.Module):
-  def __init__(self, input_size , channels = [64 , 32, 16] , kernels = [8 , 5, 3]  , classes = 2):
+  def __init__(self, input_size , channels = [64 , 64, 64] , kernels = [8 , 5, 3]  , classes = 2):
     super(FCN,self).__init__()
     self.channels = channels
     self.stem = nn.Conv1d(input_size , channels[0], 1 )
