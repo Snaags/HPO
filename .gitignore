@@ -2,3 +2,5 @@ src/HPO/model_zoo/*
 *.swp
 *.csv
 *.png
+*.ts
+*.arff
