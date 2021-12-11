@@ -4,3 +4,4 @@ src/HPO/model_zoo/*
 *.png
 *.ts
 *.arff
+*.pyc
