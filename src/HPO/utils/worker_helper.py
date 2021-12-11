@@ -130,14 +130,14 @@ def train_model_aug(model : Model , hyperparameter : dict, dataloader : DataLoad
     aug_list = []
     aug_labels = []
     for i, (samples, labels) in enumerate( dataloader ):
+      samples = samples.cuda(non_blocking=True, device = cuda_device)
+      labels = labels.cuda(non_blocking=True, device = cuda_device)
       for i in range(augment_num):
-          aug_list.append(augment(samples))
+          aug_list.append(augment(samples,hyperparameter, cuda_device))
           aug_labels.append(labels)
     
     for i , (samples , labels) in enumerate(zip(aug_list , aug_labels)):
       optimizer.zero_grad()
-      samples = samples.cuda(non_blocking=True, device = cuda_device)
-      labels = labels.cuda(non_blocking=True, device = cuda_device)
       if batch_size > 1:
         labels = labels.long().view( batch_size  )
       else:
@@ -151,7 +151,8 @@ def train_model_aug(model : Model , hyperparameter : dict, dataloader : DataLoad
       loss_list.append(loss.item())
       optimizer.step()
       if i %5 == 0:
-        graph.put(loss_list)
+        if graph != None:
+          graph.put(loss_list)
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list)
 
 
@@ -271,11 +272,18 @@ def train_model_bt(model : Model , hyperparameter : dict, dataloader : DataLoade
 
 
 
-def augment(x):
+def augment(x, hp, device = None):
+  args = [hp["jitter"], hp["scaling"], hp["window_warp_num"]]
+  rates = [hp["jitter_rate"], hp["scaling_rate"], hp["window_warp_rate"]]
   augs = [jitter, scaling, window_warp]
-  for i in augs:
-    if random.random() > 0.2:
-      x = i(x)
+  if device == None:
+    for func,arg,rate in zip(augs,args, rates):
+      if random.random() > rate:
+        x = func(x, arg )
+  else:
+    for func,arg,rate in zip(augs,args, rates):
+      if random.random() > rate:
+        x = func(x, arg , device = device)
   return x
 def barlow_twins(model, batch, cuda_device = None):
   N = batch.shape[0] #Batch Size

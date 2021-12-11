@@ -4,7 +4,7 @@ import csv
 from pynvml import *
 def assign_gpu():
   nvmlInit()
-  max_memory = 3000000000
+  max_memory = 6000000000
   count = nvmlDeviceGetCount()  
   gpu_list = []
   for i in range(count):
@@ -52,6 +52,7 @@ class train_eval:
         slots  -= 1 
         gpu[idx] = slots
     for i in range(self.num_worker):
+      print("Number of workers: {}".format(self.num_worker))
       self.processes.append(multiprocessing.Process(target = self.worker , args = (i, self.config_queue , self.gpu_slots, self.results)))
   
     ###Main Evaluation loop
