@@ -115,6 +115,19 @@ def window_warp(x : torch.Tensor, num_warps = 3, ratios = [0.5, 2], device = Non
   
   return x
 
+def cutout(x, perc=.1, device = None):    
+    seq_len = x.shape[2]    
+    win_len = int(perc * seq_len)    
+    start = np.random.randint(0, seq_len-win_len-1)    
+    end = start + win_len    
+    start = max(0, start)    
+    end = min(end, seq_len)    
+    # print("[INFO] start={}, end={}".format(start, end))    
+    x[:,:start:end] = 0    
+    # return new_ts, ts[start:end, ...]    
+    return x 
+
+
 if __name__ == "__main__":
 
     from HPO.data.datasets import Test_repsol_full , Mixed_repsol_full

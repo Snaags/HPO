@@ -41,15 +41,12 @@ class LivePlot:
 
   def fit(self, y):
     x = np.arange(start = 0 ,stop = len(y))
-    trend = np.polyfit(x,y,2)
+    trend = np.polyfit(x,y,4)
     trendpoly = np.poly1d(trend)
     return x, trendpoly 
     
   def animate(self,i):
-      try:
-        message = self.queue.get(timeout = 10)
-      except Empty:
-        exit()
+      message = self.queue.get(timeout = 10)
 
       
       self.ax1.clear()
@@ -94,14 +91,14 @@ def compute( ID = None, configs=None , gpus=None , res = None  , config = None):
 
   torch.cuda.empty_cache()
   
-def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None,  test_dataset = None, cuda_device = None,plot_queue = None):
+def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None,  test_dataset = None, cuda_device = None,plot_queue = None, model_id = None):
   if cuda_device == None:
      cuda_device = 0# torch.cuda.current_device()
   dataset = Mixed_repsol_full(0,augmentations_on = False)
   torch.cuda.set_device(cuda_device)
   print("Cuda Device Value: ", cuda_device)
- 
-  df = pd.DataFrame(columns = ["Source" , "Label", "Prediction_0", "Prediction_1","Output", "Correct"])
+  
+  df = pd.read_csv("results_df.csv", index_col = 0)
   batch_size = hyperparameter["batch_size"]
   
   # model = in_model
@@ -152,7 +149,7 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
     """
     #train_model(model , hyperparameter, trainloader , 50, batch_size , cuda_device)
     #model = freeze_FCN(model)
-    train_model_aug(model , hyperparameter, trainloader , hyperparameter["epochs"], batch_size , cuda_device, augment_num = 2, graph = plot_queue) 
+    train_model(model , hyperparameter, trainloader , hyperparameter["epochs"], batch_size , cuda_device, augment_on = 1, graph = plot_queue) 
     """
     ## Test the model
     """
@@ -169,9 +166,8 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
       for i, (inputs, labels) in enumerate( testloader):
           inputs = inputs.cuda(non_blocking=True, device = cuda_device).float()
           labels = labels.cuda(non_blocking=True, device = cuda_device).view( batch_size_test ).long().cpu().numpy()
+          ID = dataset.get_id()
           source = dataset.get_source()[0]
-          if source == "1A":
-            continue
           outputs = model(inputs).cuda(device = cuda_device)          
           preds = torch.argmax(outputs.view(batch_size_test,2),1).long().cpu().numpy()
           c = (preds == labels).sum()
@@ -190,12 +186,12 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
             else:
               rt = 0
           outputs = outputs.cpu().numpy()
-          df = df.append(pd.Series([source, labels , outputs[:,0], outputs[:,1],preds,c], index = df.columns),ignore_index = True) 
+          df = df.append(pd.Series([ID, source, labels , outputs[:,0], outputs[:,1],preds,c, model_id], index = df.columns),ignore_index = True) 
     
     print("Total Correct : {} / {} -- Recall : {} / {}".format(correct,total, recall_correct , recall_total)) 
     print() 
     df.to_csv("results_df.csv")
-   
+    
     acc = correct/total if total else np.NaN
     recall = recall_correct/recall_total if recall_total else np.NaN
     print("Accuracy: ", "%.4f" % ((acc)*100), "%")
@@ -215,7 +211,12 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
 
 if __name__ == "__main__":
   import multiprocessing
-  while True:
+  user = input("Overwrite old DataFrame? (y/n)")
+  if user.lower() == "y":
+    df = pd.DataFrame(columns = ["Sample_ID","Source" , "Label", "Prediction_0", "Prediction_1","Output", "Correct", "Model_ID"])
+    df.to_csv("results_df.csv")
+    print("New DataFrame Created")
+  for i in range(10):
     hyperparameter = {'T_0': 3,'T_mult':2, 'normal_cell_1_ops_8_input_1': 0, 'augmentations': 171, 'c1_weight': 1.2167576457622766, 'channels': 27, 'epochs': 50, 'layers': 4, 
       'lr': 0.0007072866653232726, 'normal_cell_1_num_ops': 1, 'normal_cell_1_ops_1_input_1': 0, 'normal_cell_1_ops_1_input_2': 0, 'normal_cell_1_ops_1_type': 'MaxPool5', 'normal_cell_1_ops_2_input_1': 1, 'normal_cell_1_ops_2_input_2': 0, 'normal_cell_1_ops_2_type': 'Conv5', 'normal_cell_1_ops_3_input_1': 2, 'normal_cell_1_ops_3_input_2': 0, 'normal_cell_1_ops_3_type': 'Conv7', 'normal_cell_1_ops_4_input_1': 0, 'normal_cell_1_ops_4_input_2': 0, 'normal_cell_1_ops_4_type': 'SepConv3', 'normal_cell_1_ops_5_input_1': 3, 'normal_cell_1_ops_5_input_2': 3, 'normal_cell_1_ops_5_type': 'AvgPool7', 'normal_cell_1_ops_6_input_1': 1, 'normal_cell_1_ops_6_input_2': 0, 'normal_cell_1_ops_6_type': 'MaxPool5', 'normal_cell_1_ops_7_input_1': 0, 'normal_cell_1_ops_7_input_2': 2, 'normal_cell_1_ops_7_type':     'SepConv5', 'normal_cell_1_ops_8_input_2': 6, 'normal_cell_1_ops_8_type': 'Conv3', 'normal_cell_1_ops_9_input_1': 4, 'normal_cell_1_ops_9_input_2': 1, 'normal_cell_1_ops_9_type': 'Conv7', 'num_conv': 1, 'num_re': 1, 'p': 0.02479858526104134, 'reduction_cell_1_num_ops': 1, 'reduction_cell_1_ops_1_input_1': 0, 'reduction_cell_1_ops_1_input_2': 0, 'reduction_cell_1_ops_1_type': 'FactorizedReduce'}
     #0.7790697674418605,0.5853658536585366
@@ -225,8 +226,8 @@ if __name__ == "__main__":
   "c1" : 1.4,
   "T_mult" : 1,
   "batch_size" : 2,
-  "channels" : 19,
-  "epochs" : 62,
+  "channels" : 77,
+  "epochs" : 100,
   "layers" : 3,
   "lr" : 0.002993825743228492,
   "normal_index_0_0" : 0,
@@ -245,7 +246,7 @@ if __name__ == "__main__":
   "normal_node_2_1" : 'sep_conv_3x3',
   "normal_node_3_0" : 'dil_conv_3x3',
   "normal_node_3_1" : 'skip_connect',
-  "p" : 0.017718387446598843,
+  "p" : 0.12718387446598843,
   "reduction_index_0_0" : 0,
   "reduction_index_0_1" : 1,
   "reduction_index_1_0" : 0,
@@ -262,11 +263,8 @@ if __name__ == "__main__":
   "reduction_node_2_1" : 'max_pool_3x3',
   "reduction_node_3_0" : 'sep_conv_3x3',
   "reduction_node_3_1" : 'avg_pool_3x3'}
-
     queue = multiprocessing.Queue()
     plotter = LivePlot(queue)
-    
     plot_process = multiprocessing.Process(target=plotter.show,args=())
-    plot_process.start()
-    _compute(hyperparameter,plot_queue = queue)
+    _compute(hyperparameter,model_id = "regularised_run_aug_{}".format(i))
 

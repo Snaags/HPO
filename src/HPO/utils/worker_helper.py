@@ -5,7 +5,7 @@ import numpy as np
 from torch import Tensor
 from HPO.utils.model_constructor import Model
 from torch.utils.data import DataLoader
-from HPO.utils.time_series_augmentation_torch import jitter, scaling , rotation, window_warp, crop
+from HPO.utils.time_series_augmentation_torch import jitter, scaling , rotation, window_warp, crop, cutout
 class WeightTest:
   def __init__(self, model):
     self.count_dict = {}
@@ -171,8 +171,9 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = hyperparameter["lr_step"])
   scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0 = hyperparameter["T_0"] , T_mult = hyperparameter["T_mult"])
   if "c1" in hyperparameter:
-    criterion = nn.CrossEntropyLoss(torch.Tensor([1, hyperparameter["c1"]]))
-  criterion = nn.CrossEntropyLoss(torch.Tensor([1, 2.2])).cuda(device = cuda_device)
+    criterion = nn.CrossEntropyLoss(torch.Tensor([1, hyperparameter["c1"]])).cuda(device = cuda_device)
+  else:
+    criterion = nn.CrossEntropyLoss(torch.Tensor([1, 2.2])).cuda(device = cuda_device)
   weight_test = WeightTest(model)
   epoch = 0
   peak_acc = 0
@@ -186,13 +187,13 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
     aug_list = []
     aug_labels = []
     for i, (samples, labels) in enumerate( dataloader ):
+      samples = samples.cuda(non_blocking=True, device = cuda_device)
+      labels = labels.cuda(non_blocking=True, device = cuda_device)
       for _ in range(augment_on):
-          aug_list.append(augment(samples))
+          aug_list.append(augment(samples,hyperparameter,cuda_device))
           aug_labels.append(labels)
       # zero the parameter gradients
       optimizer.zero_grad()
-      samples = samples.cuda(non_blocking=True, device = cuda_device)
-      labels = labels.cuda(non_blocking=True, device = cuda_device)
       if batch_size > 1:
         labels = labels.long().view( batch_size  )
       else:
@@ -273,18 +274,31 @@ def train_model_bt(model : Model , hyperparameter : dict, dataloader : DataLoade
 
 
 def augment(x, hp, device = None):
-  args = [hp["jitter"], hp["scaling"], hp["window_warp_num"]]
-  rates = [hp["jitter_rate"], hp["scaling_rate"], hp["window_warp_rate"]]
   augs = [jitter, scaling, window_warp]
-  if device == None:
-    for func,arg,rate in zip(augs,args, rates):
-      if random.random() > rate:
-        x = func(x, arg )
+  if "jitter" in hp:
+    args = [hp["jitter"], hp["scaling"], hp["window_warp_num"]]
+    rates = [hp["jitter_rate"], hp["scaling_rate"], hp["window_warp_rate"]]
+    if device == None:
+      for func,arg,rate in zip(augs,args, rates):
+        if random.random() > rate:
+          x = func(x, arg )
+    else:
+      for func,arg,rate in zip(augs,args, rates):
+        if random.random() > rate:
+          x = func(x, arg , device = device)
+    return x
   else:
-    for func,arg,rate in zip(augs,args, rates):
-      if random.random() > rate:
-        x = func(x, arg , device = device)
-  return x
+    rate = 0.7
+    if device == None:
+      for func in augs:
+        if random.random() > rate:
+          x = func(x)
+    else:
+      for func in augs:
+        if random.random() > rate:
+          x = func(x, device = device)
+
+    return x 
 def barlow_twins(model, batch, cuda_device = None):
   N = batch.shape[0] #Batch Size
   lmbda = 0.005

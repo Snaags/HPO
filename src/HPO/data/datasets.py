@@ -380,6 +380,7 @@ class repsol_full(Dataset):
     self.aug_path = self.path + "repsol_augmented/"
     self.x_index_address = {}
     self.y_index_address = {}
+    print(augmentations)
     augmentations_per_batch = 2
     #index_list sum()
     if augmentations == True:
@@ -389,7 +390,7 @@ class repsol_full(Dataset):
     for c,i in enumerate(files):
       self.device_track[c] = i[:2]
       data.append(np.reshape(np.load(path+i),(-1,28)))
-    self.current_index = -1
+    self.current_index = 0
     use_all = True
     multi_aug = augmentations_num
     self.aug_source_dict = {} 
@@ -403,6 +404,7 @@ class repsol_full(Dataset):
       self.real_data_index = self.current_index
       self.aug_source_dict[self.real_data_index] = []
       if augmentations:
+        print("Augs baby")
         if gen_augs == True:
           if use_all == True:
             for _ in range(multi_aug):
@@ -454,6 +456,7 @@ class repsol_full(Dataset):
 
     self.x_index_address[self.current_index] = torch.from_numpy(x.reshape(x.shape[1], x.shape[0]))
     self.y_index_address[self.current_index] = torch.from_numpy(np.unique(y).reshape((1,)))
+    print(self.current_index, self.y_index_address[self.current_index])
     self.current_index += 1 
 
   def set_window_size(self, window_size):
@@ -474,6 +477,11 @@ class repsol_full(Dataset):
       sources.append(self.device_track[i])
     self.last_batch = []
     return sources
+  
+  def get_id(self):
+    return self.last_batch
+    
+
   def get_n_classes(self):
     return self.n_classes
   
