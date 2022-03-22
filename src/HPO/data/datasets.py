@@ -58,10 +58,14 @@ class BTC(Dataset):
     ss = StandardScaler()
     self.x = ss.fit_transform(self.x)
     self.window = window_size
-    self.generate_labels()
+    self.generate_percent_labels()
     self.n_features = self.x.shape[1]
     self.n_classes = len(np.unique(self.y))
+    print(self.y)
+    for i in range(self.n_classes):
+      print(np.count_nonzero(self.y == i))
 
+    print(len(np.unique(self.y)))
   def generate_labels(self):
     idx = 3
     self.y = []
@@ -70,8 +74,26 @@ class BTC(Dataset):
           self.y.append(1)
         else:
           self.y.append(0)
+    print(self.x.shape[0])
+
+
+  def generate_percent_labels(self, classes = [0.01,0.1,0.25,0.5,0.75,0.9,0.99,1]):
+    abs_change = np.diff(self.x[:,3])
+    self.class_labels = {}
+    per_change = np.divide(abs_change , self.x[1:,3])
+    i_last = 0 
+    self.y = np.zeros(self.x.shape[0])
+    for c,i in enumerate(classes):
+      self.class_labels[c] = "{}-{}".format(i_last,i)
+      print(np.nanquantile(per_change, i))
+      hold = np.where( (per_change > np.nanquantile(per_change,i_last)) & (per_change < np.nanquantile(per_change,i)))
+      i_last = i 
+      self.y[hold] = c
+    
     print(len(self.y))
     print(self.x.shape[0])
+
+
 
   def set_window_size(self, window_size):
     self.window = window_size
@@ -96,11 +118,11 @@ class BTC(Dataset):
 
 class Train_BTC(BTC):
 
-  def __init__(self, window_size = 1000, split = 0.95 , pred_dist = 100 ): 
+  def __init__(self, window_size = 100, split = 0.95 , pred_dist = 1 ): 
     super().__init__(window_size, split = split, prediction_distance = pred_dist)
 
 class Test_BTC(BTC):
-  def __init__(self, window_size = 1000, split = 0.05, pred_dist = 100): 
+  def __init__(self, window_size = 100, split = 0.05, pred_dist = 1): 
     super().__init__(window_size,split = split, prediction_distance = pred_dist)
 
 
@@ -278,12 +300,12 @@ class TEPS_split(Dataset):
 
 class Train_TEPS_split(TEPS_split):
 
-  def __init__(self, window_size = 200, augmentations = False, max_samples = 8000000): 
+  def __init__(self, window_size = 500, augmentations = False, max_samples = 8000000): 
     super().__init__(window_size, True, augmentations,max_samples)
 
 class Test_TEPS_split(TEPS_split):
 
-  def __init__(self, window_size = 200, augmentations = False, max_samples = 4800000): 
+  def __init__(self, window_size = 500, augmentations = False, max_samples = 4800000): 
     super().__init__(window_size,  False , augmentations,max_samples)
 
 
@@ -456,7 +478,6 @@ class repsol_full(Dataset):
 
     self.x_index_address[self.current_index] = torch.from_numpy(x.reshape(x.shape[1], x.shape[0]))
     self.y_index_address[self.current_index] = torch.from_numpy(np.unique(y).reshape((1,)))
-    print(self.current_index, self.y_index_address[self.current_index])
     self.current_index += 1 
 
   def set_window_size(self, window_size):

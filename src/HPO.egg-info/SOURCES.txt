@@ -2,7 +2,6 @@ pyproject.toml
 setup.cfg
 setup.py
 src/HPO/__init__.py
-src/HPO/main.py
 src/HPO.egg-info/PKG-INFO
 src/HPO.egg-info/SOURCES.txt
 src/HPO.egg-info/dependency_links.txt

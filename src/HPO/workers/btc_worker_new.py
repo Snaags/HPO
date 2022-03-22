@@ -7,7 +7,7 @@ from HPO.utils.DARTS_utils import config_space_2_DARTS
 from HPO.utils.FCN import FCN 
 import pandas as pd
 import torch
-from HPO.data.datasets import Test_repsol_full , Mixed_repsol_full, repsol_unlabeled
+from HPO.data.datasets import Train_BTC, Test_BTC
 import torch.nn as nn
 from torch import Tensor
 from torch.utils.data import DataLoader, SubsetRandomSampler
@@ -95,7 +95,6 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
   THRESHOLD = 0.5 #Cut off for classification
   if cuda_device == None:
      cuda_device = 0# torch.cuda.current_device()
-  dataset = Mixed_repsol_full(0,augmentations_on = False)
   torch.cuda.set_device(cuda_device)
   print("Cuda Device Value: ", cuda_device)
   
@@ -110,96 +109,78 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
   LOAD = False
   pretrain_path = "pretrain"
   gen = config_space_2_DARTS(hyperparameter)
-  if PRETRAIN:
-    model = NetworkMain(27,hyperparameter["channels"],num_classes= 2 , layers = hyperparameter["layers"], auxiliary = False,drop_prob= hyperparameter["p"], genotype = gen)
-    model = model.cuda(device = cuda_device)      
-    if not LOAD:
-      pretrain_path = "pretrain"
-      pretrain_dataset = repsol_unlabeled()
-      pretrain_dataloader = DataLoader( pretrain_dataset, batch_size=64,
-        shuffle = True,drop_last=True , collate_fn = collate_fn_padd_x)
-      train_model_bt(model , hyperparameter, pretrain_dataloader , 2, batch_size = 64, cuda_device = cuda_device, graph = plot_queue)
-      torch.save(model.state_dict(), pretrain_path)
-
-  kfold = KFold(n_splits = 8, shuffle = True)
-  acc_full = [0,0]
-  recall_full = [0,0]
-  for fold,(train_idx,test_idx) in enumerate(kfold.split(dataset)):
-    print('------------fold no---------{}----------------------'.format(fold))
-    train_subsampler = torch.utils.data.SubsetRandomSampler(train_idx)
-    test_subsampler = torch.utils.data.SubsetRandomSampler(test_idx)
-   
-    trainloader = torch.utils.data.DataLoader(
-                        dataset,collate_fn = collate_fn_padd, 
-                        batch_size=batch_size, sampler=train_subsampler, drop_last = True)
-    testloader = torch.utils.data.DataLoader(
-                        dataset,collate_fn = collate_fn_padd,
-                        batch_size=1, sampler=test_subsampler)
+  train_dataset = Train_BTC()
+  test_dataset = Test_BTC()
+  trainloader = torch.utils.data.DataLoader(
+                        train_dataset,shuffle = True,
+                        batch_size=batch_size, drop_last = True)
+  testloader = torch.utils.data.DataLoader(
+                        test_dataset,
+                        batch_size=batch_size, drop_last = True)
    
     #model = Model(input_size = ( dataset.get_n_features(), ) ,output_size = 2 ,hyperparameters = hyperparameter)
-    if not PRETRAIN:
-      model = NetworkMain(27,hyperparameter["channels"],num_classes= 2 , layers = hyperparameter["layers"], auxiliary = False,drop_prob = hyperparameter["p"], genotype = gen, binary = binary)
-      model = model.cuda(device = cuda_device)
-    else:
-      model.load_state_dict(torch.load(pretrain_path))
+  if not PRETRAIN:
+    model = NetworkMain(train_dataset.get_n_features(),hyperparameter["channels"],num_classes= train_dataset.get_n_classes() , layers = hyperparameter["layers"], auxiliary = False,drop_prob = hyperparameter["p"], genotype = gen, binary = binary)
+    model = model.cuda(device = cuda_device)
+  else:
+    model.load_state_dict(torch.load(pretrain_path))
+
+
+  print("Training Data Size {} -- Testing Data Size {}".format(len(trainloader), len(testloader)))
+  print("number of classes: {}".format(train_dataset.get_n_classes()))
+  """
+  ## Train the model
+  """
+  #train_model(model , hyperparameter, trainloader , 50, batch_size , cuda_device)
+  #model = freeze_FCN(model)
+  train_model(model , hyperparameter, trainloader , hyperparameter["epochs"], batch_size , cuda_device, augment_on = 0, graph = plot_queue, binary = binary) 
+  """
+  ## Test the model
+  """
+  with torch.no_grad(): #disable back prop to test the model
+    #model = model.eval()
+    out_data = []
+    batch_size_test = batch_size
+    correct = 0
+    incorrect= 0
+    recall_correct = 0
+    recall_total = 0
+    total = 0
+    for i, (inputs, labels) in enumerate( testloader):
+        inputs = inputs.cuda(non_blocking=True, device = cuda_device).float()
+        labels = labels.cuda(non_blocking=True, device = cuda_device).view( batch_size_test ).long().cpu().numpy()
+        outputs = model(inputs).cuda(device = cuda_device)          
+        if binary:
+          print(outputs)
+          for i in outputs:
+            preds = (i > THRESHOLD)
+            c = (preds == labels[0]).item()
+            print("Reported Result {} -- Output: {} -- Prediction: {} -- Label: {}".format(c, outputs, preds ,labels))
+        else:
+          preds = torch.argmax(outputs.view(batch_size_test,train_dataset.get_n_classes()),1).long().cpu().numpy()
+          c = (preds == labels).sum()
+
+        correct += c 
+        t = len(labels)
+        total += t
+        for l,p in zip(labels, preds):
+          if l == 1:
+            recall_total += 1
+            rt = 1 
+            if l == p:
+              rc = 1
+              recall_correct += 1
+            else:
+              rc = 0
+          else:
+            rt = 0
+        outputs = outputs.cpu().numpy()
+        df_dict = {df.columns[0]: labels , df.columns[1]: preds}
+        df_new = pd.DataFrame(df_dict)
+
+        df = pd.concat([df,df_new],ignore_index = True)
 
   
-    print("Training Data Size {} -- Testing Data Size {}".format(len(trainloader), len(testloader)))
-    """
-    ## Train the model
-    """
-    #train_model(model , hyperparameter, trainloader , 50, batch_size , cuda_device)
-    #model = freeze_FCN(model)
-    train_model_aug(model , hyperparameter, trainloader , hyperparameter["epochs"], batch_size , cuda_device, augment_num = 1, graph = plot_queue, binary = binary) 
-    """
-    ## Test the model
-    """
-    with torch.no_grad(): #disable back prop to test the model
-      #model = model.eval()
-      out_data = []
-      batch_size_test = 1
-      correct = 0
-      incorrect= 0
-      recall_correct = 0
-      recall_total = 0
-      total = 0
-      dataset.get_source()
-      for i, (inputs, labels) in enumerate( testloader):
-          inputs = inputs.cuda(non_blocking=True, device = cuda_device).float()
-          labels = labels.cuda(non_blocking=True, device = cuda_device).view( batch_size_test ).long().cpu().numpy()
-          ID = dataset.get_id()
-          source = dataset.get_source()[0]
-          outputs = model(inputs).cuda(device = cuda_device)          
-          if binary:
-            print(outputs)
-            for i in outputs:
-              preds = (i > THRESHOLD)
-              c = (preds == labels[0]).item()
-              print("Reported Result {} -- Output: {} -- Prediction: {} -- Label: {}".format(c, outputs, preds ,labels))
-          else:
-            preds = torch.argmax(outputs.view(batch_size_test,2),1).long().cpu().numpy()
-            c = (preds == labels).sum()
-
-          correct += c 
-          t = len(labels)
-          total += t
-          for l,p in zip(labels, preds):
-            if l == 1:
-              recall_total += 1
-              rt = 1 
-              if l == p:
-                rc = 1
-                recall_correct += 1
-              else:
-                rc = 0
-            else:
-              rt = 0
-          outputs = outputs.cpu().numpy()
-          if binary:
-            df = df.append(pd.Series([ID, source, labels , outputs, outputs,preds,c, model_id], index = df.columns),ignore_index = True) 
-          else:
-            df = df.append(pd.Series([ID, source, labels , outputs[:,0], outputs[:,1],preds,c, model_id], index = df.columns),ignore_index = True) 
-    
     print("Total Correct : {} / {} -- Recall : {} / {}".format(correct,total, recall_correct , recall_total)) 
     print() 
     df.to_csv("results_df.csv")
@@ -211,12 +192,6 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
     model_zoo = "{}/scripts/HPO/src/HPO/model_zoo/".format(os.environ["HOME"])
     torch.save(model.state_dict() , model_zoo+"-Acc-{}-Rec-{}".format(acc, recall))
     save_obj( hyperparameter , model_zoo+"hps/"+"-Acc-{}-Rec-{}".format(acc , recall) )
-    acc_full[0] += correct
-    acc_full[1] += total
-    recall_full[0] += recall_correct
-    recall_full[1] += recall_total
-  recall = recall_full[0]/recall_full[1]
-  acc = acc_full[0]/acc_full[1]
   df.to_csv("results_df.csv")
   print("Final Scores -- ACC: {} -- REC: {}".format(acc, recall))
   return acc, recall
@@ -225,7 +200,7 @@ if __name__ == "__main__":
   import multiprocessing
   user = input("Overwrite old DataFrame? (y/n)")
   if user.lower() == "y":
-    df = pd.DataFrame(columns = ["Sample_ID","Source" , "Label", "Prediction_0", "Prediction_1","Output", "Correct", "Model_ID"])
+    df = pd.DataFrame(columns = [ "Label","Output"])
     df.to_csv("results_df.csv")
     print("New DataFrame Created")
   for i in range(10):
@@ -234,12 +209,12 @@ if __name__ == "__main__":
     #0.7790697674418605,0.5853658536585366
     hyperparameter  ={'T_0': 20, 'T_mult': 1, 'batch_size': 2, 'channels': 27, 'epochs': 155, 'layers': 8, 'lr': 0.0019989653577959284, 'normal_index_0_0': 1, 'normal_index_0_1': 1, 'normal_index_1_0': 1, 'normal_index_1_1': 1, 'normal_index_2_0': 3, 'normal_index_2_1': 3, 'normal_index_3_0': 4, 'normal_index_3_1': 1, 'normal_node_0_0': 'skip_connect', 'normal_node_0_1': 'dil_conv_3x3', 'normal_node_1_0': 'sep_conv_3x3', 'normal_node_1_1': 'dil_conv_5x5', 'normal_node_2_0': 'max_pool_3x3', 'normal_node_2_1': 'sep_conv_3x3', 'normal_node_3_0': 'dil_conv_3x3', 'normal_node_3_1': 'avg_pool_3x3', 'p': 0.17718387446598843, 'reduction_index_0_0': 0, 'reduction_index_0_1': 1, 'reduction_index_1_0': 0, 'reduction_index_1_1': 1, 'reduction_index_2_0': 1, 'reduction_index_2_1': 1, 'reduction_index_3_0': 4, 'reduction_index_3_1': 4, 'reduction_node_0_0': 'max_pool_3x3', 'reduction_node_0_1': 'dil_conv_5x5', 'reduction_node_1_0': 'skip_connect', 'reduction_node_1_1': 'max_pool_3x3', 'reduction_node_2_0': 'none', 'reduction_node_2_1': 'max_pool_3x3', 'reduction_node_3_0': 'sep_conv_3x3', 'reduction_node_3_1': 'avg_pool_3x3'}    
     hyperparameter = {
-  "T_0" : 10,
+  "T_0" : 3,
   "c1" : 2.5,
   "T_mult" : 1,
-  "batch_size" : 4,
-  "channels" : 19,
-  "epochs" : 300,
+  "batch_size" : 256,
+  "channels" : 64,
+  "epochs" : 30,
   "layers" : 3,
   "lr" : 0.002993825743228492,
   "normal_index_0_0" : 0,
@@ -278,6 +253,5 @@ if __name__ == "__main__":
     queue = multiprocessing.Queue()
     plotter = LivePlot(queue)
     plot_process = multiprocessing.Process(target=plotter.show,args=())
-    plot_process.start()
-    _compute(hyperparameter,model_id = "Binary_run_aug_intense_{}".format(i), binary = True, plot_queue = queue)
+    _compute(hyperparameter,model_id = "Binary_run_aug_intense_{}".format(i), binary = False, plot_queue = queue)
 

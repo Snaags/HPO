@@ -16,7 +16,6 @@ class Cell(nn.Module):
   """
   def __init__(self, genotype, C_prev_prev, C_prev, C, reduction, reduction_prev):
     super(Cell, self).__init__()
-    print(C_prev_prev, C_prev, C)
 
     if reduction_prev:
       self.preprocess0 = FactorizedReduce(C_prev_prev, C)
@@ -70,7 +69,7 @@ class Cell(nn.Module):
 
 class NetworkMain(nn.Module):
 
-  def __init__(self, stem_channels ,C, num_classes, layers, auxiliary, drop_prob ,genotype):
+  def __init__(self, stem_channels ,C, num_classes, layers, auxiliary, drop_prob ,genotype, binary = False):
     super(NetworkMain, self).__init__()
     self._layers = layers
     self._auxiliary = auxiliary
@@ -106,7 +105,10 @@ class NetworkMain(nn.Module):
       self.auxiliary_head = AuxiliaryHeadCIFAR(C_to_auxiliary, num_classes)
     self.global_pooling = nn.AdaptiveAvgPool1d(1)
     self.c_out = C_prev
-    self.classifier = nn.Linear(C_prev, num_classes)
+    if binary == True:
+      self.classifier = nn.Linear(C_prev, 1)
+    else:
+      self.classifier = nn.Linear(C_prev, num_classes)
   
   def get_channels(self):
     return self.c_out
