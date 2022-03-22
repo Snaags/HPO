@@ -16,7 +16,8 @@ URL = "http://www.timeseriesclassification.com/Downloads/"
 class UEA_Handler:
   def __init__(self):
     self.initial_path = os.getcwd()
-    os.chdir("src/HPO/data/UEA")
+    dataset_dir = input("Enter absolute path to store datasets (e.g. /home/user/scripts/datasets/)")
+    os.chdir("")
     self.datasets = {}
     path = ""
     with open("{}UEA_meta.csv".format(path)) as csvfile:
