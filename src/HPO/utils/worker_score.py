@@ -1,61 +1,127 @@
-class evaluator:
-  def __init__(self, model , testloader, batch_size,n_classes):
-    with torch.no_grad(): #disable back prop to test the model
-      out_data = []
-      self.batch_size = batch_size
-      self.correct = 0
-      self.incorrect= 0
-      self.total = 0
-      self.confusion_matrix = np.zeros(shape = (n_classes,n_classes))
-      self.testloader = testloader
-      self.model_prob = np.zeros(shape = (len(testloader), n_classes)) # [sample , classes]
-      self.labels = np.zeros(shape = (len(testloader),1))
-  def forward_pass(self):
-      for i, (inputs, labels) in enumerate( testloader ):
-          start_index = i * batch_size
-          end_index = (i * batch_size) + batch_size
-          inputs = inputs.cuda(non_blocking=True, device = cuda_device).float()
-          self.labels[start_index:end_index , :] = labels.cpu().numpy()
-          self.model_prob[start_index:end_index,:] = model(inputs).cpu().numpy()       
+from sklearn.metrics import confusion_matrix
+import numpy as np
+import torch
 
-  def predictions(self, binary = False, THRESHOLD = None):
-          if binary:
-            self.prediction = np.where(self.model_prob > THRESHOLD, 1,0)
-            assert self.prediction.shape == (len(testloader),1), "Shape of prediction is {} when it should be {}".format(self.prediction.shape, (len(testloader),1))
-            self.correct = (self.predictions == self.labels)
-          else:
-            self.prediction = numpy.argmax(self.model_prob, axis = 1)
-            assert self.prediction.shape == (len(testloader),1),  "Shape of prediction is {} when it should be {}".format(self.prediction.shape, (len(testloader),1))
-            self.correct = (self.predictions == self.labels)
+class Evaluator:
+  def __init__(self,batch_size,n_classes,cuda_device):
+    out_data = []
+    self.cuda_device = cuda_device
+    self.batch_size = batch_size
+    self.correct = [] #Binary Array of correct/incorrect for each sample
+    self.n_correct = 0 #Number of correct values
+    self.n_incorrect= 0 # Number of incorrect values
+    self.n_classes = n_classes
+    self.n_total = 0 #Total number of values
+    self.confusion_matrix = np.zeros(shape = (n_classes,n_classes)) #Matrix of prediction vs true values
+
+
+  def forward_pass(self, model , testloader,binary = False):
+    if binary == True:
+      s = torch.nn.Sigmoid()
+      self.model_prob = np.zeros(shape = (len(testloader), 1)) # [sample , classes]
+    else:
+      s = torch.nn.Identity()
+      self.model_prob = np.zeros(shape = (len(testloader), self.n_classes)) # [sample , classes]
+    self.labels = np.zeros(shape = (len(testloader),1))
+    #Pass validation set through model getting probabilities and labels
+    with torch.no_grad(): #disable back prop to test the model
+      for i, (inputs, labels) in enumerate( testloader ):
+          print(labels)
+          start_index = i * self.batch_size
+          end_index = (i * self.batch_size) + self.batch_size
+          inputs = inputs.cuda(non_blocking=True, device = self.cuda_device).float()
+          self.labels[start_index:end_index , :] = labels.cpu().numpy()
+          out = s(model(inputs)).cpu().numpy()      
+          self.model_prob[start_index:end_index,:] = out
+
+  def update_CM(self):
+    self.confusion_matrix += confusion_matrix(self.labels, self.prediction,labels = list(range(self.n_classes))) 
+
+
+  def predictions(self, model_is_binary = False, THRESHOLD = None):
+      if model_is_binary:
+
+        self.prediction = np.where(self.model_prob > THRESHOLD, 1,0)
+        for m,p, l in zip(self.model_prob, self.prediction, self.labels):
+          print("Logit: {} -- Predicted: {} label: {}".format(m,p,l))
+        assert self.prediction.shape == (len(self.model_prob),1), "Shape of prediction is {} when it should be {}".format(self.prediction.shape, (len(self.model_prob),1))
+      else:
+        self.prediction = numpy.argmax(self.model_prob, axis = 1)
+        assert self.prediction.shape == (len(self.model_prob),1),  "Shape of prediction is {} when it should be {}".format(self.prediction.shape, (len(self.model_prob),1))
+      self.update_CM()
+      print(self.confusion_matrix)
+  def TP(self, value):
+    TP = self.confusion_matrix[value,value]
+    return TP
+
+  def TN(self, value):
+    TN = 0
+    idx = [x for x in range(self.confusion_matrix.shape[0]) if x != value]
+    for i in idx:
+      TN += np.sum(self.confusion_matrix[i,idx]) 
+    return TN 
+
+  def FN(self, value):
+    idx = [x for x in range(self.confusion_matrix.shape[0]) if x != value]
+    FN = np.sum(self.confusion_matrix[value,idx])
+    return FN
+
+  def FP(self, value):
+    idx = [x for x in range(self.confusion_matrix.shape[0]) if x != value]
+    FP = np.sum(self.confusion_matrix[idx,value])
+    return FP
+
+  def P(self,value):
+    P = np.sum(self.confusion_matrix[value,:])
+    return P
+
+  def N(self,value):
+    N = 0
+    idx = [x for x in range(self.confusion_matrix.shape[0]) if x != value]
+    for i in idx:
+      N += np.sum(self.confusion_matrix[i,:])
+    return N
+  def T(self):
+    return self.P(0),self.N(0) 
   
+  def ACC(self, value):
+    return ( self.TP(value) + self.TN(value) ) / ( self.P(value) + self.N(value) )
+
+  def TPR(self, value):
+    return self.TP(value)/self.P(value)
+
+  def TNR(self, value):
+    return self.TN(value)/self.N(value)
+
+  def PPV(self, value):
+    tp = self.TP(value)
+    return tp/(tp + self.FP(value))
+
+  def NPV(self, value):
+    tn = self.TN(value)
+    return tn/(tn + self.FN(value))
+
+  def FNR(self, value):
+    pass
+
+  def FPR(self, value):
+    pass 
+
+  def T_ACC(self) -> float:
+    tp ,tn ,p , n = 0,0,0,0
+    for value in range(self.n_classes):
+      tp += self.TP(value) 
+      tn += self.TN(value) 
+      p += self.P(value)
+      n += self.N(value)
+    return ( tp + tn ) / ( p + n )
       
-  def evaluate(self):
-      for i, (inputs, labels) in enumerate( testloader):
-          inputs = inputs.cuda(non_blocking=True, device = cuda_device).float()
-          labels = labels.cuda(non_blocking=True, device = cuda_device).view( batch_size_test ).long().cpu().numpy()
-          outputs = model(inputs).cuda(device = cuda_device)          
-          if binary:
-            print(outputs)
-            for i in outputs:
-              preds = (i > THRESHOLD)
-              c = (preds == labels[0]).item()
-              print("Reported Result {} -- Output: {} -- Prediction: {} -- Label: {}".format(c, outputs, preds ,labels))
-          else:
-            preds = torch.argmax(outputs.view(batch_size_test,n_classes),1).long().cpu().numpy()
-            c = (preds == labels).sum()
-  
-          correct += c 
-          t = len(labels)
-          total += t
-          for l,p in zip(labels, preds):
-            if l == 1:
-              recall_total += 1
-              rt = 1 
-              if l == p:
-                rc = 1
-                recall_correct += 1
-              else:
-                rc = 0
-            else:
-              rt = 0
-          outputs = outputs.cpu().numpy()
+
+
+
+
+
+
+
+
+

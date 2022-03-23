@@ -106,6 +106,8 @@ class NetworkMain(nn.Module):
     self.global_pooling = nn.AdaptiveAvgPool1d(1)
     self.c_out = C_prev
     if binary == True:
+      self.binary = binary
+      self.outact = nn.Sigmoid()
       self.classifier = nn.Linear(C_prev, 1)
     else:
       self.classifier = nn.Linear(C_prev, num_classes)
@@ -127,6 +129,8 @@ class NetworkMain(nn.Module):
   def forward(self, input):
     out = self._forward(input)
     logits = self.classifier(out)
+    #if self.binary:
+    #  logits = self.outact(logits)
     return logits
 
 

@@ -395,23 +395,21 @@ class Test_TEPS_split_binary(TEPS_split_binary):
 
 class repsol_full(Dataset):
 
-  def __init__(self, augmentations_num, files : list, path_dir : str, augmentations, gen_augs = False):
+  def __init__(self, augmentations_num, files : list, path_dir : str, augmentations, gen_augs = False, max_size = 3000, min_size = 500):
     path = "{}/scripts/datasets/".format(os.environ["HOME"])+path_dir
     data = []
     self.path ="{}/scripts/datasets/".format(os.environ["HOME"])
     self.aug_path = self.path + "repsol_augmented/"
     self.x_index_address = {}
     self.y_index_address = {}
-    print(augmentations)
     augmentations_per_batch = 2
     #index_list sum()
-    if augmentations == True:
-      self.non_warp_augmentations =[jitter, scaling ,permutation]
-      self.warp_augmentations = [time_warp,magnitude_warp, window_slice]
     self.device_track = {}
     for c,i in enumerate(files):
-      self.device_track[c] = i[:2]
-      data.append(np.reshape(np.load(path+i),(-1,28)))
+      sample = np.reshape(np.load(path+i),(-1,28))
+      if sample.shape[0] > min_size:
+        self.device_track[c] = i[:2]
+        data.append(sample[-1*max_size:,:])
     self.current_index = 0
     use_all = True
     multi_aug = augmentations_num
@@ -425,33 +423,6 @@ class repsol_full(Dataset):
       self.add_to_dataset(batch_x,batch_y)
       self.real_data_index = self.current_index
       self.aug_source_dict[self.real_data_index] = []
-      if augmentations:
-        print("Augs baby")
-        if gen_augs == True:
-          if use_all == True:
-            for _ in range(multi_aug):
-              x = batch_x.reshape(1,batch_x.shape[0],batch_x.shape[1])
-              augs = self.warp_augmentations +self.non_warp_augmentations
-              for i in range(len(augs)):
-                  x = augs.pop(random.randint(0,len(augs) -1))(x)
-              #self.save_2_file(x.reshape(*x.shape[1:]),batch_y , datapoint , _)
-              self.add_to_dataset(x.reshape(*x.shape[1:]),batch_y)
-              print("augment {} completed at sample: {}".format(self.current_index, datapoint), end = "\r")
-              self.aug_source_dict[self.real_data_index].append(self.current_index)
-          else:
-            for i in range(augmentations_per_batch):
-              augmentations_for_current_batch = []
-              temp_augmentation_list = self.non_warp_augmentations.copy()
-              augmentations_for_current_batch.append(random.choice(self.warp_augmentations))
-              x = batch_x.reshape(1,batch_x.shape[0],batch_x.shape[1])
-              while len(augmentations_for_current_batch) < 3:
-                augmentations_for_current_batch.append(temp_augmentation_list.pop(random.randint(0,len(temp_augmentation_list)-1)))
-        
-                for augmentation_function in augmentations_for_current_batch:
-                  x = augmentation_function(x)
-                self.add_to_dataset(x.reshape(*x.shape[1:]),batch_y)
-        else:
-          self.load_augmentations(datapoint , multi_aug) 
     
     self.n_samples = self.current_index #* len(self.augmentations)
     self.features = 27
@@ -476,7 +447,7 @@ class repsol_full(Dataset):
 
   def add_to_dataset(self,x,y):
 
-    self.x_index_address[self.current_index] = torch.from_numpy(x.reshape(x.shape[1], x.shape[0]))
+    self.x_index_address[self.current_index] = torch.from_numpy(np.swapaxes(x, 0,1))
     self.y_index_address[self.current_index] = torch.from_numpy(np.unique(y).reshape((1,)))
     self.current_index += 1 
 

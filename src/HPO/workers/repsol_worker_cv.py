@@ -22,7 +22,7 @@ from HPO.workers.repeat_worker import worker_wrapper, one_out_cv_aug, one_out_cv
 from queue import Empty
 from sklearn.model_selection import KFold
 from collections import namedtuple
-
+from HPO.utils.worker_score import Evaluator 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib import style
@@ -92,38 +92,19 @@ def compute( ID = None, configs=None , gpus=None , res = None  , config = None):
   torch.cuda.empty_cache()
   
 def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None,  test_dataset = None, cuda_device = None,plot_queue = None, model_id = None, binary = False):
-  THRESHOLD = 0.5 #Cut off for classification
+  THRESHOLD = 0.3 #Cut off for classification
   if cuda_device == None:
      cuda_device = 0# torch.cuda.current_device()
   dataset = Mixed_repsol_full(0,augmentations_on = False)
   torch.cuda.set_device(cuda_device)
   print("Cuda Device Value: ", cuda_device)
   
-  df = pd.read_csv("results_df.csv", index_col = 0)
   batch_size = hyperparameter["batch_size"]
-  
-  # model = in_model
-  # model.reset_stem(train_dataset.features)  
-  # model.reset_fc(2)
-  # model = freeze_all_cells( model )
-  PRETRAIN = False
-  LOAD = False
-  pretrain_path = "pretrain"
-  gen = config_space_2_DARTS(hyperparameter)
-  if PRETRAIN:
-    model = NetworkMain(27,hyperparameter["channels"],num_classes= 2 , layers = hyperparameter["layers"], auxiliary = False,drop_prob= hyperparameter["p"], genotype = gen)
-    model = model.cuda(device = cuda_device)      
-    if not LOAD:
-      pretrain_path = "pretrain"
-      pretrain_dataset = repsol_unlabeled()
-      pretrain_dataloader = DataLoader( pretrain_dataset, batch_size=64,
-        shuffle = True,drop_last=True , collate_fn = collate_fn_padd_x)
-      train_model_bt(model , hyperparameter, pretrain_dataloader , 2, batch_size = 64, cuda_device = cuda_device, graph = plot_queue)
-      torch.save(model.state_dict(), pretrain_path)
 
+  gen = config_space_2_DARTS(hyperparameter,reduction = True)
+  n_classes = dataset.get_n_classes()
   kfold = KFold(n_splits = 8, shuffle = True)
-  acc_full = [0,0]
-  recall_full = [0,0]
+  evaluator = Evaluator(1, n_classes,cuda_device) 
   for fold,(train_idx,test_idx) in enumerate(kfold.split(dataset)):
     print('------------fold no---------{}----------------------'.format(fold))
     train_subsampler = torch.utils.data.SubsetRandomSampler(train_idx)
@@ -135,13 +116,10 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
     testloader = torch.utils.data.DataLoader(
                         dataset,collate_fn = collate_fn_padd,
                         batch_size=1, sampler=test_subsampler)
+
    
-    #model = Model(input_size = ( dataset.get_n_features(), ) ,output_size = 2 ,hyperparameters = hyperparameter)
-    if not PRETRAIN:
-      model = NetworkMain(27,hyperparameter["channels"],num_classes= 2 , layers = hyperparameter["layers"], auxiliary = False,drop_prob = hyperparameter["p"], genotype = gen, binary = binary)
-      model = model.cuda(device = cuda_device)
-    else:
-      model.load_state_dict(torch.load(pretrain_path))
+    model = NetworkMain(27,hyperparameter["channels"],num_classes= 2 , layers = hyperparameter["layers"], auxiliary = False,drop_prob = hyperparameter["p"], genotype = gen, binary = binary)
+    model = model.cuda(device = cuda_device)
 
   
     print("Training Data Size {} -- Testing Data Size {}".format(len(trainloader), len(testloader)))
@@ -154,70 +132,19 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
     """
     ## Test the model
     """
-    with torch.no_grad(): #disable back prop to test the model
-      #model = model.eval()
-      out_data = []
-      batch_size_test = 1
-      correct = 0
-      incorrect= 0
-      recall_correct = 0
-      recall_total = 0
-      total = 0
-      dataset.get_source()
-      for i, (inputs, labels) in enumerate( testloader):
-          inputs = inputs.cuda(non_blocking=True, device = cuda_device).float()
-          labels = labels.cuda(non_blocking=True, device = cuda_device).view( batch_size_test ).long().cpu().numpy()
-          ID = dataset.get_id()
-          source = dataset.get_source()[0]
-          outputs = model(inputs).cuda(device = cuda_device)          
-          if binary:
-            print(outputs)
-            for i in outputs:
-              preds = (i > THRESHOLD)
-              c = (preds == labels[0]).item()
-              print("Reported Result {} -- Output: {} -- Prediction: {} -- Label: {}".format(c, outputs, preds ,labels))
-          else:
-            preds = torch.argmax(outputs.view(batch_size_test,2),1).long().cpu().numpy()
-            c = (preds == labels).sum()
+    evaluator.forward_pass(model, testloader,binary)
+    evaluator.predictions(model_is_binary = binary , THRESHOLD = THRESHOLD)
 
-          correct += c 
-          t = len(labels)
-          total += t
-          for l,p in zip(labels, preds):
-            if l == 1:
-              recall_total += 1
-              rt = 1 
-              if l == p:
-                rc = 1
-                recall_correct += 1
-              else:
-                rc = 0
-            else:
-              rt = 0
-          outputs = outputs.cpu().numpy()
-          if binary:
-            df = df.append(pd.Series([ID, source, labels , outputs, outputs,preds,c, model_id], index = df.columns),ignore_index = True) 
-          else:
-            df = df.append(pd.Series([ID, source, labels , outputs[:,0], outputs[:,1],preds,c, model_id], index = df.columns),ignore_index = True) 
-    
-    print("Total Correct : {} / {} -- Recall : {} / {}".format(correct,total, recall_correct , recall_total)) 
-    print() 
-    df.to_csv("results_df.csv")
-    
-    acc = correct/total if total else np.NaN
-    recall = recall_correct/recall_total if recall_total else np.NaN
+    total = evaluator.T()
+    acc  =  evaluator.T_ACC()
+    recall = evaluator.TPR(1)
+    recall_total = evaluator.P(1)
+
     print("Accuracy: ", "%.4f" % ((acc)*100), "%")
     print("Recall: ", "%.4f" % ((recall)*100), "%")
-    model_zoo = "{}/scripts/HPO/src/HPO/model_zoo/".format(os.environ["HOME"])
+    model_zoo = "{}/scripts/model_zoo/".format(os.environ["HOME"])
     torch.save(model.state_dict() , model_zoo+"-Acc-{}-Rec-{}".format(acc, recall))
     save_obj( hyperparameter , model_zoo+"hps/"+"-Acc-{}-Rec-{}".format(acc , recall) )
-    acc_full[0] += correct
-    acc_full[1] += total
-    recall_full[0] += recall_correct
-    recall_full[1] += recall_total
-  recall = recall_full[0]/recall_full[1]
-  acc = acc_full[0]/acc_full[1]
-  df.to_csv("results_df.csv")
   print("Final Scores -- ACC: {} -- REC: {}".format(acc, recall))
   return acc, recall
 
@@ -237,9 +164,9 @@ if __name__ == "__main__":
   "T_0" : 10,
   "c1" : 2.5,
   "T_mult" : 1,
-  "batch_size" : 4,
-  "channels" : 19,
-  "epochs" : 300,
+  "batch_size" : 2,
+  "channels" : 54,
+  "epochs" : 148,
   "layers" : 3,
   "lr" : 0.002993825743228492,
   "normal_index_0_0" : 0,
@@ -253,7 +180,7 @@ if __name__ == "__main__":
   "normal_node_0_0" : 'skip_connect',
   "normal_node_0_1" : 'dil_conv_3x3',
   "normal_node_1_0" : 'sep_conv_3x3',
-  "normal_node_1_1" : 'dil_conv_5x5',
+  "normal_node_1_1" : 'sep_conv_15x15',
   "normal_node_2_0" : 'max_pool_3x3',
   "normal_node_2_1" : 'sep_conv_3x3',
   "normal_node_3_0" : 'dil_conv_3x3',

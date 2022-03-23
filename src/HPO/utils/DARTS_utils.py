@@ -1,10 +1,10 @@
-
+import copy
 from collections import namedtuple
 Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
 
 
 
-def config_space_2_DARTS(hyperparameters):
+def config_space_2_DARTS(hyperparameters,reduction = False):
   normal = [0,0,0,0,0,0,0,0]
   reduce = [0,0,0,0,0,0,0,0]
   for i in hyperparameters:
@@ -38,6 +38,9 @@ def config_space_2_DARTS(hyperparameters):
           reduce[idx][0] = hyperparameters[i]
   normal_concat = [x for x in range(2,len(normal)//2+2)]
   reduce_concat = [x for x in range(2,len(normal)//2+2)]
+  if reduction == False:
+    print("Reduction cell architecture disabled!")
+    reduce = copy.copy(normal)
   for n,r in zip(normal, reduce):
     if n[1] in normal_concat:
       normal_concat.pop(normal_concat.index(n[1]))

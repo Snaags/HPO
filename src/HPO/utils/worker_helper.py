@@ -5,7 +5,7 @@ import numpy as np
 from torch import Tensor
 from HPO.utils.model_constructor import Model
 from torch.utils.data import DataLoader
-from HPO.utils.time_series_augmentation_torch import jitter, scaling , rotation, window_warp, crop, cutout
+from HPO.utils.time_series_augmentation_torch import jitter, scaling , rotation, window_warp, crop, cutout,mix_up, cut_mix
 class WeightTest:
   def __init__(self, model):
     self.count_dict = {}
@@ -117,7 +117,7 @@ def train_model_aug(model : Model , hyperparameter : dict, dataloader : DataLoad
     criterion = nn.BCEWithLogitsLoss().cuda(device = cuda_device)
   
   else:
-      criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss()
   epoch = 0
   peak_acc = 0
   loss_list = []
@@ -132,10 +132,14 @@ def train_model_aug(model : Model , hyperparameter : dict, dataloader : DataLoad
     for i, (samples, labels) in enumerate( dataloader ):
       samples = samples.cuda(non_blocking=True, device = cuda_device)
       labels = labels.cuda(non_blocking=True, device = cuda_device)
-      for i in range(augment_num):
-          aug_list.append(augment(samples,hyperparameter, cuda_device))
+      if augment_num:
+          aug_sample , aug_label = augment(samples,labels,hyperparameter, cuda_device)
+          aug_list.append(aug_sample)
+          aug_labels.append(aug_label)
+      else:
+          aug_list.append(samples)
           aug_labels.append(labels)
-    
+
     for i , (samples , labels) in enumerate(zip(aug_list , aug_labels)):
       optimizer.zero_grad()
       if batch_size > 1:
@@ -283,32 +287,31 @@ def train_model_bt(model : Model , hyperparameter : dict, dataloader : DataLoade
 
 
 
-def augment(x, hp, device = None):
-  augs = [jitter, scaling, window_warp]
+def augment(x, y,hp, device = None):
+  augs = [jitter, scaling, window_warp, mix_up,cutout,cut_mix]
   if "jitter" in hp:
     args = [hp["jitter"], hp["scaling"], hp["window_warp_num"]]
     rates = [hp["jitter_rate"], hp["scaling_rate"], hp["window_warp_rate"]]
     if device == None:
       for func,arg,rate in zip(augs,args, rates):
         if random.random() > rate:
-          x = func(x, arg )
+          x,y = func(x,y, arg )
     else:
       for func,arg,rate in zip(augs,args, rates):
         if random.random() > rate:
-          x = func(x, arg , device = device)
+          x,y = func(x,y, arg , device = device)
     return x
   else:
-    rate = 0.3
+    rate = 0.1
     if device == None:
       for func in augs:
         if random.random() > rate:
-          x = func(x)
+          x,y = func(x,y)
     else:
       for func in augs:
         if random.random() > rate:
-          x = func(x, device = device)
-
-    return x 
+          x,y = func(x,y, device = device)
+    return x ,y 
 def barlow_twins(model, batch, cuda_device = None):
   N = batch.shape[0] #Batch Size
   lmbda = 0.005
