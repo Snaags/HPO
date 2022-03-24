@@ -51,14 +51,14 @@ def compute( ID = None, configs=None , gpus=None , res = None  , config = None):
     if device != None:
       print("Starting config with device: {}".format(device))
       for crashes in range(3):
-      try:
-        acc , rec =  _compute(hyperparameter = config , cuda_device = device)
-      except:
-        print("Model crash: {} ".format(crashes+1))
-        time.sleep(60)
-        if crashes == 2:
-          print("Final Crash giving score of zero")
-          acc , rec = 0 , 0 
+        try:
+          acc , rec =  _compute(hyperparameter = config , cuda_device = device)
+        except:
+          print("Model crash: {} ".format(crashes+1))
+          time.sleep(60)
+          if crashes == 2:
+            print("Final Crash giving score of zero")
+            acc , rec = 0 , 0 
       res.put([config , acc , rec ]) 
 
   torch.cuda.empty_cache()

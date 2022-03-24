@@ -53,11 +53,11 @@ def init_config():
   ###Optimiser###
   lr =CSH.UniformFloatHyperparameter(name = "lr",			lower = 0.000001  ,upper = 0.05)
   p =CSH.UniformFloatHyperparameter(name = "p",			lower = 0.01 ,upper = 0.3 )
-  epochs = CSH.UniformIntegerHyperparameter(name = "epochs", lower = 4, upper = 15)
-  layers = CSH.UniformIntegerHyperparameter(name = "layers", lower = 2, upper = 3)
+  epochs = CSH.UniformIntegerHyperparameter(name = "epochs", lower = 4, upper = 150)
+  layers = CSH.UniformIntegerHyperparameter(name = "layers", lower = 2, upper = 5)
   T_0 = CSH.UniformIntegerHyperparameter(name = "T_0", lower = 1, upper = 20)
   T_mult = CSH.UniformIntegerHyperparameter(name = "T_mult", lower = 1, upper = 3)
-  channels = CSH.UniformIntegerHyperparameter(name = "channels", lower = 4, upper = 10)
+  channels = CSH.UniformIntegerHyperparameter(name = "channels", lower = 10, upper = 40)
   
 
 

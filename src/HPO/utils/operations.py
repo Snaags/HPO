@@ -10,7 +10,7 @@ OPS = {
   'sep_conv_3x3' : lambda C, stride, affine: SepConv(C, C, 3, stride, 1, affine=affine),
   'sep_conv_5x5' : lambda C, stride, affine: SepConv(C, C, 5, stride, 2, affine=affine),
   'sep_conv_7x7' : lambda C, stride, affine: SepConv(C, C, 7, stride, 3, affine=affine),
-  'sep_conv_15x15' : lambda C, stride, affine: SepConv(C, C, 15, stride, 7, affine=affine),
+  'sep_conv_9x9' : lambda C, stride, affine: SepConv(C, C, 9, stride, 7, affine=affine),
   'dil_conv_3x3' : lambda C, stride, affine: DilConv(C, C, 3, stride, 2, 2, affine=affine),
   'dil_conv_5x5' : lambda C, stride, affine: DilConv(C, C, 5, stride, 4, 2, affine=affine)
 }
