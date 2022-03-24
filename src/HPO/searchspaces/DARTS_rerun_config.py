@@ -22,7 +22,7 @@ def init_config():
     'sep_conv_3x3',
     'sep_conv_5x5',
     'sep_conv_7x7',
-    'sep_conv_15x15',
+    'sep_conv_9x9',
     'dil_conv_3x3',
     'dil_conv_5x5'
   ]
@@ -55,7 +55,6 @@ def init_config():
   p =CSH.UniformFloatHyperparameter(name = "p",			lower = 0.01 ,upper = 0.3 )
   epochs = CSH.UniformIntegerHyperparameter(name = "epochs", lower = 4, upper = 15)
   layers = CSH.UniformIntegerHyperparameter(name = "layers", lower = 2, upper = 3)
-  c1 = CSH.UniformFloatHyperparameter(name = "c1_weight" , lower = 1,upper = 3)
   T_0 = CSH.UniformIntegerHyperparameter(name = "T_0", lower = 1, upper = 20)
   T_mult = CSH.UniformIntegerHyperparameter(name = "T_mult", lower = 1, upper = 3)
   channels = CSH.UniformIntegerHyperparameter(name = "channels", lower = 4, upper = 10)
@@ -87,7 +86,6 @@ def init_config():
     ###Topology Definition]###
   
   hp_list = [
-        c1,
         epochs,
         lr,
         p,

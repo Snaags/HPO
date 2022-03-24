@@ -50,7 +50,15 @@ def compute( ID = None, configs=None , gpus=None , res = None  , config = None):
 
     if device != None:
       print("Starting config with device: {}".format(device))
-      acc , rec =  _compute(hyperparameter = config , cuda_device = device)
+      for crashes in range(3):
+      try:
+        acc , rec =  _compute(hyperparameter = config , cuda_device = device)
+      except:
+        print("Model crash: {} ".format(crashes+1))
+        time.sleep(60)
+        if crashes == 2:
+          print("Final Crash giving score of zero")
+          acc , rec = 0 , 0 
       res.put([config , acc , rec ]) 
 
   torch.cuda.empty_cache()
@@ -76,8 +84,10 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
   evaluator = Evaluator(1, n_classes,cuda_device) 
 
   for outer in range(OUTER_LOOP):
+
     for fold,(train_idx,test_idx) in enumerate(kfold.split(dataset)):
       print('--Outer Loop-- {}---Fold No.--{}----------------------'.format(outer,fold))
+      torch.cuda.empty_cache()
       train_subsampler = torch.utils.data.SubsetRandomSampler(train_idx)
       test_subsampler = torch.utils.data.SubsetRandomSampler(test_idx)
      
