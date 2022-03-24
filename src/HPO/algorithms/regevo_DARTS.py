@@ -233,10 +233,10 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
 
 
 def main(worker, configspace):
-  pop_size = 5
-  evaluations = 500
+  pop_size = 125
+  evaluations = 3000
   load_file = "RegEvo.csv"
-  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =5, sample_batch_size = 2)
+  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =25, sample_batch_size = 16)
   Architectures = []
   accuracy_scores = []
   generations = list(range(evaluations))
