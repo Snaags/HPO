@@ -97,12 +97,12 @@ def magnitude_warp(x : torch.Tensor,y, sigma=0.2, knot=4):
 
     return ret,y
 
-def crop(x : torch.Tensor,y, crop_min = 0.85, crop_max = 0.95):
+def crop(x : torch.Tensor,y, crop_min = 0.85, crop_max = 0.95, device = None):
   sig_len = x.shape[2]
   length= random.uniform(crop_min,crop_max)
   length = int(length * sig_len)
   if random.choice([0,1]) == 1:
-    return  x[:,:,:length]
+    return  x[:,:,:length],y
   else:
     return  x[:,:,(sig_len-length):],y
 
@@ -127,7 +127,7 @@ def cutout(x,y, perc=.1, device = None):
     # return new_ts, ts[start:end, ...]    
     return x,y 
 
-def mix_up(x,y, m = 0.2, device = None):
+def mix_up(x,y, m = 0.3, device = None):
     dist = torch.distributions.beta.Beta(m,m)
     DEBUG = False
     #x = [batch, channels , length]

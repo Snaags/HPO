@@ -287,29 +287,47 @@ def train_model_bt(model : Model , hyperparameter : dict, dataloader : DataLoade
 
 
 
+
+
 def augment(x, y,hp, device = None):
-  augs = [jitter, scaling, window_warp, mix_up,cutout,cut_mix]
+  augs = [jitter, scaling, window_warp,crop, mix_up,cutout,cut_mix]
+
   if "jitter" in hp:
-    args = [hp["jitter"], hp["scaling"], hp["window_warp_num"]]
-    rates = [hp["jitter_rate"], hp["scaling_rate"], hp["window_warp_rate"]]
+    args = [hp["jitter"], hp["scaling"], hp["window_warp_num"], hp["crop"] , hp["mix_up"], hp["cut_out"], hp["cut_mix"]]
+    rates = [hp["jitter_rate"], hp["scaling_rate"], hp["window_warp_rate"],hp["crop_rate"], hp["mix_up_rate"], hp["cut_out_rate"], hp["cut_mix_rate"]]
+
     if device == None:
       for func,arg,rate in zip(augs,args, rates):
-        if random.random() > rate:
-          x,y = func(x,y, arg )
+
+        if rate > 1:
+          for _ in range((int(rate)+1)):
+            if random.random() < (rate/(int(rate)+1)):
+              x,y = func(x, y, arg )
+        else:
+          if random.random() < rate:
+            x,y = func(x,y, arg )
+
     else:
       for func,arg,rate in zip(augs,args, rates):
-        if random.random() > rate:
-          x,y = func(x,y, arg , device = device)
-    return x
+        if rate > 1:
+          for _ in range((int(rate)+1)):
+            if random.random() < (rate/(int(rate)+1)):
+              x,y = func(x, y, arg )
+        else:
+          if random.random() < rate:
+            x,y = func(x,y, arg , device = device)
+
+    return x,y
+
   else:
     rate = 0.1
     if device == None:
       for func in augs:
-        if random.random() > rate:
+        if random.random() < rate:
           x,y = func(x,y)
     else:
       for func in augs:
-        if random.random() > rate:
+        if random.random() < rate:
           x,y = func(x,y, device = device)
     return x ,y 
 def barlow_twins(model, batch, cuda_device = None):

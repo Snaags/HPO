@@ -1,12 +1,12 @@
-#from multiprocessing import Queue, Process
-from threading import Thread as Process
-from queue import Queue
+from multiprocessing import Queue, Process
+#from threading import Thread as Process
+#from queue import Queue
 import time
 import csv
 from pynvml import *
 def assign_gpu():
   nvmlInit()
-  max_memory = 1000000000
+  max_memory = 3000000000
   count = nvmlDeviceGetCount()  
   gpu_list = []
   for i in range(count):
@@ -38,7 +38,7 @@ class train_eval:
     self.filename = filename
     self.worker = worker
 
-  def eval(self, population, datasets):
+  def eval(self, population, datasets = None):
     self.acc_list = []
     self.recall_list = []
     self.config_list = []
@@ -49,10 +49,6 @@ class train_eval:
     for i in population:
       self.config_queue.put(i.get_dictionary())
     
-    #Dataset can be train , validation or both as a list of lists [train, validation]
-    for i in datasets:
-      self.datasets.put(i)
-      print(self.datasets.qsize())
     #Initialise GPU slots
     for i in gpu:
       slots = i
@@ -66,6 +62,11 @@ class train_eval:
         print("Number of workers: {}".format(self.num_worker))
         self.processes.append(Process(target = self.worker , args = (i, self.config_queue , self.gpu_slots, self.results)))
     else:
+    #Dataset can be train , validation or both as a list of lists [train, validation]
+    
+      for i in datasets:
+        self.datasets.put(i)
+        print(self.datasets.qsize())
       for i in range(self.num_worker):
         print("Number of workers: {}".format(self.num_worker))
         self.processes.append(Process(target = self.worker , args = (i, self.config_queue , self.gpu_slots, self.results,self.datasets)))

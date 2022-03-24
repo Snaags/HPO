@@ -34,6 +34,7 @@ from HPO.algorithms.algorithm_utils import train_eval
 
 
 class Model:
+  MUTATE_RATE = 0.2
   def __init__(self, cs):
     self._arch = None
     self.accuracy = 0
@@ -44,10 +45,28 @@ class Model:
   def exchange_one( self , key : str ):
     new_hp = self.cs.sample_configuration().get_dictionary()[key]
     
-    print("Old value: {}".format(self._arch.get_dictionary()[key]))
     self._arch[key] = new_hp
-    print("New value: {}".format(self._arch.get_dictionary()[key]))
-    
+  
+  def perturb(self, key : str):
+    value_not_valid = True
+    value_type = self.fix_type(key)
+    while value_not_valid:
+      try:
+        self._arch[key] = self._arch[key] + value_type(self._arch[key]*random.uniform(0,Model.MUTATE_RATE)*random.choice([-1,1]))
+      except ValueError:
+        value_not_valid = True
+      else:
+        value_not_valid = False
+
+  def fix_type(self,key):
+    hp = str(self.cs[key])
+    if "Integer" in hp:
+      return round
+    if "Float" in hp:
+      return float
+    else:
+      return str
+
 
   def set_value(self, name, value):
     self._arch[name] = value
@@ -70,15 +89,52 @@ def model_change(parent, child):
   for _,i in zip(p_dict, c_dict):
     if p_dict[i] != c_dict[i]:
       print("Mutated {} from {} to {}".format(i, p_dict[i], c_dict[i]))
-      pass
+      return True
+  print("WARNING: no change found!!!")
+  return False
 
 
+
+def Mutate(cs, parent_model : Model) -> Model:
+  model = copy.deepcopy(parent_model) 
+    
+  def op_mutation(model: Model) -> Model:
+    operation = ""
+    while "node" not in operation:
+      operation = random.choice(model.arch().keys())
+    model.exchange_one(operation)
+    return model
+  
+
+  def cont_mutation( model : Model):
+    operation = ""
+    while ("node" in operation) or ("index" in operation) or operation == "": 
+      operation = random.choice(model.arch().keys())
+    model.perturb(operation)
+    return model
+    
+    
+     
+  def hidden_state_mutation(model : Model) -> Model:
+    operation = ""
+    while "index" not in operation:
+      operation = random.choice(model.arch().keys())
+    model.exchange_one(operation)
+    return model
+    
+
+  while not model_change(parent_model, model):
+    model = random.choice([op_mutation, hidden_state_mutation , cont_mutation])(model)    
+  return model 
+
+
+"""
 def Mutate(cs, parent_model : Model) -> Model:
   model = copy.deepcopy(parent_model) 
   model.set_arch(csu.get_random_neighbor(model._arch, random.randint(1,999)))
   model_change(parent_model,model)
   return model
-
+"""
 def load_csv(file , cs):
   population = []
   history = []
@@ -177,10 +233,10 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
 
 
 def main(worker, configspace):
-  pop_size = 50
+  pop_size = 5
   evaluations = 500
   load_file = "RegEvo.csv"
-  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =25, sample_batch_size = 15, load_file = load_file)
+  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =5, sample_batch_size = 2)
   Architectures = []
   accuracy_scores = []
   generations = list(range(evaluations))
