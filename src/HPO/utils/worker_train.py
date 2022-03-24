@@ -22,6 +22,16 @@ class WeightTest:
         self.count_dict[name] += temp
         print("Weight {} updates: {}".format(name, min(self.count_dict[name])))
 
+
+import gc
+def tensor_list():
+  for obj in gc.get_objects():
+      try:
+          if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+              print(type(obj), obj.size())
+      except:
+          pass
+
 class BarlowTwins(nn.Module):
   def __init__(self, model):
      super().__init__()
@@ -161,7 +171,7 @@ def train_model_aug(model : Model , hyperparameter : dict, dataloader : DataLoad
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list)
 
 
-
+    #tensor_list()
     scheduler.step()
     epoch += 1 
     #dataloader.set_iterator()

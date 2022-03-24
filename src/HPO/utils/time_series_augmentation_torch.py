@@ -106,12 +106,14 @@ def crop(x : torch.Tensor,y, crop_min = 0.85, crop_max = 0.95, device = None):
   else:
     return  x[:,:,(sig_len-length):],y
 
-def window_warp(x : torch.Tensor,y, num_warps = 3, ratios = [0.5, 2], device = None):
+def window_warp(x : torch.Tensor,y, num_warps = 3, ratios = [0.25,0.5,1.5,2], device = None):
   for i in range(num_warps):
     start = random.randint(1, x.shape[2]-10) 
     end = min([x.shape[2],start+random.randint(2, x.shape[2])])
     out= interpolate(x[:,:,start:end], scale_factor = random.choice(ratios)).cuda(device = device)
     x = torch.cat((x[:,:,:start],out,x[:,:,end:]),dim = 2)
+  if x.shape[2] > 5000:
+    x = x[:,:,-5000:]
   
   return x,y
 
