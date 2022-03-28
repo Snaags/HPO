@@ -61,6 +61,8 @@ class Cell(nn.Module):
           h1 = drop_path(h1, drop_prob)
         if not isinstance(op2, Identity):
           h2 = drop_path(h2, drop_prob)
+      if h1.shape[2] != h2.shape[2]:
+        print(op1,op2)
       s = h1 + h2
       states += [s]
     return torch.cat([states[i] for i in self._concat], dim=1)

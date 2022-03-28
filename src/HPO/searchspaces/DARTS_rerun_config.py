@@ -22,7 +22,6 @@ def init_config():
     'sep_conv_3x3',
     'sep_conv_5x5',
     'sep_conv_7x7',
-    'sep_conv_9x9',
     'dil_conv_3x3',
     'dil_conv_5x5'
   ]
