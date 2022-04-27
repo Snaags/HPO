@@ -224,6 +224,7 @@ class NetworkCIFAR(nn.Module):
     self.global_pooling = nn.AdaptiveAvgPool2d(1)
     self.classifier = nn.Linear(C_prev, num_classes)
 
+
   def forward(self, input):
     logits_aux = None
     s0 = s1 = self.stem(input)
@@ -234,8 +235,10 @@ class NetworkCIFAR(nn.Module):
           logits_aux = self.auxiliary_head(s1)
     out = self.global_pooling(s1)
     logits = self.classifier(out.view(out.size(0),-1))
-    return logits, logits_aux
-
+    if self._auxiliary:
+      return logits, logits_aux
+    else:
+      return logits
 
 class NetworkImageNet(nn.Module):
 
