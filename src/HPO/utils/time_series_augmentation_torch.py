@@ -112,8 +112,9 @@ def window_warp(x : torch.Tensor,y, num_warps = 3, ratios = [0.5,0.75,2],size = 
         end = min([x.shape[2],start+random.randint(2, int(x.shape[2]*size))])
         out= interpolate(x[:,:,start:end], scale_factor = random.choice(ratios)).cuda(device = device)
         x = torch.cat((x[:,:,:start],out,x[:,:,end:]),dim = 2)
-    if x.shape[2] > 6000:
-        x = x[:,:,-6000:]
+    if x.shape[2] > 10000:
+
+        x = x[:,:,-10000:]
 
     return x,y
 

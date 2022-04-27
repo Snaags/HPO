@@ -21,15 +21,16 @@ class Evaluator:
       self.model_prob = np.zeros(shape = (len(testloader), 1)) # [sample , classes]
     else:
       s = torch.nn.Identity()
-      self.model_prob = np.zeros(shape = (len(testloader), self.n_classes)) # [sample , classes]
-    self.labels = np.zeros(shape = (len(testloader),1))
+      self.model_prob = np.zeros(shape = (len(testloader)*self.batch_size, self.n_classes)) # [sample , classes]
+    self.labels = np.zeros(shape = (len(testloader)*self.batch_size,1))
     #Pass validation set through model getting probabilities and labels
     with torch.no_grad(): #disable back prop to test the model
+      num_batches = len(testloader) + self.batch_size
       for i, (inputs, labels) in enumerate( testloader ):
           start_index = i * self.batch_size
           end_index = (i * self.batch_size) + self.batch_size
           inputs = inputs.cuda(non_blocking=True, device = self.cuda_device).float()
-          self.labels[start_index:end_index , :] = labels.cpu().numpy()
+          self.labels[start_index:end_index , :] = labels.view(self.batch_size,1).cpu().numpy()
           out = s(model(inputs)).cpu().numpy()      
           self.model_prob[start_index:end_index,:] = out
 
@@ -45,19 +46,20 @@ class Evaluator:
           print("Logit: {} -- Predicted: {} label: {}".format(m,p,l))
         assert self.prediction.shape == (len(self.model_prob),1), "Shape of prediction is {} when it should be {}".format(self.prediction.shape, (len(self.model_prob),1))
       else:
-        self.prediction = np.argmax(self.model_prob, axis = 1)
+        self.prediction = np.argmax(self.model_prob, axis = 1).reshape(-1,1)
         assert self.prediction.shape == (len(self.model_prob),1),  "Shape of prediction is {} when it should be {}".format(self.prediction.shape, (len(self.model_prob),1))
       self.update_CM()
-      print(self.confusion_matrix)
+      with np.printoptions(linewidth = (5*self.n_classes+20)):
+        print(self.confusion_matrix)
   def TP(self, value):
     TP = self.confusion_matrix[value,value]
     return TP
+  
+  def Correct(self):
+    return np.sum(np.diag(self.confusion_matrix))
 
   def TN(self, value):
-    TN = 0
-    idx = [x for x in range(self.confusion_matrix.shape[0]) if x != value]
-    for i in idx:
-      TN += np.sum(self.confusion_matrix[i,idx]) 
+    TN = self.Correct() - TP(value)
     return TN 
 
   def FN(self, value):
@@ -81,7 +83,7 @@ class Evaluator:
       N += np.sum(self.confusion_matrix[i,:])
     return N
   def T(self):
-    return self.P(0),self.N(0) 
+    return np.sum(self.confusion_matrix)
   
   def ACC(self, value):
     return ( self.TP(value) + self.TN(value) ) / ( self.P(value) + self.N(value) )
@@ -107,14 +109,8 @@ class Evaluator:
     pass 
 
   def T_ACC(self) -> float:
-    tp ,tn ,p , n = 0,0,0,0
-    for value in range(self.n_classes):
-      tp += self.TP(value) 
-      tn += self.TN(value) 
-      p += self.P(value)
-      n += self.N(value)
-    return ( tp + tn ) / ( p + n )
-      
+    return self.Correct() / self.T()
+     
 
 
 

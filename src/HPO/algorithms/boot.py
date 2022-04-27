@@ -2,6 +2,7 @@ import random
 import os 
 import numpy as np
 import torch
+import copy
 from HPO.searchspaces.DARTS_config import init_config
 from torch.utils.data import Dataset
 from HPO.algorithms.algorithm_utils import train_eval
@@ -10,6 +11,7 @@ if DEBUG_CONST:
   random.seed(1)
   np.random.seed(1)
   torch.random.manual_seed(1) 
+
 class Labels:
   def __init__(self,clean, classes , samples):
     self.values = clean
@@ -33,10 +35,12 @@ class Labels:
 
 
 class SampleSet(Dataset):
-  def __init__(self,parent,mapping):
-    self.parent = parent
+  def __init__(self,mapping):
     self.mapping = mapping
     self.n_samples = len(self.mapping)-1
+    self.parent = None 
+  def set_main_dataset(self,dataset):
+    self.parent = dataset
   def __getitem__(self, index):
     index = self.mapping[index]
     return self.parent[index]
@@ -52,24 +56,6 @@ class SampleSet(Dataset):
     return self.n_samples
 
 
-class SampleSet(Dataset):
-  def __init__(self,parent,mapping):
-    self.parent = parent
-    self.mapping = mapping
-    self.n_samples = len(self.mapping)-1
-  def __getitem__(self, index):
-    index = self.mapping[index]
-    return self.parent[index]
-  def __len__(self):
-    return self.n_samples
-  def get_n_classes(self):
-    return self.parent.get_n_classes()
-  def get_n_samples(self):
-    return self.n_samples
-  def get_n_features(self):
-    return self.parent.get_n_features()
-  def __len__(self):
-    return self.n_samples
 
 class Generic(Dataset):
   def __init__(self, x_samples, n_classes , n_features, clean_labels):
@@ -95,17 +81,21 @@ class Generic(Dataset):
     return self.n_samples
   def get_n_features(self):
     return self.n_features
-
   def __len__(self):
     return self.n_samples
 
+"""
+class SampleSet(Generic):
+  def __init__(self,x_samples,n_classes,n_features,labels):
+    self.n_samples = x_samples.shape
+    super().__init__(x_samples, n_classes , n_features, labels)
+"""
 class BootSet(Generic):
   def __init__(self, x_samples, n_classes , n_features, clean_labels = None , noisy_labels = None ):
     """
     x_samples : array-like of all samples
     clean_labels : diction of confirmed correct labels {index_of_sample : label_value}
     noisy_labels : diction of non confirmed labels {index_of_sample : label_value}
-
     """
     self.n_samples = len(x_samples)
     print("Number of samples: {}".format(self.n_samples))
@@ -115,20 +105,22 @@ class BootSet(Generic):
     self.n_classes = n_classes
 
   def generate_training_sample(self,size):
-    mapping = self.generate_mapping(size)
-    return SampleSet(self,mapping)  
+    mapping,indexs = self.generate_mapping(size)
+    return SampleSet(mapping)
 
   def generate_mapping(self, size):
     is_valid = self.labels.get_valid_samples()
     mapping  = {}
+    sub_sample_indexs = []
     samples = list(range(self.n_samples-1))
     index = 0
     while len(mapping) < size:
       sample = samples.pop(random.randint(0,len(samples)-1))
       if is_valid[sample]:
         mapping[index] = sample
+        sub_sample_indexs.append(sample)
         index+=1
-    return mapping
+    return mapping,sub_sample_indexs
       
 def split_x_y(files : list, path : str):
     x_samples = {}
@@ -142,17 +134,25 @@ def split_x_y(files : list, path : str):
     return x_samples , clean_labels
     
 
+def load_test():
 
+    path = "/home/snaags/scripts/datasets/TEPS/split/"
+    files = os.listdir(path)
+    filtr = "testing"
+    files_test = [ name for name in files if filtr in name]    
+    x_validation , y_validation = split_x_y(files_test,path)
+    #Random subset of keys and samples 
+    
+    n_features = 52
+    n_classes = 21
+    return Generic(x_validation,  n_classes , n_features, y_validation) 
 
-def teps_loader(num_clean = 1000,total_samples = 10000):
+def load_train(num_clean = 10000,total_samples = 10000):
     path = "/home/snaags/scripts/datasets/TEPS/split/"
     files = os.listdir(path)
     filtr = "training"
     files_train = [ name for name in files if filtr in name]    
-    filtr = "testing"
-    files_test = [ name for name in files if filtr in name]    
     x_samples , clean_labels = split_x_y(files_train, path)
-    x_validation , y_validation = split_x_y(files_test,path)
     #Random subset of keys and samples 
     if total_samples != None:
       subset_keys = np.random.choice( a = list(x_samples.keys()) , size = total_samples ,replace = False)
@@ -172,20 +172,23 @@ def teps_loader(num_clean = 1000,total_samples = 10000):
     
     n_features = 52
     n_classes = 21
-    return BootSet(samples, n_classes, n_features, clean_labels_subset), Generic(x_validation,  n_classes , n_features, y_validation) 
+    return BootSet(samples, n_classes, n_features, clean_labels_subset)
 
 def compute_size():
   #Place holder
   return 500
 
+global test_data
+test_data = load_test()
+global bootloader
+bootloader = load_train()
 def main(worker):
     
   #Settings
   N_ITERATIONS = 100
   CORES = 1
-  BATCH = 4
+  BATCH = 24
   ##Set Up  
-  bootloader, validation = teps_loader() 
   cs = init_config()
   train = train_eval( worker, CORES, filename = "bootloader.csv", handle_dataset = True)
   
@@ -197,7 +200,7 @@ def main(worker):
     for _ in range(BATCH):
       size = compute_size()
       configs.append( cs.sample_configuration())
-      training_samples.append([ bootloader.generate_training_sample(size) , validation])
+      training_samples.append([ bootloader.generate_training_sample(size)])
       
     acc , recall , config = train.eval( population = configs, datasets =training_samples )
     print(acc, recall)

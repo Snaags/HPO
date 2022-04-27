@@ -73,7 +73,7 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
   ### Configuration 
   THRESHOLD = 0.4 #Cut off for classification
   batch_size = 2 
-  OUTER_LOOP, INNER_FOLDS = random.choice([[2,4],[3,3]])
+  OUTER_LOOP, INNER_FOLDS = 4,7#random.choice([[2,4],[3,3]])
 
   if cuda_device == None:
      cuda_device = 0# torch.cuda.current_device()
@@ -196,6 +196,51 @@ if __name__ == "__main__":
   "reduction_node_3_0" : 'sep_conv_3x3',
   "reduction_node_3_1" : 'avg_pool_3x3'}
 
+    hyperparameter = {'T_0': 7, 'T_mult': 2, 'channels': 30, 'crop': 0.6847182532225822, 'crop_rate': 0.2929741909616447, 'cut_mix': 0.49486530322216793, 
+    'cut_mix_rate': 0.01743674667083489, 'cut_out': 0.4134402179541481, 'cut_out_rate': 0.7823166472887966, 'epochs': 80, 'jitter': 0.10877384615040561, 
+    'jitter_rate': 1.2734504684858023, 'layers': 3, 'lr': 0.005812450826036978, 'mix_up': 0.7765095465814658, 'mix_up_rate': 0.2660859783873094, 
+    'normal_index_0_0': 0, 'normal_index_0_1': 0, 'normal_index_1_0': 2, 'normal_index_1_1': 2, 'normal_index_2_0': 0, 'normal_index_2_1': 1, 
+    'normal_index_3_0': 4, 'normal_index_3_1': 0, 'normal_node_0_0': 'dil_conv_5x5', 'normal_node_0_1': 'sep_conv_5x5', 'normal_node_1_0': 'max_pool_3x3', 
+    'normal_node_1_1': 'sep_conv_7x7', 'normal_node_2_0': 'sep_conv_5x5', 'normal_node_2_1': 'max_pool_3x3', 'normal_node_3_0': 'skip_connect', 
+    'normal_node_3_1': 'max_pool_3x3', 'p': 0.15150177262925374, 'scaling': 0.203519696355658, 'scaling_rate': 0.45477655363093866, 
+    'window_warp_num': 3, 'window_warp_rate': 0.8891148164326206}
+    hyperparameter = {'T_0': 7,
+   'T_mult': 2,
+   'channels': 30,
+   'crop': 0.6847182532225822,
+   'crop_rate': 0.28763247475786663,
+   'cut_mix': 0.4794422635758023,
+   'cut_mix_rate': 0.01743674667083489,
+   'cut_out': 0.4134402179541481,
+   'cut_out_rate': 0.7823166472887966,
+   'epochs': 80,
+   'jitter': 0.09545675432567491,
+   'jitter_rate': 1.2734504684858023,
+   'layers': 3,
+   'lr': 0.006502443808387311,
+   'mix_up': 0.7775718984162936,
+   'mix_up_rate': 0.2660859783873094,
+   'normal_index_0_0': 0,
+   'normal_index_0_1': 0,
+   'normal_index_1_0': 2,
+   'normal_index_1_1': 2,
+   'normal_index_2_0': 0,
+   'normal_index_2_1': 1,
+   'normal_index_3_0': 4,
+   'normal_index_3_1': 1,
+   'normal_node_0_0': 'dil_conv_5x5',
+   'normal_node_0_1': 'sep_conv_5x5',
+   'normal_node_1_0': 'max_pool_3x3',
+   'normal_node_1_1': 'sep_conv_3x3',
+   'normal_node_2_0': 'sep_conv_5x5',
+   'normal_node_2_1': 'max_pool_3x3',
+   'normal_node_3_0': 'skip_connect',
+   'normal_node_3_1': 'max_pool_3x3',
+   'p': 0.17949193843615582,
+   'scaling': 0.203519696355658,
+   'scaling_rate': 0.45477655363093866,
+   'window_warp_num': 3,
+   'window_warp_rate': 0.8891148164326206}
     queue = multiprocessing.Queue()
     plotter = LivePlot(queue)
     plot_process = multiprocessing.Process(target=plotter.show,args=())

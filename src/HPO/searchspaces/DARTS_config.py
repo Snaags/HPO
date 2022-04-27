@@ -9,7 +9,7 @@ from HPO.utils.ConfigStruct import Parameter, Cumulative_Integer_Struct, LTP_Par
 Seperate Pooling and Convolution Layers
 Add more convolution operations (kernalSize and maybe stride)
 """
-
+ 
 def init_config():
 
   cs = CS.ConfigurationSpace()
@@ -22,7 +22,6 @@ def init_config():
     'sep_conv_3x3',
     'sep_conv_5x5',
     'sep_conv_7x7',
-    'sep_conv_15x15',
     'dil_conv_3x3',
     'dil_conv_5x5'
   ]
