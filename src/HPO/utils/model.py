@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 #from HPO.utils.operations import *
+from HPO.utils.operations2d import *
 from torch.autograd import Variable
 from HPO.utils.utils import drop_path
 
@@ -73,7 +74,6 @@ class NetworkMain(nn.Module):
 
   def __init__(self, stem_channels ,C, num_classes, layers, auxiliary, drop_prob ,genotype, binary = False):
     super(NetworkMain, self).__init__()
-    from HPO.utils.operations import *
     self._layers = layers
     self._auxiliary = auxiliary
     self.drop_path_prob = drop_prob
@@ -192,7 +192,6 @@ class NetworkCIFAR(nn.Module):
 
   def __init__(self, C, num_classes, layers, drop_prob, auxiliary, genotype):
     super(NetworkCIFAR, self).__init__()
-    from HPO.utils.operations2d import *
     self.drop_path_prob = drop_prob
     self._layers = layers
     self._auxiliary = auxiliary
