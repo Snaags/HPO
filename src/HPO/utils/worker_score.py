@@ -1,6 +1,55 @@
 from sklearn.metrics import confusion_matrix
 import numpy as np
 import torch
+import torch.nn.functional as F
+
+def ce_loss(logits, targets, use_hard_labels=True, reduction='none'):
+    """
+    wrapper for cross entropy loss in pytorch.
+    
+    Args
+        logits: logit values, shape=[Batch size, # of classes]
+        targets: integer or vector, shape=[Batch size] or [Batch size, # of classes]
+        use_hard_labels: If True, targets have [Batch size] shape with int values. If False, the target is vector (default True)
+    """
+    if use_hard_labels:
+        log_pred = F.log_softmax(logits, dim=-1)
+        return F.nll_loss(log_pred, targets, reduction=reduction)
+        # return F.cross_entropy(logits, targets, reduction=reduction) this is unstable
+    else:
+        assert logits.shape == targets.shape
+        log_pred = F.log_softmax(logits, dim=-1)
+        nll_loss = torch.sum(-targets * log_pred, dim=1)
+        return nll_loss
+
+def consistency_loss(logits_s, logits_w, name='ce', T=1.0, p_cutoff=0.0, use_hard_labels=True):
+    assert name in ['ce', 'L2']
+    logits_w = logits_w.detach()
+    if name == 'L2':
+        assert logits_w.size() == logits_s.size()
+        return F.mse_loss(logits_s, logits_w, reduction='mean')
+
+    elif name == 'L2_mask':
+        pass
+
+    elif name == 'ce':
+        pseudo_label = torch.softmax(logits_w, dim=-1)
+        max_probs, max_idx = torch.max(pseudo_label, dim=-1)
+        mask = max_probs.ge(p_cutoff).float()
+        select = max_probs.ge(p_cutoff).long()
+        # strong_prob, strong_idx = torch.max(torch.softmax(logits_s, dim=-1), dim=-1)
+        # strong_select = strong_prob.ge(p_cutoff).long()
+        # select = select * strong_select * (strong_idx == max_idx)
+        if use_hard_labels:
+            masked_loss = ce_loss(logits_s, max_idx, use_hard_labels, reduction='none') * mask
+        else:
+            pseudo_label = torch.softmax(logits_w / T, dim=-1)
+            masked_loss = ce_loss(logits_s, pseudo_label, use_hard_labels) * mask
+        return masked_loss.mean(), mask.mean(), select, max_idx.long()
+    else:
+        assert Exception('Not Implemented consistency_loss')
+            
+
 
 class Evaluator:
   def __init__(self,batch_size,n_classes,cuda_device):
@@ -15,7 +64,28 @@ class Evaluator:
     self.confusion_matrix = np.zeros(shape = (n_classes,n_classes)) #Matrix of prediction vs true values
 
 
-  def forward_pass(self, model , testloader,binary = False):
+  def unsup_loss(self, loader, model):
+    loss = 0 
+    samples = len(loader)
+    for i, (x_w , x_s) in enumerate(loader):
+      x = torch.cat(x_w,x_s)
+      logits = model(x)
+      logits_w, logits_s = logits.chunk(2)
+      loss += consistency_loss(logits_s, logits_w)
+    averaged_loss = loss/samples
+    return averaged_loss
+
+
+  def sup_loss(self, loader, model):
+    loss = 0 
+    samples = len(loader)
+    for i, (x , y) in enumerate(loader):
+      logits = model(x)
+      loss += ce(logits, y)
+    averaged_loss = loss/samples
+    return averaged_loss
+
+  def forward_pass(self, model , testloader, binary = False):
     if binary == True:
       s = torch.nn.Sigmoid()
       self.model_prob = np.zeros(shape = (len(testloader), 1)) # [sample , classes]
@@ -51,6 +121,7 @@ class Evaluator:
       self.update_CM()
       with np.printoptions(linewidth = (5*self.n_classes+20)):
         print(self.confusion_matrix)
+
   def TP(self, value):
     TP = self.confusion_matrix[value,value]
     return TP
