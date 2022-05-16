@@ -17,7 +17,7 @@ class Evaluator:
 
   def forward_pass(self, model , testloader,binary = False):
     if binary == True:
-      s = torch.nn.Sigmoid()
+      s = torch.nn.Identity()# torch.nn.Sigmoid()
       self.model_prob = np.zeros(shape = (len(testloader), 1)) # [sample , classes]
     else:
       s = torch.nn.Identity()

@@ -39,6 +39,14 @@ class train_eval:
     self.filename = filename
     self.worker = worker
 
+  def allocate_gpu(self):
+    if max(self.gpu) == 0:
+      return None
+    idx = self.gpu.index(max(self.gpu))
+    self.gpu[idx] -= 1
+    return idx
+    
+
   def eval(self, population, datasets = None):
     self.acc_list = []
     self.recall_list = []
@@ -46,11 +54,12 @@ class train_eval:
        
     self.processes = []
     gpu = assign_gpu()
-    
+    self.gpu =gpu
     for i in population:
       self.config_queue.put(i.get_dictionary())
     
     #Initialise GPU slots
+    """
     for i in gpu:
       slots = i
       idx = gpu.index(slots)
@@ -58,6 +67,13 @@ class train_eval:
         self.gpu_slots.put(idx)
         slots  -= 1 
         gpu[idx] = slots
+    """
+    while True:
+      slot = self.allocate_gpu()
+      if slot == None:
+        break
+      else:
+        self.gpu_slots.put(slot)
     if self.handle_dataset == False:
       for i in range(self.num_worker):
         print("Number of workers: {}".format(self.num_worker))

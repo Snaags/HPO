@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-#from HPO.utils.operations import *
-from HPO.utils.operations2d import *
+from HPO.utils.operations import *
+#from HPO.utils.operations2d import *
 from torch.autograd import Variable
 from HPO.utils.utils import drop_path
 
@@ -125,7 +125,6 @@ class NetworkMain(nn.Module):
       if i == 2*self._layers//3:
         if self._auxiliary and self.training:
           logits_aux = self.auxiliary_head(s1)
-    #print("size before pooling: {}".format(s1.shape))
     out = self.global_pooling(s1)
     return out.view(out.size(0),-1)
 

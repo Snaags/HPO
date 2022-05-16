@@ -90,11 +90,11 @@ def collate_fn_padd_x(batch):
     batch = torch.transpose(batch_samples , 1 , 2 )
     return batch
 
-def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tensor , epoch : int, epochs : int, correct :int , total : int , peak_acc : float , loss : Tensor, n_iter, loss_list = None):
+def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tensor , epoch : int, epochs : int, correct :int , total : int , peak_acc : float , loss : Tensor, n_iter, loss_list = None, binary = True):
   def cal_acc(y,t):
-    correct = np.count_nonzero(y==t)
-    total = len(t)
-    return correct , total
+    c = np.count_nonzero(y.T==t)
+    tot = len(t)
+    return c , tot
 
   def convert_label_max_only(y):
     y = y.cpu().detach().numpy()
@@ -103,8 +103,10 @@ def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tens
     for count, i in enumerate(idx):
         out[count, i] = 1
     return idx
-
-  new_correct , new_total =  cal_acc(convert_label_max_only(outputs), labels.cpu().detach().numpy())
+  if binary == True:
+    new_correct , new_total = cal_acc(outputs.ge(0.5).cpu().detach().numpy(), labels.cpu().detach().numpy())
+  else:
+    new_correct , new_total =  cal_acc(convert_label_max_only(outputs), labels.cpu().detach().numpy())
   correct += new_correct 
   total += new_total
   acc = correct / total 
@@ -122,7 +124,7 @@ def train_model_aug(model : Model , hyperparameter : dict, dataloader : DataLoad
   n_iter = len(dataloader) 
   optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["lr"])
   #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = hyperparameter["lr_step"])
-  scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0 = hyperparameter["T_0"] , T_mult = hyperparameter["T_mult"])
+  #scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0 = hyperparameter["T_0"] , T_mult = hyperparameter["T_mult"])
   if binary == True:
     criterion = nn.BCEWithLogitsLoss().cuda(device = cuda_device)
   
@@ -172,7 +174,7 @@ def train_model_aug(model : Model , hyperparameter : dict, dataloader : DataLoad
 
 
     #tensor_list()
-    scheduler.step()
+    #scheduler.step()
     epoch += 1 
     #dataloader.set_iterator()
   print()
@@ -303,8 +305,8 @@ def augment(x, y,hp, device = None):
   augs = [jitter, scaling, window_warp,crop, mix_up,cutout,cut_mix]
 
   if "jitter" in hp:
-    args = [hp["jitter"], hp["scaling"], hp["window_warp_num"], hp["crop"] , hp["mix_up"], hp["cut_out"], hp["cut_mix"]]
-    rates = [hp["jitter_rate"], hp["scaling_rate"], hp["window_warp_rate"],hp["crop_rate"], hp["mix_up_rate"], hp["cut_out_rate"], hp["cut_mix_rate"]]
+    args = [hp["jitter"], hp["scaling"], hp["window_warp_num"], hp["crop"]]# , hp["mix_up"], hp["cut_out"], hp["cut_mix"]]
+    rates = [hp["jitter_rate"], hp["scaling_rate"], hp["window_warp_rate"]]#,hp["crop_rate"], hp["mix_up_rate"], hp["cut_out_rate"], hp["cut_mix_rate"]]
 
     if device == None:
       for func,arg,rate in zip(augs,args, rates):
@@ -330,7 +332,7 @@ def augment(x, y,hp, device = None):
     return x,y
 
   else:
-    rate = 0.1
+    rate = 0.5
     if device == None:
       for func in augs:
         if random.random() < rate:
