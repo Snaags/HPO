@@ -14,7 +14,7 @@ def time_test(func, n = 100, batch_size = 10 , window_length = 1000, features = 
     print("Total time for ",func.__name__,": ", time.time()- start , " Seconds")
 
 
-def jitter(x : torch.Tensor, y,sigma=0.01, device = None):
+def jitter(x : torch.Tensor, y,sigma=0.03, device = None):
     
     n = torch.distributions.normal.Normal(loc=0., scale=sigma)
     return torch.add(x,n.sample(x.shape).cuda(device = device)),y 

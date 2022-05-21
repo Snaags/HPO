@@ -1,4 +1,5 @@
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_curve, auc
+import matplotlib.pyplot as plt 
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -66,12 +67,18 @@ class Evaluator:
 
   def unsup_loss(self, loader, model):
     loss = 0 
+    if model.binary == True:
+      lossFn = nn.BCEWithLogitsLoss()
+    else:
+      lossFn = nn.CrossEntropyLoss()
     samples = len(loader)
-    for i, (x_w , x_s) in enumerate(loader):
-      x = torch.cat(x_w,x_s)
-      logits = model(x)
-      logits_w, logits_s = logits.chunk(2)
-      loss += consistency_loss(logits_s, logits_w)
+    for i, (x) in enumerate(loader):
+      x_1 = augment(x)
+      x_2 = augment(x)
+      x_aug = torch.cat(x_1,x_2)
+      logits_aug = model(x_aug)
+      logits_1, logits_2 = logits.chunk(2)
+      loss += lossFn(logits_1, logits_2)
     averaged_loss = loss/samples
     return averaged_loss
 
@@ -79,15 +86,40 @@ class Evaluator:
   def sup_loss(self, loader, model):
     loss = 0 
     samples = len(loader)
+    if model.binary == True:
+      lossFn = nn.BCEWithLogitsLoss()
+    else:
+      lossFn = nn.CrossEntropyLoss()
     for i, (x , y) in enumerate(loader):
       logits = model(x)
-      loss += ce(logits, y)
+      loss += lossFn(logits, y)
     averaged_loss = loss/samples
     return averaged_loss
 
+  def ROC(self,fold):
+    fpr , tpr, thresholds = roc_curve(self.labels, self.model_prob) 
+    roc_auc = auc(fpr,tpr)
+    plt.figure()
+    lw = 2
+    plt.plot(
+        fpr,
+        tpr,
+        color="darkorange",
+        lw=lw,
+        label="ROC curve (area = %0.2f)" % roc_auc,
+    )
+    plt.plot([0, 1], [0, 1], color="navy", lw=lw, linestyle="--")
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("Receiver operating characteristic example")
+    plt.legend(loc="lower right")
+    plt.savefig("ROC_{}".format(fold))
+
   def forward_pass(self, model , testloader, binary = False):
     if binary == True:
-      s = torch.nn.Identity()# torch.nn.Sigmoid()
+      s = torch.nn.Sigmoid() #torch.nn.Identity()# torch.nn.Sigmoid()
       self.model_prob = np.zeros(shape = (len(testloader), 1)) # [sample , classes]
     else:
       s = torch.nn.Identity()
@@ -103,7 +135,6 @@ class Evaluator:
           self.labels[start_index:end_index , :] = labels.view(self.batch_size,1).cpu().numpy()
           out = s(model(inputs)).cpu().numpy()      
           self.model_prob[start_index:end_index,:] = out
-
   def update_CM(self):
     self.confusion_matrix += confusion_matrix(self.labels, self.prediction,labels = list(range(self.n_classes))) 
 

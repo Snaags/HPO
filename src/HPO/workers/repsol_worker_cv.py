@@ -7,7 +7,7 @@ from HPO.utils.DARTS_utils import config_space_2_DARTS
 from HPO.utils.FCN import FCN 
 import pandas as pd
 import torch
-from HPO.data.repsol_dataset import Test_repsol_full , Mixed_repsol_full, repsol_unlabeled
+from HPO.data.repsol_dataset import Mixed_repsol_full
 import torch.nn as nn
 from torch import Tensor
 from torch.utils.data import DataLoader, SubsetRandomSampler
@@ -70,12 +70,24 @@ def compute( ID = None, configs=None , gpus=None , res = None  , config = None):
    
 def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None,  test_dataset = None, cuda_device = None,plot_queue = None, model_id = None, binary = True):
   ### Configuration 
-  THRESHOLD = -0.1 #Cut off for classification
+  THRESHOLD = 0.4 #Cut off for classification
+  NAS = True
+  
+  if NAS == True:
+    hpo = {
+  "batch_size" : 2,
+  "channels" : 27,
+  'lr': 0.005170869707739693, 'p': 0.0, 
+  "epochs" : 50,
+  "layers" : 3}
+  eval_hyperparameter = {}
+  eval_hyperparameter.update(hyperparameter)
+  eval_hyperparameter.update(hpo)
 
   if cuda_device == None:
      cuda_device = 0# torch.cuda.current_device()
 
-  dataset = Mixed_repsol_full(path_dir ="repsol-meta-cv/train/" )
+  dataset = Mixed_repsol_full(path_dir ="repsol_mixed/" )
   torch.cuda.set_device(cuda_device)
 
   print("Cuda Device Value: ", cuda_device)
@@ -88,7 +100,7 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
 
   for fold,(train_idx,test_idx) in enumerate(kfold.split(dataset,dataset.y())):
       print('---Fold No.--{}----------------------'.format(fold))
-      batch_size =2# int(len(train_idx)/4)
+      batch_size = 2#int(len(train_idx)/4)
       torch.cuda.empty_cache()
       train_subsampler = torch.utils.data.SubsetRandomSampler(train_idx)
       test_subsampler = torch.utils.data.SubsetRandomSampler(test_idx)
@@ -101,12 +113,12 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
                           batch_size=1, sampler=test_subsampler)
 
       ### Build Model
-      model = NetworkMain(27,hyperparameter["channels"],num_classes= 2 , layers = hyperparameter["layers"], auxiliary = False,drop_prob = hyperparameter["p"], genotype = gen, binary = binary)
+      model = NetworkMain(27,eval_hyperparameter["channels"],num_classes= 2 , layers = eval_hyperparameter["layers"], auxiliary = False,drop_prob = eval_hyperparameter["p"], genotype = gen, binary = binary)
       model = model.cuda(device = cuda_device)
       """
       ### Train the model
       """
-      train_model_aug(model , hyperparameter, trainloader , hyperparameter["epochs"], batch_size , cuda_device, augment_num = 1, graph = plot_queue, binary = binary) 
+      train_model_aug(model , eval_hyperparameter, trainloader , eval_hyperparameter["epochs"], batch_size , cuda_device, augment_num = 1, graph = plot_queue, binary = binary) 
       """
       ### Test the model
       """
@@ -128,7 +140,6 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
         torch.save(model.state_dict() , model_zoo+"-Acc-{}-Rec-{}".format(acc, recall))
         save_obj( hyperparameter , model_zoo+"hps/"+"-Acc-{}-Rec-{}".format(acc , recall) )
 
-      save_model(model,hyperparameter)
 
   print("Final Scores -- ACC: {} -- REC: {}".format(acc, recall))
   return acc, recall
@@ -270,6 +281,9 @@ if __name__ == "__main__":
     #   'scaling_rate': 0.45477655363093866,
     #   'window_warp_num': 3,
     #   'window_warp_rate': 0.8891148164326206}
+
+    #0.8170731707317073,0.6486486486486487,"
+    hyperparameter = {'normal_index_0_0': 0, 'normal_index_0_1': 0, 'normal_index_1_0': 1, 'normal_index_1_1': 1, 'normal_index_2_0': 3, 'normal_index_2_1': 3, 'normal_index_3_0': 2, 'normal_index_3_1': 2, 'normal_node_0_0': 'avg_pool_3x3', 'normal_node_0_1': 'sep_conv_7x7', 'normal_node_1_0': 'sep_conv_5x5', 'normal_node_1_1': 'sep_conv_5x5', 'normal_node_2_0': 'sep_conv_7x7', 'normal_node_2_1': 'avg_pool_3x3', 'normal_node_3_0': 'skip_connect', 'normal_node_3_1': 'sep_conv_5x5', 'reduction_index_0_0': 1, 'reduction_index_0_1': 0, 'reduction_index_1_0': 0, 'reduction_index_1_1': 1, 'reduction_index_2_0': 1, 'reduction_index_2_1': 2, 'reduction_index_3_0': 4, 'reduction_index_3_1': 1, 'reduction_node_0_0': 'sep_conv_3x3', 'reduction_node_0_1': 'dil_conv_5x5', 'reduction_node_1_0': 'none', 'reduction_node_1_1': 'max_pool_3x3', 'reduction_node_2_0': 'dil_conv_3x3', 'reduction_node_2_1': 'avg_pool_3x3', 'reduction_node_3_0': 'none', 'reduction_node_3_1': 'sep_conv_5x5'}
     queue = multiprocessing.Queue()
     plotter = LivePlot(queue)
     plot_process = multiprocessing.Process(target=plotter.show,args=())

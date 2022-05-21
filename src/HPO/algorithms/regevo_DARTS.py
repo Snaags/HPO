@@ -124,7 +124,7 @@ def Mutate(cs, parent_model : Model) -> Model:
     
 
   while not model_change(parent_model, model):
-    model = random.choice([op_mutation, hidden_state_mutation , cont_mutation])(model)    
+    model = random.choice([op_mutation, hidden_state_mutation])(model)    
   return model 
 
 
@@ -232,11 +232,10 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
   return history
 
 
-def main(worker, configspace):
-  pop_size = 125
-  evaluations = 3000
-  load_file = "RegEvo.csv"
-  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =25, sample_batch_size = 16)
+def main(worker, configspace, load_file = "reg_evo.csv"):
+  pop_size = 100
+  evaluations = 1000
+  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =24, sample_batch_size = 8)
   Architectures = []
   accuracy_scores = []
   generations = list(range(evaluations))

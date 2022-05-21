@@ -6,12 +6,13 @@ import random
 from sklearn.preprocessing import StandardScaler
 from HPO.utils.time_series_augmentation import permutation , magnitude_warp, time_warp, window_slice, jitter, scaling, rotation
 import os
-
-class repsol_full(Dataset):
+import matplotlib.pyplot as plt
+class Repsol_Full(Dataset):
 
   def __init__(self, path_dir : str, max_size = 3000, min_size = 500):
     self.path = "{}/scripts/datasets/".format(os.environ["HOME"])+path_dir
     data = []
+    DEBUG = False
     self.x_index_address = {}
     self.y_index_address = {}
     #index_list sum()
@@ -19,6 +20,10 @@ class repsol_full(Dataset):
     self.device_track = {}
     for c,i in enumerate(files):
       sample = np.reshape(np.load(self.path+i),(-1,28))
+      if DEBUG:
+        plt.plot(sample)
+        plt.savefig("datadebug") 
+        input("waiting for next plot")
       if sample.shape[0] > min_size:
         self.device_track[c] = i[:2]
         data.append(sample[-1*max_size:,:])
@@ -90,28 +95,14 @@ class repsol_full(Dataset):
     return self.n_samples 
 
 
-class Train_repsol_full(repsol_full):
 
-  def __init__(self, augmentations_num = 200, augmentations = True , sections = [ "1A", "1B", "1C"]): 
-    path = "{}/scripts/datasets/repsol_train".format(os.environ["HOME"])
-    train_files = os.listdir(path)
-    path_dir = "repsol_train/"
-    super().__init__(augmentations_num, train_files,path_dir, augmentations , sections)
-
-class Test_repsol_full(repsol_full):
-
-  def __init__(self, augmentations_num = 200, augmentations = False , sections = [ "1A", "1B", "1C" ]): 
-    path = "{}/scripts/datasets/repsol_test".format(os.environ["HOME"])
-    test_files = os.listdir(path)
-    path_dir = "repsol_test/"
-    super().__init__(augmentations_num, test_files ,path_dir, augmentations, sections)
-
-class Mixed_repsol_full(repsol_full):
+class Mixed_repsol_full(Repsol_Full):
   def __init__(self, path_dir = None):
     path = "{}/scripts/datasets/repsol_mixed".format(os.environ["HOME"])
     if path_dir == None: 
       path_dir = "repsol_mixed/"
     super().__init__( path_dir)
+
 
 class repsol_unlabeled(Dataset):
   def __init__(self, window_size = 500):

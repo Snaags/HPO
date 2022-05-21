@@ -54,6 +54,27 @@ class BarlowTwins(nn.Module):
     x = self.nets[0]._forward(x)
     x = self.nets[1](x)
     return x
+
+class Metaloader:
+  def __init__(self, dataloaders,max_epochs):
+    pass  
+
+  def __getitem__(self,idx):
+    non_empty_dataloaders = list(dataloaders)
+    iter_dl = {}
+    for b in dataloaders:
+      iter_dl[b] = iter(dataloaders[b])
+    for i in range(n_iter):
+      while True:
+        batch_size = random.choice(non_empty_dataloaders)
+        try:
+          samples, labels = next(iter_dl[batch_size])
+        except StopIteration:
+          non_empty_dataloaders.remove(batch_size)
+        else:
+          break
+
+
 def collate_fn_padd(batch):
     '''
     Padds batch of variable length
@@ -117,6 +138,87 @@ def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tens
     ,"%.2f" % loss," Correct / Total : {} / {} ".format(correct , total),  end = '\r')
   return correct ,total ,peak_acc
 
+def train_model_multibatch(model : Model , hyperparameter : dict, dataloaders : dict , epochs : int, batch_size : int, cuda_device = None, augment_num = 2, graph = None, binary = False):
+  """
+  Trains models with an assortment of batch sizes to produce a wider range of augmentated samples
+  """
+
+  if cuda_device == None:
+    cuda_device = torch.cuda.current_device()
+  optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["lr"])
+  #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = hyperparameter["lr_step"])
+  #scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0 = hyperparameter["T_0"] , T_mult = hyperparameter["T_mult"])
+  if binary == True:
+    criterion = nn.BCEWithLogitsLoss().cuda(device = cuda_device)
+  
+  else:
+    criterion = nn.CrossEntropyLoss()
+  epoch = 0
+  peak_acc = 0
+  loss_list = []
+  total = 0
+  correct = 0
+  while epoch < epochs:
+    if epoch % 3 == 0:
+      total = 0
+      correct = 0
+    aug_list = []
+    aug_labels = []
+    non_empty_dataloaders = list(dataloaders)
+    iter_dl = {}
+    for b in dataloaders:
+      iter_dl[b] = iter(dataloaders[b])
+    if epoch < epochs/2:
+      non_empty_dataloaders.remove(4)
+    if epoch < epochs/2:
+      non_empty_dataloaders.remove(8)
+    if epoch < 2*(epochs/3):
+      non_empty_dataloaders.remove(16)
+    if epoch > 3*(epochs/4):
+      non_empty_dataloaders.remove(2)
+    n_iter = 0
+    for b_s in non_empty_dataloaders:
+      n_iter += len(dataloaders[b_s])
+    for i in range(n_iter):
+      while True:
+        batch_size = random.choice(non_empty_dataloaders)
+        try:
+          samples, labels = next(iter_dl[batch_size])
+        except StopIteration:
+          non_empty_dataloaders.remove(batch_size)
+        else:
+          break
+      samples = samples.cuda(non_blocking=True, device = cuda_device)
+      labels = labels.cuda(non_blocking=True, device = cuda_device)
+      aug_sample , aug_label = augment(samples,labels,hyperparameter, cuda_device)
+      aug_list.append(aug_sample)
+      aug_labels.append(aug_label)
+      optimizer.zero_grad()
+      if batch_size > 1:
+        labels = labels.long().view( batch_size  )
+      else:
+        labels = labels.long().view( 1 )
+      outputs = model(samples.float()).cuda(device = cuda_device)
+      # forward + backward + optimize
+      if binary:
+        loss = criterion(outputs.view(batch_size), labels.float()).cuda(device = cuda_device)
+      else:
+        loss = criterion(outputs, labels).cuda(device = cuda_device)
+      loss.backward()
+      loss_list.append(loss.item())
+      optimizer.step()
+      if i %5 == 0:
+        if graph != None:
+          graph.put(loss_list)
+        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list)
+
+
+    #tensor_list()
+    #scheduler.step()
+    epoch += 1 
+    #dataloader.set_iterator()
+  print()
+  print("Num epochs: {}".format(epoch))
 
 def train_model_aug(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, batch_size : int, cuda_device = None, augment_num = 2, graph = None, binary = False):
   if cuda_device == None:
@@ -302,11 +404,11 @@ def train_model_bt(model : Model , hyperparameter : dict, dataloader : DataLoade
 
 
 def augment(x, y,hp, device = None):
-  augs = [jitter, scaling, window_warp,crop, mix_up,cutout,cut_mix]
+  augs = [jitter, scaling, window_warp,crop, mix_up,cutout]
 
   if "jitter" in hp:
-    args = [hp["jitter"], hp["scaling"], hp["window_warp_num"], hp["crop"]]# , hp["mix_up"], hp["cut_out"], hp["cut_mix"]]
-    rates = [hp["jitter_rate"], hp["scaling_rate"], hp["window_warp_rate"]]#,hp["crop_rate"], hp["mix_up_rate"], hp["cut_out_rate"], hp["cut_mix_rate"]]
+    args = [hp["jitter"], hp["scaling"], hp["window_warp_num"], hp["crop"] , hp["mix_up"], hp["cut_out"]]
+    rates = [hp["jitter_rate"], hp["scaling_rate"], hp["window_warp_rate"],hp["crop_rate"], hp["mix_up_rate"], hp["cut_out_rate"]]
 
     if device == None:
       for func,arg,rate in zip(augs,args, rates):
