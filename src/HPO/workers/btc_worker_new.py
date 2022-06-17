@@ -8,17 +8,17 @@ from HPO.utils.FCN import FCN
 import pandas as pd
 import torch
 from HPO.data.datasets import Train_BTC, Test_BTC
+from HPO.utils.worker_score import Evaluator 
 import torch.nn as nn
 from torch import Tensor
 from torch.utils.data import DataLoader, SubsetRandomSampler
 import random
 from HPO.utils.time_series_augmentation import permutation , magnitude_warp, time_warp
 from HPO.utils.time_series_augmentation_torch import jitter, scaling, rotation
-from HPO.utils.worker_helper import train_model, collate_fn_padd, train_model_bt, collate_fn_padd_x, train_model_aug
+from HPO.utils.worker_train import train_model, collate_fn_padd, train_model_bt, collate_fn_padd_x, train_model_aug
 from HPO.utils.weight_freezing import freeze_FCN, freeze_resnet
 from HPO.utils.ResNet1d import resnet18
 from HPO.utils.files import save_obj
-from HPO.workers.repeat_worker import worker_wrapper, one_out_cv_aug, one_out_cv
 from queue import Empty
 from sklearn.model_selection import KFold
 from collections import namedtuple
@@ -125,6 +125,7 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
   else:
     model.load_state_dict(torch.load(pretrain_path))
 
+  evaluator = Evaluator(batch_size, train_dataset.get_n_classes(),cuda_device,testloader) 
 
   print("Training Data Size {} -- Testing Data Size {}".format(len(trainloader), len(testloader)))
   print("number of classes: {}".format(train_dataset.get_n_classes()))
@@ -133,9 +134,20 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
   """
   #train_model(model , hyperparameter, trainloader , 50, batch_size , cuda_device)
   #model = freeze_FCN(model)
-  train_model(model , hyperparameter, trainloader , hyperparameter["epochs"], batch_size , cuda_device, augment_on = 0, graph = plot_queue, binary = binary) 
+  train_model(model , hyperparameter, trainloader , hyperparameter["epochs"], batch_size ,
+       cuda_device, augment_on = 0, graph = plot_queue, binary = binary, evaluator = evaluator) 
   """
   ## Test the model
+  """
+
+  evaluator.forward_pass(model, testloader,False)
+  evaluator.predictions(model_is_binary = False)
+  
+  ### Get Metrics
+  total = evaluator.T()
+  acc  =  evaluator.T_ACC()
+  recall = evaluator.TPR(1)
+  recall_total = evaluator.P(1)
   """
   with torch.no_grad(): #disable back prop to test the model
     #model = model.eval()
@@ -179,19 +191,13 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
         df_new = pd.DataFrame(df_dict)
 
         df = pd.concat([df,df_new],ignore_index = True)
-
+    """
   
-    print("Total Correct : {} / {} -- Recall : {} / {}".format(correct,total, recall_correct , recall_total)) 
-    print() 
-    df.to_csv("results_df.csv")
-    
-    acc = correct/total if total else np.NaN
-    recall = recall_correct/recall_total if recall_total else np.NaN
-    print("Accuracy: ", "%.4f" % ((acc)*100), "%")
-    print("Recall: ", "%.4f" % ((recall)*100), "%")
-    model_zoo = "{}/scripts/HPO/src/HPO/model_zoo/".format(os.environ["HOME"])
-    torch.save(model.state_dict() , model_zoo+"-Acc-{}-Rec-{}".format(acc, recall))
-    save_obj( hyperparameter , model_zoo+"hps/"+"-Acc-{}-Rec-{}".format(acc , recall) )
+  print("Accuracy: ", "%.4f" % ((acc)*100), "%")
+  print("Recall: ", "%.4f" % ((recall)*100), "%")
+  model_zoo = "{}/scripts/HPO/src/HPO/model_zoo/".format(os.environ["HOME"])
+  torch.save(model.state_dict() , model_zoo+"-Acc-{}-Rec-{}".format(acc, recall))
+  save_obj( hyperparameter , model_zoo+"hps/"+"-Acc-{}-Rec-{}".format(acc , recall) )
   df.to_csv("results_df.csv")
   print("Final Scores -- ACC: {} -- REC: {}".format(acc, recall))
   return acc, recall
@@ -212,8 +218,8 @@ if __name__ == "__main__":
   "T_0" : 3,
   "c1" : 2.5,
   "T_mult" : 1,
-  "batch_size" : 256,
-  "channels" : 64,
+  "batch_size" : 128,
+  "channels" : 128,
   "epochs" : 30,
   "layers" : 3,
   "lr" : 0.002993825743228492,
@@ -233,7 +239,7 @@ if __name__ == "__main__":
   "normal_node_2_1" : 'sep_conv_3x3',
   "normal_node_3_0" : 'dil_conv_3x3',
   "normal_node_3_1" : 'skip_connect',
-  "p" : 0.012718387446598843,
+  "p" : 0.0,
   "reduction_index_0_0" : 0,
   "reduction_index_0_1" : 1,
   "reduction_index_1_0" : 0,
@@ -253,5 +259,6 @@ if __name__ == "__main__":
     queue = multiprocessing.Queue()
     plotter = LivePlot(queue)
     plot_process = multiprocessing.Process(target=plotter.show,args=())
+    plot_process.start()
     _compute(hyperparameter,model_id = "Binary_run_aug_intense_{}".format(i), binary = False, plot_queue = queue)
-
+    exit()

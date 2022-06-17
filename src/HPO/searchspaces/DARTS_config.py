@@ -76,13 +76,13 @@ def init_config():
 
   lr =CSH.UniformFloatHyperparameter(name = "lr",			lower = 0.000001  ,upper = 0.05)
   p =CSH.UniformFloatHyperparameter(name = "p",			lower = 0.01 ,upper = 0.3 )
-  epochs = CSH.UniformIntegerHyperparameter(name = "epochs", lower = 1, upper = 50)
-  layers = CSH.UniformIntegerHyperparameter(name = "layers", lower = 4, upper = 8)
+  epochs = CSH.UniformIntegerHyperparameter(name = "epochs", lower = 1, upper = 5)
+  layers = CSH.UniformIntegerHyperparameter(name = "layers", lower = 3, upper = 6)
   c1 = CSH.UniformFloatHyperparameter(name = "c1_weight" , lower = 1,upper = 3)
   batch_size = CSH.UniformIntegerHyperparameter(name = "batch_size", lower = 2, upper = 16)
   T_0 = CSH.UniformIntegerHyperparameter(name = "T_0", lower = 2, upper = 10)
   T_mult = CSH.UniformIntegerHyperparameter(name = "T_mult", lower = 1, upper = 3)
-  channels = CSH.UniformIntegerHyperparameter(name = "channels", lower = 2, upper = 30)
+  channels = CSH.UniformIntegerHyperparameter(name = "channels", lower = 16, upper = 32)
   augmentations = CSH.UniformIntegerHyperparameter(name = "augmentations", lower = 0, upper = 20)
   
     ###Topology Definition]###

@@ -210,7 +210,7 @@ def train_model_multibatch(model : Model , hyperparameter : dict, dataloaders : 
       if i %5 == 0:
         if graph != None:
           graph.put(loss_list)
-        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list)
+        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list, binary = binary)
 
 
     #tensor_list()
@@ -272,7 +272,7 @@ def train_model_aug(model : Model , hyperparameter : dict, dataloader : DataLoad
       if i %5 == 0:
         if graph != None:
           graph.put(loss_list)
-        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list)
+        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = binary)
 
 
     #tensor_list()
@@ -282,13 +282,14 @@ def train_model_aug(model : Model , hyperparameter : dict, dataloader : DataLoad
   print()
   print("Num epochs: {}".format(epoch))
 
-def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, batch_size : int, cuda_device = None, augment_on = 0, graph = None, binary = False):
+def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, 
+    batch_size : int, cuda_device = None, augment_on = 0, graph = None, binary = False,evaluator= None):
   if cuda_device == None:
     cuda_device = torch.cuda.current_device()
   n_iter = len(dataloader) 
   optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["lr"])
   #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = hyperparameter["lr_step"])
-  scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0 = hyperparameter["T_0"] , T_mult = hyperparameter["T_mult"])
+  #scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0 = hyperparameter["T_0"] , T_mult = hyperparameter["T_mult"])
   if binary == True:
     criterion = nn.BCEWithLogitsLoss().cuda(device = cuda_device)
   
@@ -335,6 +336,15 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
       if i %10 == 0:
         if graph != None:
           graph.put(loss_list)
+
+      if i % 500 == 0 and i != 0:
+        if evaluator != None:
+          evaluator.forward_pass(model,subset = 200)
+          evaluator.predictions(model_is_binary = False)
+          acc  =  evaluator.T_ACC()
+          evaluator.reset_cm()
+          print("Validation set Accuracy: {}".format(acc))
+      if i% 5 == 0:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list)
     if augment_on == True:
       for i , (samples , labels) in enumerate(zip(aug_list , aug_labels)):
@@ -360,9 +370,8 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
           correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list)
 
 
-
-    scheduler.step()
-    epoch += 1 
+    #scheduler.step()
+    epoch += 1
     #dataloader.set_iterator()
   print()
   print("Num epochs: {}".format(epoch))

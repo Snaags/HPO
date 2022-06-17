@@ -1,4 +1,5 @@
 src/HPO/model_zoo/*
+results/
 *.swp
 *.csv
 *.png

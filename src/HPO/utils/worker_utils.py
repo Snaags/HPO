@@ -19,7 +19,7 @@ class LivePlot:
     return x, trendpoly 
     
   def animate(self,i):
-      message = self.queue.get(timeout = 10)
+      message = self.queue.get(timeout = 30)
 
       
       self.ax1.clear()
