@@ -1,4 +1,5 @@
 import csv
+import os 
 import copy
 import torch
 from multiprocessing import Pool
@@ -39,6 +40,7 @@ class Model:
     self._arch = None
     self.accuracy = 0
     self.cs = cs
+    self.recall = 0
 
   def set_arch(self, arch):
     self._arch = arch
@@ -81,9 +83,9 @@ def train_and_eval_population(worker, population, sample_batch, train):
     configs.append(model.arch())
   
   acc , _rec , _config = train.eval( configs )
-  for mod,result in zip(population, acc):
+  for mod,result,recall in zip(population, acc, _rec):
     mod.accuracy = result
-
+    mod.recall = recall
 def model_change(parent, child):
   p_dict , c_dict = parent.arch().get_dictionary(), child.arch().get_dictionary()
   for _,i in zip(p_dict, c_dict):
@@ -147,6 +149,7 @@ def load_csv(file , cs):
       model = Model(cs)
       model.set_arch(Configuration(cs,arch))
       model.accuracy = acc
+      model.recall = rec
       population.append(model)
       history.append(model)
   return population, history
@@ -173,16 +176,17 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
   # Initialize the population with random models.
   if load_file ==None:
     train = train_eval( worker, sample_batch_size, "RegEvo.csv")
-    while len(population) < population_size:
-      model = Model( CS )
-      model.set_arch( CS.sample_configuration() )
-      population.append(model)
-      history.append(model)
-  
-    train_and_eval_population(worker, population, sample_batch_size, train )
+  elif not os.path.exists(load_file):
+    train = train_eval( worker, sample_batch_size, load_file)
   else:
-    train = train_eval( worker, sample_batch_size, "RegEvo.csv" )
     population , history = load_csv(load_file, CS)
+    train = train_eval( worker, sample_batch_size, load_file )
+  while len(population) < population_size:
+    model = Model( CS )
+    model.set_arch( CS.sample_configuration() )
+    population.append(model)
+    history.append(model)
+  train_and_eval_population(worker, population, sample_batch_size, train )
   # Carry out evolution in cycles. Each cycle produces a model and removes
   # another.
   children = []
@@ -233,28 +237,32 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
 
 
 def main(worker, configspace, load_file = "reg_evo.csv"):
-  pop_size = 100
-  evaluations = 1000
-  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =24, sample_batch_size = 8)
+  N = 5 #N best models to return
+  pop_size = 64
+  evaluations = 256
+  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =8, sample_batch_size = 8, load_file = load_file)
   Architectures = []
   accuracy_scores = []
+  recall_scores = []
   generations = list(range(evaluations))
   for i in history:
     accuracy_scores.append(i.accuracy)
     Architectures.append(i.arch)
-  
-  plt.scatter(generations[:pop_size],accuracy_scores[:pop_size], c = "red")
-  plt.scatter(generations[pop_size:],accuracy_scores[pop_size:])
-  plt.title("Accuracy Scores of Configurations")
-  plt.xlabel("Generation")
-  plt.ylabel("Accuracy")
-  plt.grid()
-  plt.savefig("regevo.png",dpi = 1200)
+    recall_scores.append(i.recall)
+  top_acc = []
+  top_rec = []
+  top_config = []
 
-  indexs = accuracy_scores.index(max(accuracy_scores))
-  print("Best accuracy: ", accuracy_scores[indexs])
-  print("Best Hyperparameters: ", Architectures[indexs]())
-
+  for i in range(N):
+    indexs = accuracy_scores.index(max(accuracy_scores))
+    print("Best accuracy: ", accuracy_scores[indexs])
+    print("Best Hyperparameters: ", Architectures[indexs]())
+    acc , rec , config = accuracy_scores[indexs] , recall_scores[indexs], Architectures[indexs]()
+    top_acc.append(acc)
+    top_rec.append(rec)
+    top_config.append(config.get_dictionary())
+    accuracy_scores.remove(max(accuracy_scores))
+  return top_config,top_acc , top_rec
 
 
 
