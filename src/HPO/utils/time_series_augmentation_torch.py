@@ -168,35 +168,30 @@ def cut_mix(x,y, perc=.1, device = None):
     return x,y 
 if __name__ == "__main__":
 
-    from HPO.data.datasets import Test_repsol_full , Mixed_repsol_full
     import torch.nn as nn
     from torch import Tensor
-    from torch.utils.data import DataLoader
+    from torch.utils.data.teps_datasets import Train_TEPS
     import random
-    from HPO.utils.worker_helper import train_model, collate_fn_padd
-    from HPO.utils.weight_freezing import freeze_all_cells
     import timeit
     import matplotlib.pyplot as plt
-    funcs = [cut_mix]
+    funcs = [crop,jitter,scaling,window_warp]
     batch_size = 512
     window_length = 500
     features = 27
-    train_dataset = Mixed_repsol_full(0, augmentations_on = False)
+    train_dataset = Train_TEPS()
     train_dataloader = DataLoader( train_dataset, batch_size=4,
-      shuffle = True,drop_last=True, collate_fn = collate_fn_padd)
+      shuffle = True,drop_last=True)
     for s,l in train_dataloader:
         x = s.cuda()
         y = l.cuda()
         for func in funcs:
             print(x.shape)
-            print(y)
             print(func)
-            plt.plot(x[0,26,:].cpu(),label = "orig")
+            #plt.plot(x[0,26,:].cpu(),label = "orig")
             x_p,y_p = func(x,y,device = 0)
             x_p = x_p[0,26,:].cpu()
-            plt.plot(x_p ,alpha = 0.5,label = "aug")
-            print(y_p)
-            plt.legend()
-            plt.show()
-      #print("Total time for ",func.__name__,": ", timeit.timeit("{}(x)".format(func.__name__), "from __main__ import {}, {}".format(func.__name__, "x"), number = 10) , " Seconds")
+            #plt.plot(x_p ,alpha = 0.5,label = "aug")
+            #plt.legend()
+            #plt.show()
+            print("Total time for ",func.__name__,": ", timeit.timeit("{}(x)".format(func.__name__), "from __main__ import {}, {}".format(func.__name__, "x"), number = 10) , " Seconds")
 

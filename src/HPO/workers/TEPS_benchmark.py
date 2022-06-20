@@ -132,13 +132,15 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
       recall = evaluator.TPR(1)
       recall_total = evaluator.P(1)
       sup = evaluator.sup_loss(model, testloader)
+      sup10 = evaluator.sup_loss(model, testloader, n_augment = 10)
+      unsup10 = evaluator.unsup_loss(model, testloader, n_augment = 10)
       unsup = evaluator.unsup_loss(model, testloader)
-      cons = evaluator.c_loss(model, testloader)
-      cons_10 = evaluator.c_loss(model, testloader,10)
+      #cons = evaluator.c_loss(model, testloader)
+      #cons_10 = evaluator.c_loss(model, testloader,10)
       #posttrain_naswot = evaluator.score_naswot(model,testloader)
       #df_loss = evaluator.loss_over_sample_size(model, dataset_test)
       print("Supervised Loss: {} -- Unsupvised Loss: {}".format(sup,unsup))
-      print("Consistency Loss: {} -- Consistency Loss(10): {}".format(cons,cons_10))
+      print("Supervised Loss(10): {} -- Unsupervised Loss(10): {}".format(sup10,unsup10))
       #print("NASWOT PRE: {} -- NASWOT POST: {}".format(pretrain_naswot,posttrain_naswot))
       print("Accuracy: ", "%.4f" % ((acc)*100), "%")
       print("Recall: ", "%.4f" % ((recall)*100), "%")
@@ -151,7 +153,7 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
 
 
   print("Final Scores -- ACC: {} -- REC: {}".format(acc, recall))
-  return acc, recall, sup.item(), unsup.item(), cons.item(),cons_10.item()
+  return acc, recall, sup.item(), unsup.item(), sup10.item(),unsup10.item()
 
 if __name__ == "__main__":
   import multiprocessing

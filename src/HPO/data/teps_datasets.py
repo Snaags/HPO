@@ -13,7 +13,7 @@ class TEPS(Dataset):
       self.samples_per_class = [samples_per_class]* self.n_classes
     else:
       self.samples_per_class = [0]* self.n_classes
-    path = "/home/snaags/scripts/datasets/TEPS/split/"
+    path = "{}/scripts/datasets/TEPS/split/".format(os.environ["HOME"])
     files = os.listdir(path)
     #Get either Training or testing samples
     if train == True:
@@ -77,8 +77,8 @@ class TEPS(Dataset):
     x = self.x_index_address[index]
     y = self.y_index_address[index]
 
+    return x , y.item()
 
-    return x , y
   
   def get_n_classes(self):
     return self.n_classes

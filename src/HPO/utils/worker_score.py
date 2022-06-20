@@ -235,7 +235,7 @@ class Evaluator:
         
       return sup_losses, usup_losses , usup10_losses, usup100_losses
 
-  def sup_loss(self, model,loader, binary = False):
+  def sup_loss(self, model,loader,n_augment = 1 , binary = False):
     loss = 0 
     S = torch.nn.Sigmoid()
     samples = len(loader)
@@ -245,11 +245,12 @@ class Evaluator:
       lossFn = F.cross_entropy
     with torch.no_grad(): #disable back prop to test the model
       for i, (x , y) in enumerate(loader):
-        x = x.cuda(non_blocking=True, device = self.cuda_device).float()
-        y = y.cuda(non_blocking=True, device = self.cuda_device).long()
-
-        logits = model(x)
-        loss += lossFn(S(logits), y)
+        for i in range(n_augment):
+          x = x.cuda(non_blocking=True, device = self.cuda_device).float()
+          y = y.cuda(non_blocking=True, device = self.cuda_device).long()
+          x = augment(x,device = self.cuda_device)
+          logits = model(x)
+          loss += lossFn(S(logits), y)
       averaged_loss = loss/samples
     return averaged_loss
 
