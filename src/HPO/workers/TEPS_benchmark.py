@@ -75,8 +75,9 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
   if cuda_device == None:
      cuda_device = 0# torch.cuda.current_device()
 
-  dataset_train = Train_TEPS()
-  dataset_test = Test_TEPS()
+  dataset_train = Train_TEPS(samples_per_class = 50)
+  dataset_test = Test_TEPS(samples_per_class = 2)
+  dataset_test_full = Test_TEPS()
   torch.cuda.set_device(cuda_device)
 
   print("Cuda Device Value: ", cuda_device)
@@ -105,6 +106,9 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
                           dataset_test,collate_fn = collate_fn_padd,
                           batch_size=batch_size,drop_last = True)
 
+      testloader_full = torch.utils.data.DataLoader(
+                          dataset_test_full,collate_fn = collate_fn_padd,
+                          batch_size=batch_size,drop_last = True)
       ### Build Model
       model = NetworkMain(dataset_train.get_n_features(),hyperparameter["channels"],num_classes= dataset_train.get_n_classes() , layers = hyperparameter["layers"], auxiliary = False,drop_prob = hyperparameter["p"], genotype = gen, binary = binary)
       model = model.cuda(device = cuda_device)
@@ -115,11 +119,11 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
       if multibatch:
         train_model_multibatch(model , hyperparameter, trainloader , hyperparameter["epochs"], batch_size , cuda_device, augment_num = 1, graph = plot_queue, binary = binary) 
       else:  
-        train_model_aug(model , hyperparameter, trainloader , hyperparameter["epochs"], batch_size , cuda_device, augment_num = 0, graph = plot_queue, binary = binary) 
+        train_model_aug(model , hyperparameter, trainloader , hyperparameter["epochs"], batch_size , cuda_device, augment_num = 1, graph = plot_queue, binary = binary) 
       """
       ### Test the model
       """
-      evaluator.forward_pass(model, testloader,binary)
+      evaluator.forward_pass(model, testloader_full,binary)
       evaluator.predictions(model_is_binary = binary , THRESHOLD = THRESHOLD)
 
       ### Get Metrics
@@ -129,9 +133,12 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
       recall_total = evaluator.P(1)
       sup = evaluator.sup_loss(model, testloader)
       unsup = evaluator.unsup_loss(model, testloader)
+      cons = evaluator.c_loss(model, testloader)
+      cons_10 = evaluator.c_loss(model, testloader,10)
       #posttrain_naswot = evaluator.score_naswot(model,testloader)
-      df_loss = evaluator.loss_over_sample_size(model, dataset_test)
+      #df_loss = evaluator.loss_over_sample_size(model, dataset_test)
       print("Supervised Loss: {} -- Unsupvised Loss: {}".format(sup,unsup))
+      print("Consistency Loss: {} -- Consistency Loss(10): {}".format(cons,cons_10))
       #print("NASWOT PRE: {} -- NASWOT POST: {}".format(pretrain_naswot,posttrain_naswot))
       print("Accuracy: ", "%.4f" % ((acc)*100), "%")
       print("Recall: ", "%.4f" % ((recall)*100), "%")
@@ -144,7 +151,7 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
 
 
   print("Final Scores -- ACC: {} -- REC: {}".format(acc, recall))
-  return acc, recall, sup.item(), unsup.item(), df_loss
+  return acc, recall, sup.item(), unsup.item(), cons.item(),cons_10.item()
 
 if __name__ == "__main__":
   import multiprocessing

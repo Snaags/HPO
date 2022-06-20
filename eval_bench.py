@@ -30,11 +30,11 @@ def dist():
     df_loss.to_csv("loss_aug_{}.csv".format(i))
 def nas():
   for i in range(100):
-    hpo = {'batch_size': 2, 'channels': 64, 'jitter': 0.01241258424762939, 'jitter_rate': 0.5439942968995378, 'mix_up': 0.19412584247629389, 'mix_up_rate': 0.5439942968995378, 'cut_mix': 0.19412584247629389, 'cut_mix_rate': 0.5439942968995378, 'cut_out': 0.0941258424762939, 'cut_out_rate': 0.7439942968995378, 'crop': 0.19412584247629389, 'crop_rate': 0.5439942968995378, 'scaling': 0.001317169415702424, 'scaling_rate': 0.4353430973459786, 'window_warp_num': 3, 'window_warp_rate': 1.4001548161604196, 'lr': 0.00025170869707739693, 'p': 0.00, 'epochs': 100, 'layers': 9}
+    hpo = {'batch_size': 32, 'channels': 32, 'jitter': 0.01241258424762939, 'jitter_rate': 0.5439942968995378, 'mix_up': 0.19412584247629389, 'mix_up_rate': 0.5439942968995378, 'cut_mix': 0.19412584247629389, 'cut_mix_rate': 0.5439942968995378, 'cut_out': 0.0941258424762939, 'cut_out_rate': 0.7439942968995378, 'crop': 0.19412584247629389, 'crop_rate': 0.5439942968995378, 'scaling': 0.001317169415702424, 'scaling_rate': 0.4353430973459786, 'window_warp_num': 3, 'window_warp_rate': 1.4001548161604196, 'lr': 0.00025170869707739693, 'p': 0.00, 'epochs': 30, 'layers': 6}
     hp = cs.sample_configuration().get_dictionary()
     hp.update(hpo)
-    acc, rec ,sup ,unsup,pretrain_naswot , posttrain_naswot = _compute(hp, binary = False)
-    list2csv([acc,rec,sup,unsup,pretrain_naswot,posttrain_naswot,i],"TEPS_deep.csv")
+    acc, rec ,sup ,unsup,cons, cons_10 = _compute(hp, binary = False)
+    list2csv([acc,rec,sup,unsup,cons,cons_10,i],"TEPS_deep_limited.csv")
 
 if __name__ == "__main__":
-  dist()  
+  nas() 

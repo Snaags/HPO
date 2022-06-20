@@ -6,19 +6,38 @@ import random
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 class TEPS(Dataset):
-  def __init__(self, window_size, train , augmentations, max_samples):
+  def __init__(self, window_size, train , augmentations, samples_per_class = None):
     self.features = 52
     self.n_classes = 21
-    self.samples_per_class = [0]* self.n_classes
-    self.max_samples = max_samples
+    if samples_per_class != None:
+      self.samples_per_class = [samples_per_class]* self.n_classes
+    else:
+      self.samples_per_class = [0]* self.n_classes
     path = "/home/snaags/scripts/datasets/TEPS/split/"
     files = os.listdir(path)
+    #Get either Training or testing samples
     if train == True:
       filtr = "training"
     else:
       filtr = "testing"
-    files = [ name for name in files if filtr in name]    
+    files_all = [ name for name in files if filtr in name]    
     
+    #randomly Subsample to $samples_per_class number of files of each class
+    if samples_per_class == None:
+      files = files_all
+    else:
+      files = []
+      for i in files_all:
+        if i[6:8].isnumeric():
+          if self.samples_per_class[int(i[6:8])] > 0:
+            files.append(i)
+            self.samples_per_class[int(i[6:8])] -=1
+        else:
+          if self.samples_per_class[int(i[6])] > 0:
+            files.append(i)
+            self.samples_per_class[int(i[6])] -=1
+        if sum(self.samples_per_class) == 0:
+          break
     data = []
     self.x_index_address = {}
     self.y_index_address = {}
@@ -74,11 +93,11 @@ class TEPS(Dataset):
 
 class Train_TEPS(TEPS):
 
-  def __init__(self, window_size = 500, augmentations = False, max_samples = 8000000): 
-    super().__init__(window_size, True, augmentations,max_samples)
+  def __init__(self, window_size = 500, augmentations = False,samples_per_class = None): 
+    super().__init__(window_size, True, augmentations,samples_per_class)
 
 class Test_TEPS(TEPS):
 
-  def __init__(self, window_size = 500, augmentations = False, max_samples = 4800000): 
-    super().__init__(window_size,  False , augmentations,max_samples)
+  def __init__(self, window_size = 500, augmentations = False,samples_per_class = None): 
+    super().__init__(window_size,  False , augmentations,samples_per_class)
 

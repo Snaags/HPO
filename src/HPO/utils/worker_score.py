@@ -73,7 +73,7 @@ class StratifiedBatchSampler:
     def __len__(self):
         return len(self.y)
 
-def augment(x, y = None, device = None):
+def augment(x, y = None, settings = None ,device = None):
   augs = [jitter, scaling, window_warp,crop]
   
   rate = 0.5
@@ -82,9 +82,16 @@ def augment(x, y = None, device = None):
       if random.random() < rate:
         x,y = func(x,y)
   else:
-    for func in augs:
-      if random.random() < rate:
-        x,y = func(x,y, device = device)
+    if settings != None:
+      rates = settings["rates"]
+      hps = settings["hps"]
+      for rate, hp,func in zip(rates, hps,augs):
+        if random.random() < rate:
+          x,y = func(x,y,hp, device = device)
+    else:
+      for func in augs:
+        if random.random() < rate:
+          x,y = func(x,y, device = device)
   return x  
 def ce_loss(logits, targets, use_hard_labels=True, reduction='none'):
     """
@@ -127,7 +134,7 @@ def consistency_loss(logits_s, logits_w, name='ce', T=1.0, p_cutoff=0.0, use_har
         else:
             pseudo_label = torch.softmax(logits_w / T, dim=-1)
             masked_loss = ce_loss(logits_s, pseudo_label, use_hard_labels) * mask
-        return masked_loss.mean(), mask.mean(), select, max_idx.long()
+        return masked_loss.mean()
     else:
         assert Exception('Not Implemented consistency_loss')
             
@@ -246,6 +253,31 @@ class Evaluator:
       averaged_loss = loss/samples
     return averaged_loss
 
+  def c_loss(self,model,loader,n_augment = 1,binary = False):
+    loss = 0 
+    s_rates = [0.7, 0.7, 0.9,0.7]
+    s_hps = [0.15, 0.12, 4,0.49]
+    w_rates = [0.3, 0.3, 0.5,0.3]
+    w_hps = [0.015, 0.012, 2,0.1]
+    w_settings = {"rates": w_rates,"hps":w_hps}
+    s_settings = {"rates": s_rates,"hps":s_hps}
+    S = torch.nn.Sigmoid()
+    if binary == True:
+      lossFn = F.binary_cross_entropy_with_logits
+    else:
+      lossFn = F.cross_entropy
+    samples = len(loader)
+    with torch.no_grad(): #disable back prop to test the model
+      for i, (x,_) in enumerate(loader):
+        x = x.cuda(non_blocking=True, device = self.cuda_device).float()
+        for a in range(n_augment):
+          x_s = augment(x,s_settings,device = self.cuda_device)
+          x_w = augment(x,w_settings,device = self.cuda_device)
+          logits_w = model(x_w)
+          logits_s = model(x_s)
+          loss += consistency_loss(logits_s, logits_w)
+      averaged_loss = loss/(samples*n_augment)
+    return averaged_loss
   def ROC(self,fold):
     fpr , tpr, thresholds = roc_curve(self.labels, self.model_prob) 
     roc_auc = auc(fpr,tpr)
