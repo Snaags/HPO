@@ -28,20 +28,23 @@ hpo = {
   "epochs" : 50,
   "layers" : 3}
 ##Settings 
+NUM_FOLDS = 10
 budget = 8
 logging.info("Starting MetaCV")
-metacv = MetaCV(source_path = "/home/cmackinnon/scripts/datasets/repsol_mixed", destination_path = "/home/cmackinnon/scripts/datasets/repsol-meta-cv", num_samples = 87, num_folds = 5)
-for i in range(5):
+metacv = MetaCV(source_path = "/home/cmackinnon/scripts/datasets/repsol_mixed", destination_path = "/home/cmackinnon/scripts/datasets/repsol-meta-cv", num_samples = 87, num_folds = NUM_FOLDS)
+for i in range(NUM_FOLDS):
   metacv.next_fold()
-  best_config, best_score , best_rec= algorithm(worker, config, "random_{}.csv".format(metacv.current_fold))
-  best_config.update(hpo)
-  with Pool(budget) as pool:
-    res = pool.starmap(validate, [[best_config,1]]*8)
-  acc = np.mean(np.asarray(res)[:,0])
-  rec = np.mean(np.asarray(res)[:,1])
+  best_config, best_score , best_rec= algorithm(worker, config, "reg_evo_{}.csv".format(metacv.current_fold)) 
   print("Validated results for meta CV fold {}:".format(i))
   logging.info("Validated results for meta CV fold {}:".format(i))
-  print("HPO CV score - ACC: {} - REC: {}".format(best_score,best_rec))
-  logging.info("HPO CV score - ACC: {} - REC: {}".format(best_score,best_rec))
-  print("MetaCV test set score - ACC: {} - REC: {}".format(acc,rec))
-  logging.info("MetaCV test set score - ACC: {} - REC: {}".format(acc,rec))
+  for top , (hpo_score,hpo_rec,hpo_config) in enumerate(zip(best_score,best_rec,best_config)):
+    hpo_config.update(hpo)
+    with Pool(budget) as pool:
+      res = pool.starmap(validate, [[hpo_config,1]]*8)
+    acc = np.mean(np.asarray(res)[:,0])
+    rec = np.mean(np.asarray(res)[:,1])
+  
+    print("HPO CV score [TOP {} model] - ACC: {} - REC: {}".format(top,hpo_score,hpo_rec))
+    logging.info("HPO CV score [TOP {} model] - ACC: {} - REC: {}".format(top,hpo_score,hpo_rec))
+    print("MetaCV test set score [TOP {} model] - ACC: {} - REC: {}".format(top,acc,rec))
+    logging.info("MetaCV test set score [TOP {} model] - ACC: {} - REC: {}".format(top,acc,rec))

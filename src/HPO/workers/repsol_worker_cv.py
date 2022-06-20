@@ -87,7 +87,7 @@ def _compute(hyperparameter,budget = 4, in_model = None , train_dataset = None, 
   if cuda_device == None:
      cuda_device = 0# torch.cuda.current_device()
 
-  dataset = Mixed_repsol_full(path_dir ="repsol_mixed/" )
+  dataset = Mixed_repsol_full(path_dir ="repsol-meta-cv/train/" )
   torch.cuda.set_device(cuda_device)
 
   print("Cuda Device Value: ", cuda_device)
