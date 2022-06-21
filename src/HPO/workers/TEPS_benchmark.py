@@ -74,11 +74,19 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
      cuda_device = 0# torch.cuda.current_device()
   
   ##Set up augmentations##
+  """
   jitter = aug.Jitter(device = cuda_device,sigma = 0.1)
   crop = aug.Crop(device = cuda_device)
   scaling = aug.Scaling(device = cuda_device)
   window_warp = aug.WindowWarp(device = cuda_device)
   cut_out = aug.CutOut(device = cuda_device)
+  """
+  jitter = aug.Jitter(device = cuda_device,sigma = 0.125, rate = 0.5)
+  crop = aug.Crop(device = cuda_device, rate = 0.8, crop_min = 0.6 , crop_max = 0.98)
+  scaling = aug.Scaling(device = cuda_device)
+  window_warp = aug.WindowWarp(device = cuda_device,rate = 0.8)
+  cut_out = aug.CutOut(device = cuda_device)
+
   augmentations = [jitter,crop,scaling, window_warp, cut_out]
 
   dataset_train = Train_TEPS(augmentations = augmentations, device = cuda_device)
@@ -91,7 +99,8 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
   print(gen)
 
   gen = Genotype(normal=[('avg_pool_3x3', 1), ('avg_pool_3x3', 0), ('avg_pool_3x3', 1), ('dil_conv_3x3', 0), ('avg_pool_3x3', 1), ('dil_conv_5x5', 0), ('sep_conv_5x5', 4), ('dil_conv_5x5', 2)],normal_concat=range(2, 6), reduce=[('max_pool_3x3', 0), ('skip_connect', 1), ('avg_pool_3x3', 0), ('dil_conv_3x3', 1), ('dil_conv_3x3', 2), ('sep_conv_5x5', 1), ('sep_conv_5x5', 2), ('dil_conv_5x5', 1)], reduce_concat=range(2, 6))
-
+  #genotype = Genotype(normal=[('max_pool_3x3', 1), ('sep_conv_3x3', 0), ('max_pool_3x3', 2), ('max_pool_3x3', 1), ('sep_conv_5x5', 2), ('max_pool_3x3', 1), ('max_pool_3x3', 3), ('max_pool_3x3', 2)], normal_concat=range(2, 6), reduce=[('sep_conv_3x3', 0), ('sep_conv_5x5', 1), ('max_pool_3x3', 2), ('max_pool_3x3', 0), ('sep_conv_5x5', 2), ('max_pool_3x3', 0), ('avg_pool_3x3', 2), ('sep_conv_5x5', 0)], reduce_concat=range(2, 6))
+  genotype = Genotype(normal=[('max_pool_3x3', 1), ('sep_conv_3x3', 0), ('max_pool_3x3', 2), ('sep_conv_5x5', 1), ('max_pool_3x3', 2), ('max_pool_3x3', 1), ('max_pool_3x3', 3), ('max_pool_3x3', 2)], normal_concat=range(2, 6), reduce=[('max_pool_3x3', 0), ('skip_connect', 1), ('max_pool_3x3', 0), ('max_pool_3x3', 2), ('sep_conv_5x5', 2), ('max_pool_3x3', 0), ('sep_conv_5x5', 0), ('max_pool_3x3', 4)], reduce_concat=range(2, 6))
 
   n_classes = dataset_train.get_n_classes()
   inner = 4
@@ -174,6 +183,7 @@ if __name__ == "__main__":
 
   hyperparameter = {'normal_index_0_0': 0, 'normal_index_0_1': 0, 'normal_index_1_0': 1, 'normal_index_1_1': 2, 'normal_index_2_0': 0, 'normal_index_2_1': 3, 'normal_index_3_0': 2, 'normal_index_3_1': 2, 'normal_node_0_0': 'avg_pool_3x3', 'normal_node_0_1': 'none', 'normal_node_1_0': 'max_pool_3x3', 'normal_node_1_1': 'skip_connect', 'normal_node_2_0': 'sep_conv_7x7', 'normal_node_2_1': 'dil_conv_3x3', 'normal_node_3_0': 'skip_connect', 'normal_node_3_1': 'dil_conv_3x3', 'reduction_index_0_0': 0, 'reduction_index_0_1': 0, 'reduction_index_1_0': 2, 'reduction_index_1_1': 1, 'reduction_index_2_0': 3, 'reduction_index_2_1': 0, 'reduction_index_3_0': 1, 'reduction_index_3_1': 4, 'reduction_node_0_0': 'sep_conv_3x3', 'reduction_node_0_1': 'sep_conv_5x5', 'reduction_node_1_0': 'sep_conv_7x7', 'reduction_node_1_1': 'skip_connect', 'reduction_node_2_0': 'max_pool_3x3', 'reduction_node_2_1': 'skip_connect', 'reduction_node_3_0': 'max_pool_3x3', 'reduction_node_3_1': 'dil_conv_5x5', 'batch_size': 2, 'channels': 27, 'jitter': 0.1241258424762939, 'jitter_rate': 0.5439942968995378, 'mix_up': 0.19412584247629389, 'mix_up_rate': 0.5439942968995378, 'cut_mix': 0.19412584247629389, 'cut_mix_rate': 0.5439942968995378, 'cut_out': 0.0941258424762939, 'cut_out_rate': 0.7439942968995378, 'crop': 0.19412584247629389, 'crop_rate': 0.5439942968995378, 'scaling': 0.001317169415702424, 'scaling_rate': 0.4353430973459786, 'window_warp_num': 3, 'window_warp_rate': 1.4001548161604196, 'lr': 0.005170869707739693, 'p': 0.00296905723528657, 'epochs': 70, 'layers': 3}
   hpo = {'batch_size': 2, 'channels': 64, 'jitter': 0.01241258424762939, 'jitter_rate': 0.5439942968995378, 'mix_up': 0.19412584247629389, 'mix_up_rate': 0.5439942968995378, 'cut_mix': 0.19412584247629389, 'cut_mix_rate': 0.5439942968995378, 'cut_out': 0.0941258424762939, 'cut_out_rate': 0.7439942968995378, 'crop': 0.19412584247629389, 'crop_rate': 0.5439942968995378, 'scaling': 0.001317169415702424, 'scaling_rate': 0.4353430973459786, 'window_warp_num': 3, 'window_warp_rate': 1.4001548161604196, 'lr': 0.0025170869707739693, 'p': 0.00, 'epochs': 20, 'layers': 3}
+  hpo = {'channels': 64, 'lr': 0.0025170869707739693, 'p': 0.00, 'epochs': 20, 'layers': 3}
   #0.8125,0.7931034482758621,"
   hyperparameter = {'normal_index_0_0': 0, 'normal_index_0_1': 0, 'normal_index_1_0': 2, 'normal_index_1_1': 0, 'normal_index_2_0': 0, 'normal_index_2_1': 0, 'normal_index_3_0': 2, 'normal_index_3_1': 2, 'normal_node_0_0': 'avg_pool_3x3', 'normal_node_0_1': 'none', 'normal_node_1_0': 'skip_connect', 'normal_node_1_1': 'max_pool_3x3', 'normal_node_2_0': 'sep_conv_5x5', 'normal_node_2_1': 'none', 'normal_node_3_0': 'avg_pool_3x3', 'normal_node_3_1': 'dil_conv_3x3', 'reduction_index_0_0': 0, 'reduction_index_0_1': 1, 'reduction_index_1_0': 2, 'reduction_index_1_1': 0, 'reduction_index_2_0': 3, 'reduction_index_2_1': 1, 'reduction_index_3_0': 1, 'reduction_index_3_1': 2, 'reduction_node_0_0': 'skip_connect', 'reduction_node_0_1': 'none', 'reduction_node_1_0': 'max_pool_3x3', 'reduction_node_1_1': 'avg_pool_3x3', 'reduction_node_2_0': 'skip_connect', 'reduction_node_2_1': 'sep_conv_5x5', 'reduction_node_3_0': 'sep_conv_5x5', 'reduction_node_3_1': 'sep_conv_3x3'}
 

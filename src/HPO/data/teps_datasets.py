@@ -57,8 +57,8 @@ class TEPS(Dataset):
     self.n_samples = self.current_index #* len(self.augmentations)
     self.labels = torch.Tensor(self.labels)
   def add_to_dataset(self,x,y):
-    self.x_index_address[self.current_index] = torch.from_numpy(np.swapaxes(x,0,1)).float()
-    self.y_index_address[self.current_index] = torch.from_numpy(np.unique(y)).long()
+    self.x_index_address[self.current_index] = torch.from_numpy(np.swapaxes(x,0,1)).float().cuda(device = self.device )
+    self.y_index_address[self.current_index] = torch.from_numpy(np.unique(y)).cuda(device = self.device).long()
     self.samples_per_class[int(y[0])] += x.shape[0]
     self.labels.append(self.y_index_address[self.current_index])
     self.current_index += 1
@@ -76,8 +76,8 @@ class TEPS(Dataset):
     #this means the index
 
      
-    x = self.x_index_address[index].cuda(device = self.device)
-    y = self.y_index_address[index].cuda(device = self.device)
+    x = self.x_index_address[index]
+    y = self.y_index_address[index]
     if self.augmentations:
       for func in self.augmentations:
         x,y = func(x,y)
