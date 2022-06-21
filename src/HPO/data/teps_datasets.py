@@ -6,8 +6,10 @@ import random
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 class TEPS(Dataset):
-  def __init__(self, window_size, train , augmentations, samples_per_class = None):
+  def __init__(self, window_size, train , augmentations, samples_per_class = None,device = None):
     self.features = 52
+    self.device = device
+    self.augmentations = augmentations
     self.n_classes = 21
     if samples_per_class != None:
       self.samples_per_class = [samples_per_class]* self.n_classes
@@ -73,10 +75,12 @@ class TEPS(Dataset):
     #index_address keys are the first usable index in a batch for the window size
     #this means the index
 
-    
-    x = self.x_index_address[index]
-    y = self.y_index_address[index]
-
+     
+    x = self.x_index_address[index].cuda(device = self.device)
+    y = self.y_index_address[index].cuda(device = self.device)
+    if self.augmentations:
+      for func in self.augmentations:
+        x,y = func(x,y)
     return x , y.item()
 
   
@@ -93,11 +97,11 @@ class TEPS(Dataset):
 
 class Train_TEPS(TEPS):
 
-  def __init__(self, window_size = 500, augmentations = False,samples_per_class = None): 
-    super().__init__(window_size, True, augmentations,samples_per_class)
+  def __init__(self, window_size = 500, augmentations = False,samples_per_class = None,device = None): 
+    super().__init__(window_size, True, augmentations,samples_per_class,device = device)
 
 class Test_TEPS(TEPS):
 
-  def __init__(self, window_size = 500, augmentations = False,samples_per_class = None): 
-    super().__init__(window_size,  False , augmentations,samples_per_class)
+  def __init__(self, window_size = 500, augmentations = False,samples_per_class = None,device = None): 
+    super().__init__(window_size,  False , augmentations,samples_per_class,device = device)
 

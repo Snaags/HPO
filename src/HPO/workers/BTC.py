@@ -7,7 +7,7 @@ from HPO.utils.DARTS_utils import config_space_2_DARTS
 from HPO.utils.FCN import FCN 
 import pandas as pd
 import torch
-from HPO.data.teps_datasets import Train_TEPS , Test_TEPS
+from HPO.data.btc_dataset import Train , Test
 import torch.nn as nn
 from torch import Tensor
 from torch.utils.data import DataLoader, SubsetRandomSampler
@@ -69,7 +69,7 @@ def compute( ID = None, configs=None , gpus=None , res = None  , config = None):
 def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  test_path = None, cuda_device = None,plot_queue = None, model_id = None, binary = True):
   ### Configuration 
   THRESHOLD = 0.4 #Cut off for classification
-  batch_size = 64
+  batch_size = 256
   if cuda_device == None:
      cuda_device = 0# torch.cuda.current_device()
   
@@ -81,8 +81,8 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
   cut_out = aug.CutOut(device = cuda_device)
   augmentations = [jitter,crop,scaling, window_warp, cut_out]
 
-  dataset_train = Train_TEPS(augmentations = augmentations, device = cuda_device)
-  dataset_test = Test_TEPS()
+  dataset_train = Train(device = cuda_device)
+  dataset_test = Test()
   #dataset_test_full = Test_TEPS()
   torch.cuda.set_device(cuda_device)
 
@@ -141,14 +141,6 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
       acc  =  evaluator.T_ACC()
       recall = evaluator.TPR(1)
       recall_total = evaluator.P(1)
-      sup = evaluator.sup_loss(model, testloader)
-      #sup10 = evaluator.sup_loss(model, testloader, n_augment = 10)
-      #unsup10 = evaluator.unsup_loss(model, testloader, n_augment = 10)
-      unsup = evaluator.unsup_loss(model, testloader)
-      #cons = evaluator.c_loss(model, testloader)
-      #cons_10 = evaluator.c_loss(model, testloader,10)
-      #posttrain_naswot = evaluator.score_naswot(model,testloader)
-      #df_loss = evaluator.loss_over_sample_size(model, dataset_test)
       print("Supervised Loss: {} -- Unsupvised Loss: {}".format(sup,unsup))
       #print("Supervised Loss(10): {} -- Unsupervised Loss(10): {}".format(sup10,unsup10))
       #print("NASWOT PRE: {} -- NASWOT POST: {}".format(pretrain_naswot,posttrain_naswot))
@@ -180,6 +172,10 @@ if __name__ == "__main__":
   #0.8170731707317073,0.6486486486486487,"
   hyperparameter = {'normal_index_0_0': 0, 'normal_index_0_1': 0, 'normal_index_1_0': 1, 'normal_index_1_1': 1, 'normal_index_2_0': 3, 'normal_index_2_1': 3, 'normal_index_3_0': 2, 'normal_index_3_1': 2, 'normal_node_0_0': 'avg_pool_3x3', 'normal_node_0_1': 'sep_conv_7x7', 'normal_node_1_0': 'sep_conv_5x5', 'normal_node_1_1': 'sep_conv_5x5', 'normal_node_2_0': 'sep_conv_7x7', 'normal_node_2_1': 'avg_pool_3x3', 'normal_node_3_0': 'skip_connect', 'normal_node_3_1': 'sep_conv_5x5', 'reduction_index_0_0': 1, 'reduction_index_0_1': 0, 'reduction_index_1_0': 0, 'reduction_index_1_1': 1, 'reduction_index_2_0': 1, 'reduction_index_2_1': 2, 'reduction_index_3_0': 4, 'reduction_index_3_1': 1, 'reduction_node_0_0': 'sep_conv_3x3', 'reduction_node_0_1': 'dil_conv_5x5', 'reduction_node_1_0': 'none', 'reduction_node_1_1': 'max_pool_3x3', 'reduction_node_2_0': 'dil_conv_3x3', 'reduction_node_2_1': 'avg_pool_3x3', 'reduction_node_3_0': 'none', 'reduction_node_3_1': 'sep_conv_5x5'}
   hyperparameter.update(hpo)
-  _compute(hyperparameter, binary = False)
+  queue = multiprocessing.Queue()
+  plotter = LivePlot(queue)
+  plot_process = multiprocessing.Process(target=plotter.show,args=())
+  plot_process.start()
+  _compute(hyperparameter, binary = False,plot_queue = queue)
   exit()
 

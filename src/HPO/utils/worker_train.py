@@ -307,15 +307,10 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
     if epoch % 3 == 0:
       total = 0
       correct = 0
-    aug_list = []
-    aug_labels = []
     for i, (samples, labels) in enumerate( dataloader ):
       samples = samples.cuda(non_blocking=True, device = cuda_device)
       labels = labels.cuda(non_blocking=True, device = cuda_device)
       batch_size = samples.shape[0]
-      for _ in range(augment_on):
-          aug_list.append(augment(samples,hyperparameter,cuda_device))
-          aug_labels.append(labels)
       # zero the parameter gradients
       optimizer.zero_grad()
       if batch_size > 1:
@@ -345,29 +340,8 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
           evaluator.reset_cm()
           print("Validation set Accuracy: {}".format(acc))
       if i% 5 == 0:
-        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list)
-    if augment_on == True:
-      for i , (samples , labels) in enumerate(zip(aug_list , aug_labels)):
-        optimizer.zero_grad()
-        samples = samples.cuda(non_blocking=True, device = cuda_device)
-        labels = labels.cuda(non_blocking=True, device = cuda_device)
-        if batch_size > 1:
-          labels = labels.long().view( batch_size  )
-        else:
-          labels = labels.long().view( 1 )
-        outputs = model(samples.float()).cuda(device = cuda_device)
-        # forward + backward + optimize
-        if batch_size == 1:
-          outputs = outputs.view(batch_size,outputs.shape[0])
-        if binary:
-          loss = criterion(outputs.view(batch_size), labels.float()).cuda(device = cuda_device)
-        else:
-          loss = criterion(outputs, labels).cuda(device = cuda_device)
-        loss.backward()
-        loss_list.append(loss.item())
-        optimizer.step()
-        if i %5 == 0:
-          correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list)
+        #correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list)
+        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = binary)
 
 
     #scheduler.step()

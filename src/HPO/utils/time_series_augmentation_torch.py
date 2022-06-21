@@ -14,11 +14,12 @@ def time_test(func, n = 100, batch_size = 10 , window_length = 1000, features = 
     print("Total time for ",func.__name__,": ", time.time()- start , " Seconds")
 
 
+
+
 def jitter(x : torch.Tensor, y,sigma=0.03, device = None):
     
     n = torch.distributions.normal.Normal(loc=0., scale=sigma)
     return torch.add(x,n.sample(x.shape).cuda(device = device)),y 
-
 
 
 def scaling(x : torch.Tensor, y,sigma=0.05, device = None):
@@ -170,21 +171,28 @@ if __name__ == "__main__":
 
     import torch.nn as nn
     from torch import Tensor
-    from torch.utils.data.teps_datasets import Train_TEPS
+    from HPO.data.teps_datasets import Train_TEPS
+    from torch.utils.data import DataLoader
     import random
     import timeit
     import matplotlib.pyplot as plt
-    funcs = [crop,jitter,scaling,window_warp]
-    batch_size = 512
+    jitter = Jitter(device = 0)
+    scaling = Scaling(device = 0)
+    funcs = [crop,jitter,jitter_func,scaling_func,scaling,window_warp]
+    batch_size = 32
     window_length = 500
     features = 27
     train_dataset = Train_TEPS()
-    train_dataloader = DataLoader( train_dataset, batch_size=4,
+    train_dataloader = DataLoader( train_dataset, batch_size=batch_size,
       shuffle = True,drop_last=True)
-    for s,l in train_dataloader:
+    for i,(s,l) in enumerate(train_dataloader):
         x = s.cuda()
         y = l.cuda()
+        if i > 0:
+          break
         for func in funcs:
+           
+            """
             print(x.shape)
             print(func)
             #plt.plot(x[0,26,:].cpu(),label = "orig")
@@ -193,5 +201,9 @@ if __name__ == "__main__":
             #plt.plot(x_p ,alpha = 0.5,label = "aug")
             #plt.legend()
             #plt.show()
-            print("Total time for ",func.__name__,": ", timeit.timeit("{}(x)".format(func.__name__), "from __main__ import {}, {}".format(func.__name__, "x"), number = 10) , " Seconds")
+            """
+            print("from __main__ import {}, {}, {}".format(func.__name__, "x","y"))
+            t = timeit.timeit("{}(x,y)".format(func.__name__), "from __main__ import {}, {}, {}".format(func.__name__, "x","y"), number = 1000)
+            print("Total time for ",func.__name__,": ",t , " Seconds")
+            print("Time per sample: {}".format(t/batch_size))
 
