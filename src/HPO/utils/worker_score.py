@@ -313,6 +313,7 @@ class Evaluator:
       s = torch.nn.Identity()
       self.model_prob = np.zeros(shape = (len(self.testloader)*self.batch_size, self.n_classes)) # [sample , classes]
     self.labels = np.zeros(shape = (len(self.testloader)*self.batch_size,1))
+
     #Pass validation set through model getting probabilities and labels
     with torch.no_grad(): #disable back prop to test the model
       num_batches = len(self.testloader) + self.batch_size
@@ -325,8 +326,11 @@ class Evaluator:
           self.model_prob[start_index:end_index,:] = out
           if subset != None:
             if i > subset:
+              self.labels = self.labels[:end_index,:]
+              self.model_prob = self.model_prob[:end_index, :]
               break
   def update_CM(self):
+    print(self.labels.shape)
     self.confusion_matrix += confusion_matrix(self.labels, self.prediction,labels = list(range(self.n_classes))) 
   def reset_cm(self):
     self.confusion_matrix = np.zeros(shape = (self.n_classes,self.n_classes)) #Matrix of prediction vs true values

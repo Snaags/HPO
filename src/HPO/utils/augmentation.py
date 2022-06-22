@@ -1,4 +1,4 @@
-
+import matplotlib.pyplot as plt
 import torch
 import random
 from torch.nn.functional import interpolate
@@ -103,7 +103,43 @@ class CutOut(object):
     x[:,start:end] = 0    
     return x,y 
 
+class MixUp(object):
+  def __init__(self, m = 0.3 , rate = 0.3 , device = None):
+    self.device = device 
+    self.rate = rate
+    self.dist = torch.distributions.beta.Beta(m,m)
+    self.mix_sample = None
+    self.mix_label = None 
+  def __call__(self,x,y):
+    if random.random() < self.rate:
+      if self.mix_sample == None:
+        self.mix_sample = x
+        self.mix_label = y
+        return x,y
+      else: 
+        return self.call(x,y)
+    else:
+      return x,y
 
+  def call(self,x,y):
+    DEBUG = False
+    #x = [batch, channels , length]
+    #y = [batch, 1]
+    mix = self.dist.sample()
+    MTS_1 = x.clone()
+    MTS_2 = self.mix_sample.clone()
+    LAB_1 = y.clone()
+    LAB_2 = self.mix_label.clone()
+    x = (MTS_1 * mix)  + (MTS_2 *(1-mix))
+    y = (LAB_1 * mix) + (LAB_2 * (1-mix))
+    if DEBUG == True:
+      print("mix value is {} and label value is {}".format(mix,y))
+      plt.plot(MTS_1[26,:].cpu(),label = "series 1",alpha = 0.7)
+      plt.plot(MTS_2[26,:].cpu(),label = "series 2",alpha = 0.7)
+      plt.plot(x[26,:].cpu(),label = "Mix",alpha = 0.7)
+      plt.legend()
+      plt.show()
+    return x ,y
 
 def mix_up(x,y, m = 0.3, device = None):
     dist = torch.distributions.beta.Beta(m,m)

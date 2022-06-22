@@ -88,8 +88,12 @@ def collate_fn_padd(batch):
     batch_samples = torch.nn.utils.rnn.pad_sequence(batch_samples ,batch_first = True)
     ## compute mask
     mask = (batch != 0)
-     
-    labels = torch.Tensor([t[1] for t in batch])
+    labels = []
+    for pair in batch:
+      one_hot_label = pair[1]
+      labels.append(one_hot_label)
+    labels = torch.stack(labels).squeeze()
+    #labels = torch.Tensor([t[1] for t in batch])
     batch = torch.transpose(batch_samples , 1 , 2 )
     return batch, labels
 
@@ -308,15 +312,15 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
       total = 0
       correct = 0
     for i, (samples, labels) in enumerate( dataloader ):
-      samples = samples.cuda(non_blocking=True, device = cuda_device)
-      labels = labels.cuda(non_blocking=True, device = cuda_device)
+      #samples = samples.cuda(non_blocking=True, device = cuda_device)
+      #labels = labels.cuda(non_blocking=True, device = cuda_device)
       batch_size = samples.shape[0]
       # zero the parameter gradients
       optimizer.zero_grad()
-      if batch_size > 1:
-        labels = labels.long().view( batch_size  )
-      else:
-        labels = labels.long().view( 1 )
+      #if batch_size > 1:
+      #  labels = labels.long().view( batch_size  )
+      #else:
+      #  labels = labels.long().view( 1 )
       outputs = model(samples.float()).cuda(device = cuda_device)
       # forward + backward + optimize
       if batch_size == 1:

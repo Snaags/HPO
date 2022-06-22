@@ -1,4 +1,5 @@
 import numpy as np
+import torch.nn.functional as F
 import os
 import torch
 from torch.utils.data import Dataset
@@ -6,9 +7,10 @@ import random
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 class TEPS(Dataset):
-  def __init__(self, window_size, train , augmentations, samples_per_class = None,device = None):
+  def __init__(self, window_size, train , augmentations, samples_per_class = None,one_hot = True,device = None):
     self.features = 52
     self.device = device
+    self.one_hot = one_hot
     self.augmentations = augmentations
     self.n_classes = 21
     if samples_per_class != None:
@@ -57,10 +59,13 @@ class TEPS(Dataset):
     self.n_samples = self.current_index #* len(self.augmentations)
     self.labels = torch.Tensor(self.labels)
   def add_to_dataset(self,x,y):
-    self.x_index_address[self.current_index] = torch.from_numpy(np.swapaxes(x,0,1)).float().cuda(device = self.device )
-    self.y_index_address[self.current_index] = torch.from_numpy(np.unique(y)).cuda(device = self.device).long()
+    if self.one_hot == True:
+      self.x_index_address[self.current_index] = torch.from_numpy(np.swapaxes(x,0,1)).float().cuda(device = self.device )
+      self.y_index_address[self.current_index] = F.one_hot(torch.from_numpy(np.unique(y)).long(),num_classes = self.n_classes).cuda(device = self.device).long()
+    else:
+      self.x_index_address[self.current_index] = torch.from_numpy(np.swapaxes(x,0,1)).float().cuda(device = self.device )
+      self.y_index_address[self.current_index] = torch.from_numpy(np.unique(y)).cuda(device = self.device).long()
     self.samples_per_class[int(y[0])] += x.shape[0]
-    self.labels.append(self.y_index_address[self.current_index])
     self.current_index += 1
 
   def get_n_samples_per_class(self):
@@ -74,14 +79,15 @@ class TEPS(Dataset):
   def __getitem__(self, index):
     #index_address keys are the first usable index in a batch for the window size
     #this means the index
-
      
     x = self.x_index_address[index]
     y = self.y_index_address[index]
     if self.augmentations:
       for func in self.augmentations:
         x,y = func(x,y)
-    return x , y.item()
+    if self.one_hot == False:
+      return x , y.long()
+    return x , y
 
   
   def get_n_classes(self):
@@ -97,11 +103,11 @@ class TEPS(Dataset):
 
 class Train_TEPS(TEPS):
 
-  def __init__(self, window_size = 500, augmentations = False,samples_per_class = None,device = None): 
-    super().__init__(window_size, True, augmentations,samples_per_class,device = device)
+  def __init__(self, window_size = 500, augmentations = False,samples_per_class = None,one_hot = True,device = None): 
+    super().__init__(window_size, True, augmentations,samples_per_class,one_hot = one_hot,device = device)
 
 class Test_TEPS(TEPS):
 
-  def __init__(self, window_size = 500, augmentations = False,samples_per_class = None,device = None): 
-    super().__init__(window_size,  False , augmentations,samples_per_class,device = device)
+  def __init__(self, window_size = 500, augmentations = False,samples_per_class = None,one_hot = False,device = None): 
+    super().__init__(window_size,  False , augmentations,samples_per_class,one_hot = one_hot,device = device)
 
