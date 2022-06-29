@@ -5,7 +5,7 @@ from HPO.algorithms.NASWOT import naswot
 import torch
 import torch.nn.functional as F
 from HPO.utils.time_series_augmentation_torch import  jitter, scaling, window_warp,crop, cutout
-from HPO.utils.worker_train import train_model, collate_fn_padd, train_model_bt, collate_fn_padd_x, train_model_aug, train_model_multibatch
+from HPO.utils.train_utils import collate_fn_padd, collate_fn_padd_x
 import random
 import copy
 from torch.utils.data import Sampler
@@ -330,7 +330,6 @@ class Evaluator:
               self.model_prob = self.model_prob[:end_index, :]
               break
   def update_CM(self):
-    print(self.labels.shape)
     self.confusion_matrix += confusion_matrix(self.labels, self.prediction,labels = list(range(self.n_classes))) 
   def reset_cm(self):
     self.confusion_matrix = np.zeros(shape = (self.n_classes,self.n_classes)) #Matrix of prediction vs true values
