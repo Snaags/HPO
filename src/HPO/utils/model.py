@@ -110,7 +110,7 @@ class NetworkMain(nn.Module):
     self.c_out = C_prev
     if binary == True:
       self.binary = binary
-      self.outact = nn.Sigmoid()
+      #self.outact = nn.Sigmoid()
       self.classifier = nn.Linear(C_prev, 1)
     else:
       self.classifier = nn.Linear(C_prev, num_classes)

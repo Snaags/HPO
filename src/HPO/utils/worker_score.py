@@ -279,7 +279,7 @@ class Evaluator:
           loss += consistency_loss(logits_s, logits_w)
       averaged_loss = loss/(samples*n_augment)
     return averaged_loss
-  def ROC(self,fold):
+  def ROC(self,fold = 0):
     fpr , tpr, thresholds = roc_curve(self.labels, self.model_prob) 
     roc_auc = auc(fpr,tpr)
     plt.figure()
@@ -300,7 +300,7 @@ class Evaluator:
     plt.legend(loc="lower right")
     plt.savefig("ROC_{}".format(fold))
 
-  def forward_pass(self, model , testloader = None, binary = False, subset = None):
+  def forward_pass(self, model , testloader = None, binary = False, subset = None,n_iter = 1):
     if testloader != None:
       self.testloader = testloader
     elif self.testloader == None and testloader == None:
@@ -308,27 +308,27 @@ class Evaluator:
 
     if binary == True:
       s = torch.nn.Sigmoid() #torch.nn.Identity()# torch.nn.Sigmoid()
-      self.model_prob = np.zeros(shape = (len(self.testloader), 1)) # [sample , classes]
+      self.model_prob = np.zeros(shape = (len(self.testloader)*self.batch_size*n_iter, 1)) # [sample , classes]
     else:
       s = torch.nn.Identity()
-      self.model_prob = np.zeros(shape = (len(self.testloader)*self.batch_size, self.n_classes)) # [sample , classes]
-    self.labels = np.zeros(shape = (len(self.testloader)*self.batch_size,1))
+      self.model_prob = np.zeros(shape = (len(self.testloader)*self.batch_size*n_iter, self.n_classes)) # [sample , classes]
+    self.labels = np.zeros(shape = (len(self.testloader)*self.batch_size*n_iter,1))
 
     #Pass validation set through model getting probabilities and labels
     with torch.no_grad(): #disable back prop to test the model
-      num_batches = len(self.testloader) + self.batch_size
-      for i, (inputs, labels) in enumerate( self.testloader ):
-          start_index = i * self.batch_size
-          end_index = (i * self.batch_size) + self.batch_size
-          inputs = inputs.cuda(non_blocking=True, device = self.cuda_device).float()
-          self.labels[start_index:end_index , :] = labels.view(self.batch_size,1).cpu().numpy()
-          out = s(model(inputs)).cpu().numpy()      
-          self.model_prob[start_index:end_index,:] = out
-          if subset != None:
-            if i > subset:
-              self.labels = self.labels[:end_index,:]
-              self.model_prob = self.model_prob[:end_index, :]
-              break
+      for n in range(n_iter):
+        for i, (inputs, labels) in enumerate( self.testloader ):
+            start_index = i * self.batch_size + (n * len(self.testloader) * self.batch_size)
+            end_index = (i * self.batch_size + (n * len(self.testloader) * self.batch_size)) + self.batch_size
+            inputs = inputs.cuda(non_blocking=True, device = self.cuda_device).float()
+            self.labels[start_index:end_index , :] = labels.view(self.batch_size,1).cpu().numpy()
+            out = s(model(inputs)).cpu().numpy()
+            self.model_prob[start_index:end_index,:] = out
+            if subset != None:
+              if i > subset:
+                self.labels = self.labels[:end_index,:]
+                self.model_prob = self.model_prob[:end_index, :]
+                break
   def update_CM(self):
     self.confusion_matrix += confusion_matrix(self.labels, self.prediction,labels = list(range(self.n_classes))) 
   def reset_cm(self):

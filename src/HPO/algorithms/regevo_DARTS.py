@@ -38,9 +38,9 @@ class Model:
   MUTATE_RATE = 0.2
   def __init__(self, cs):
     self._arch = None
-    self.accuracy = 0
+    self.accuracy = None
     self.cs = cs
-    self.recall = 0
+    self.recall = None
 
   def set_arch(self, arch):
     self._arch = arch
@@ -49,6 +49,8 @@ class Model:
     
     self._arch[key] = new_hp
   
+  def __repr__(self):
+    return "Model(Accuracy: {} , Recall: {})".format(self.accuracy,self.recall)
   def perturb(self, key : str):
     value_not_valid = True
     value_type = self.fix_type(key)
@@ -80,8 +82,8 @@ class Model:
 def train_and_eval_population(worker, population, sample_batch, train):
   configs = []
   for model in population:
-    configs.append(model.arch())
-  
+    if model.accuracy == None:
+      configs.append(model.arch())
   acc , _rec , _config = train.eval( configs )
   for mod,result,recall in zip(population, acc, _rec):
     mod.accuracy = result
@@ -99,6 +101,7 @@ def model_change(parent, child):
 
 def Mutate(cs, parent_model : Model) -> Model:
   model = copy.deepcopy(parent_model) 
+  model.accuracy = None
     
   def op_mutation(model: Model) -> Model:
     operation = ""
@@ -181,6 +184,18 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
   else:
     population , history = load_csv(load_file, CS)
     train = train_eval( worker, sample_batch_size, load_file )
+    a = []
+    r = []
+    c= []
+    for model in history:
+      a.append(model.accuracy)
+      r.append(model.recall)
+      c.append(model.arch().get_dictionary())
+    train.resume(a,r,c)
+    if len(population) > population_size:
+      population = population[-population_size:]
+    for i in population:
+      print(repr(i))
   while len(population) < population_size:
     model = Model( CS )
     model.set_arch( CS.sample_configuration() )
@@ -238,9 +253,9 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
 
 def main(worker, configspace, load_file = "reg_evo.csv"):
   N = 5 #N best models to return
-  pop_size = 64
-  evaluations = 256
-  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =8, sample_batch_size = 8, load_file = load_file)
+  pop_size = 100
+  evaluations = 500
+  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =4, sample_batch_size = 4, load_file = load_file)
   Architectures = []
   accuracy_scores = []
   recall_scores = []
