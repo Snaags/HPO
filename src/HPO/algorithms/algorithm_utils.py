@@ -6,7 +6,7 @@ import csv
 from pynvml import *
 def assign_gpu():
   nvmlInit()
-  max_memory = 1000000000
+  max_memory = 700000000
   count = nvmlDeviceGetCount()  
   gpu_list = []
   for i in range(count):
@@ -39,6 +39,10 @@ class train_eval:
     self.filename = filename
     self.worker = worker
 
+  def resume(self, acc, recall, config):
+    self.acc_list_full = acc
+    self.recall_list_full = recall
+    self.config_list_full = config
   def allocate_gpu(self):
     if max(self.gpu) == 0:
       return None

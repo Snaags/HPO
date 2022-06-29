@@ -70,7 +70,7 @@ def compute( ID = None, configs=None , gpus=None , res = None  , config = None):
 def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  test_path = None, cuda_device = None,plot_queue = None, model_id = None, binary = True):
   ### Configuration 
   THRESHOLD = 0.4 #Cut off for classification
-  batch_size = 64
+  batch_size = 8
   if cuda_device == None:
      cuda_device = 0# torch.cuda.current_device()
   
@@ -83,15 +83,15 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
   cut_out = aug.CutOut(device = cuda_device)
   """
   jitter = aug.Jitter(device = cuda_device,sigma = 0.125, rate = 0.5)
-  crop = aug.Crop(device = cuda_device, rate = 0.8, crop_min = 0.6 , crop_max = 0.98)
+  crop = aug.Crop(device = cuda_device, rate = 0.8, crop_min = 0.3 , crop_max = 0.98)
   scaling = aug.Scaling(device = cuda_device)
-  window_warp = aug.WindowWarp(device = cuda_device,rate = 0.8)
+  window_warp = aug.WindowWarp(device = cuda_device,rate = 0.9)
   cut_out = aug.CutOut(device = cuda_device)
-  mix_up = aug.MixUp(device = cuda_device)
+  mix_up = aug.MixUp(device = cuda_device,m = 0.2, rate = 0.3)
   augmentations = [mix_up,jitter,crop,scaling, window_warp, cut_out]
 
-  dataset_train = Train_TEPS(augmentations = augmentations, device = cuda_device)
-  dataset_test = Test_TEPS()
+  dataset_train = Train_TEPS(augmentations = augmentations, samples_per_class = 60,device = cuda_device,one_hot = False,binary = True)
+  dataset_test = Test_TEPS(binary = True,samples_per_class = 500)
   #dataset_test_full = Test_TEPS()
   torch.cuda.set_device(cuda_device)
 
@@ -99,9 +99,9 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
   gen = config_space_2_DARTS(hyperparameter,reduction = True)
   print(gen)
 
-  gen = Genotype(normal=[('avg_pool_3x3', 1), ('avg_pool_3x3', 0), ('avg_pool_3x3', 1), ('dil_conv_3x3', 0), ('avg_pool_3x3', 1), ('dil_conv_5x5', 0), ('sep_conv_5x5', 4), ('dil_conv_5x5', 2)],normal_concat=range(2, 6), reduce=[('max_pool_3x3', 0), ('skip_connect', 1), ('avg_pool_3x3', 0), ('dil_conv_3x3', 1), ('dil_conv_3x3', 2), ('sep_conv_5x5', 1), ('sep_conv_5x5', 2), ('dil_conv_5x5', 1)], reduce_concat=range(2, 6))
+  #gen = Genotype(normal=[('avg_pool_3x3', 1), ('avg_pool_3x3', 0), ('avg_pool_3x3', 1), ('dil_conv_3x3', 0), ('avg_pool_3x3', 1), ('dil_conv_5x5', 0), ('sep_conv_5x5', 4), ('dil_conv_5x5', 2)],normal_concat=range(2, 6), reduce=[('max_pool_3x3', 0), ('skip_connect', 1), ('avg_pool_3x3', 0), ('dil_conv_3x3', 1), ('dil_conv_3x3', 2), ('sep_conv_5x5', 1), ('sep_conv_5x5', 2), ('dil_conv_5x5', 1)], reduce_concat=range(2, 6))
   #genotype = Genotype(normal=[('max_pool_3x3', 1), ('sep_conv_3x3', 0), ('max_pool_3x3', 2), ('max_pool_3x3', 1), ('sep_conv_5x5', 2), ('max_pool_3x3', 1), ('max_pool_3x3', 3), ('max_pool_3x3', 2)], normal_concat=range(2, 6), reduce=[('sep_conv_3x3', 0), ('sep_conv_5x5', 1), ('max_pool_3x3', 2), ('max_pool_3x3', 0), ('sep_conv_5x5', 2), ('max_pool_3x3', 0), ('avg_pool_3x3', 2), ('sep_conv_5x5', 0)], reduce_concat=range(2, 6))
-  genotype = Genotype(normal=[('max_pool_3x3', 1), ('sep_conv_3x3', 0), ('max_pool_3x3', 2), ('sep_conv_5x5', 1), ('max_pool_3x3', 2), ('max_pool_3x3', 1), ('max_pool_3x3', 3), ('max_pool_3x3', 2)], normal_concat=range(2, 6), reduce=[('max_pool_3x3', 0), ('skip_connect', 1), ('max_pool_3x3', 0), ('max_pool_3x3', 2), ('sep_conv_5x5', 2), ('max_pool_3x3', 0), ('sep_conv_5x5', 0), ('max_pool_3x3', 4)], reduce_concat=range(2, 6))
+  #genotype = Genotype(normal=[('max_pool_3x3', 1), ('sep_conv_3x3', 0), ('max_pool_3x3', 2), ('sep_conv_5x5', 1), ('max_pool_3x3', 2), ('max_pool_3x3', 1), ('max_pool_3x3', 3), ('max_pool_3x3', 2)], normal_concat=range(2, 6), reduce=[('max_pool_3x3', 0), ('skip_connect', 1), ('max_pool_3x3', 0), ('max_pool_3x3', 2), ('sep_conv_5x5', 2), ('max_pool_3x3', 0), ('sep_conv_5x5', 0), ('max_pool_3x3', 4)], reduce_concat=range(2, 6))
 
   n_classes = dataset_train.get_n_classes()
   inner = 4
@@ -122,7 +122,7 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
                           dataset_train,collate_fn = collate_fn_padd,shuffle = True,
                           batch_size=batch_size, drop_last = True)
       testloader = torch.utils.data.DataLoader(
-                          dataset_test,collate_fn = collate_fn_padd,
+                          dataset_test,collate_fn = collate_fn_padd,shuffle = True,
                           batch_size=batch_size,drop_last = True)
       evaluator = Evaluator(batch_size, n_classes,cuda_device,testloader = testloader) 
 
@@ -141,7 +141,7 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
       """
       evaluator.forward_pass(model, testloader,binary)
       evaluator.predictions(model_is_binary = binary , THRESHOLD = THRESHOLD)
-
+      evaluator.ROC()
       ### Get Metrics
       total = evaluator.T()
       acc  =  evaluator.T_ACC()
@@ -172,9 +172,41 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
   return acc, recall, sup.item(), unsup.item()#, sup10.item(),unsup10.item()
 
 if __name__ == "__main__":
-  hpo = {'channels': 32, 'lr': 0.0025170869707739693, 'p': 0.00, 'epochs': 30, 'layers': 3}
-  hyperparameter = {'normal_index_0_0': 0, 'normal_index_0_1': 0, 'normal_index_1_0': 1, 'normal_index_1_1': 1, 'normal_index_2_0': 3, 'normal_index_2_1': 3, 'normal_index_3_0': 2, 'normal_index_3_1': 2, 'normal_node_0_0': 'avg_pool_3x3', 'normal_node_0_1': 'sep_conv_7x7', 'normal_node_1_0': 'sep_conv_5x5', 'normal_node_1_1': 'sep_conv_5x5', 'normal_node_2_0': 'sep_conv_7x7', 'normal_node_2_1': 'avg_pool_3x3', 'normal_node_3_0': 'skip_connect', 'normal_node_3_1': 'sep_conv_5x5', 'reduction_index_0_0': 1, 'reduction_index_0_1': 0, 'reduction_index_1_0': 0, 'reduction_index_1_1': 1, 'reduction_index_2_0': 1, 'reduction_index_2_1': 2, 'reduction_index_3_0': 4, 'reduction_index_3_1': 1, 'reduction_node_0_0': 'sep_conv_3x3', 'reduction_node_0_1': 'dil_conv_5x5', 'reduction_node_1_0': 'none', 'reduction_node_1_1': 'max_pool_3x3', 'reduction_node_2_0': 'dil_conv_3x3', 'reduction_node_2_1': 'avg_pool_3x3', 'reduction_node_3_0': 'none', 'reduction_node_3_1': 'sep_conv_5x5'}
+  hpo = {'channels': 128, 'lr': 0.0025170869707739693, 'p': 0.00, 'epochs': 200, 'layers': 6}
+  hyperparameter = {'normal_index_0_0': 0,
+  'normal_index_0_1': 0,
+  'normal_index_1_0': 1,
+  'normal_index_1_1': 0,
+  'normal_index_2_0': 1,
+  'normal_index_2_1': 2,
+  'normal_index_3_0': 2,
+  'normal_index_3_1': 2,
+  'normal_node_0_0': 'max_pool_3x3',
+  'normal_node_0_1': 'avg_pool_3x3',
+  'normal_node_1_0': 'avg_pool_3x3',
+  'normal_node_1_1': 'sep_conv_7x7',
+  'normal_node_2_0': 'avg_pool_3x3',
+  'normal_node_2_1': 'sep_conv_7x7',
+  'normal_node_3_0': 'sep_conv_3x3',
+  'normal_node_3_1': 'sep_conv_7x7',
+  'reduction_index_0_0': 1,
+  'reduction_index_0_1': 0,
+  'reduction_index_1_0': 0,
+  'reduction_index_1_1': 0,
+  'reduction_index_2_0': 1,
+  'reduction_index_2_1': 2,
+  'reduction_index_3_0': 1,
+  'reduction_index_3_1': 2,
+  'reduction_node_0_0': 'skip_connect',
+  'reduction_node_0_1': 'sep_conv_7x7',
+  'reduction_node_1_0': 'avg_pool_3x3',
+  'reduction_node_1_1': 'max_pool_3x3',
+  'reduction_node_2_0': 'sep_conv_7x7',
+  'reduction_node_2_1': 'sep_conv_7x7',
+  'reduction_node_3_0': 'skip_connect',
+  'reduction_node_3_1': 'dil_conv_3x3'}
+
   hyperparameter.update(hpo)
-  _compute(hyperparameter, binary = False)
+  _compute(hyperparameter, binary = True)
   exit()
 

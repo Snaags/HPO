@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from torch import Tensor
+from HPO.utils.train_log import Logger
 from HPO.utils.model_constructor import Model
 from torch.utils.data import DataLoader
 
@@ -21,8 +22,10 @@ def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tens
     return idx
   if binary == True:
     new_correct , new_total = cal_acc(outputs.ge(0.5).cpu().detach().numpy(), labels.cpu().detach().numpy())
-  else:
+  elif len(labels.shape) > 1:
     new_correct , new_total =  cal_acc(convert_label_max_only(outputs), convert_label_max_only(labels))
+  else:
+    new_correct , new_total =  cal_acc(convert_label_max_only(outputs), labels.cpu().detach().numpy())
   correct += new_correct 
   total += new_total
   acc = correct / total 
@@ -40,10 +43,9 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
     cuda_device = torch.cuda.current_device()
   n_iter = len(dataloader) 
   optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["lr"])
-  scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, "min",patience = 5,verbose = True, factor = 0.5,cooldown = 2)
+  scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, "max",patience = 3,verbose = True, factor = 0.5,cooldown = 1)
   if binary == True:
     criterion = nn.BCEWithLogitsLoss().cuda(device = cuda_device)
-  
   else:
     criterion = nn.CrossEntropyLoss()
   epoch = 0
@@ -51,6 +53,9 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   loss_list = []
   total = 0
   correct = 0
+  acc = 0
+  recall = 0
+  logger = Logger()
   while epoch < epochs:
     if epoch % 3 == 0:
       total = 0
@@ -64,24 +69,24 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
       else:
         loss = criterion(outputs, labels).cuda(device = cuda_device)
       loss.backward()
-      loss_list.append(loss.item())
       optimizer.step()
-      if i %100 == 0:
-        if graph != None:
-          graph.put(loss_list)
 
-      if i % 100 == 0 and i != 0:
-        if evaluator != None:
-          evaluator.forward_pass(model,subset = 50)
-          evaluator.predictions(model_is_binary = False)
-          acc  =  evaluator.T_ACC()
-          evaluator.reset_cm()
-          print("")
-          print("Validation set Accuracy: {}".format(acc))
-          print("")
-          scheduler.step(acc)
       if i% 5 == 0:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = binary)
+      logger.update({"loss": loss.item(), "training_accuracy": (correct/total),"index" : i,
+              "epoch": epoch, "validation_accuracy": acc, "lr":optimizer.param_groups[0]['lr'],"validation recall": recall })
+    if epoch % 5 == 0:
+      if evaluator != None:
+        evaluator.forward_pass(model,subset = 400,binary = binary)
+        evaluator.predictions(model_is_binary = binary,THRESHOLD = 0.4)
+        evaluator.ROC("train")
+        acc  =  evaluator.T_ACC()
+        recall = evaluator.TPR(1)
+        evaluator.reset_cm()
+        print("")
+        print("Validation set Accuracy: {} -- Recall: {}".format(acc,recall))
+        print("")
+        scheduler.step(acc)
     epoch += 1
   print()
   print("Num epochs: {}".format(epoch))

@@ -53,6 +53,9 @@ class Crop(object):
     sig_len = x.shape[1]
     length= random.uniform(self.crop_min,self.crop_max)
     length = int(length * sig_len)
+    start = random.randint(0,(sig_len - length))
+    return x[:,start:(length+start)],y
+
     if random.choice([0,1]) == 1:
       return  x[:,:length],y
     else:
