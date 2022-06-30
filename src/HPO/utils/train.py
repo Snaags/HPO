@@ -6,6 +6,7 @@ from torch import Tensor
 from HPO.utils.train_log import Logger
 from HPO.utils.model_constructor import Model
 from torch.utils.data import DataLoader
+from HPO.utils.train_utils import stdio_print_training_data
 
 def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tensor , epoch : int, epochs : int, correct :int , total : int , peak_acc : float , loss : Tensor, n_iter, loss_list = None, binary = True):
   def cal_acc(y,t):
@@ -75,6 +76,9 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
       loss.backward()
       optimizer.step()
 
+      if i% 5 == 0:
+        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = binary)
+    
       if i% 5 == 0:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = binary)
       logger.update({"loss": loss.item(), "training_accuracy": (correct/total),"index" : i,

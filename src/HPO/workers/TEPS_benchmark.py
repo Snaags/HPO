@@ -13,8 +13,8 @@ from torch import Tensor
 from torch.utils.data import DataLoader, SubsetRandomSampler
 import random
 import HPO.utils.augmentation as aug
-from HPO.utils.worker_train import collate_fn_padd, train_model_bt, collate_fn_padd_x, train_model_aug, train_model_multibatch
 from HPO.utils.train_log import Logger
+from HPO.utils.train_utils import collate_fn_padd
 from HPO.utils.train import train_model
 from HPO.utils.weight_freezing import freeze_FCN, freeze_resnet
 from HPO.utils.ResNet1d import resnet18
@@ -73,7 +73,7 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
   THRESHOLD = 0.4 #Cut off for classification
   batch_size = 16
   if cuda_device == None:
-     cuda_device = 0# torch.cuda.current_device()
+     cuda_device = 1# torch.cuda.current_device()
   
   ##Set up augmentations##
   jitter = aug.Jitter(device = cuda_device,sigma = 0.125, rate = 0.5)
@@ -119,11 +119,7 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
       """
       ### Train the model
       """
-      #pretrain_naswot = evaluator.score_naswot(model,testloader)
-      if multibatch:
-        train_model_multibatch(model , hyperparameter, trainloader , hyperparameter["epochs"], batch_size , cuda_device, augment_num = 1, graph = plot_queue, binary = binary) 
-      else:  
-        train_model(model , hyperparameter, trainloader , hyperparameter["epochs"], batch_size , cuda_device, graph = plot_queue, binary = binary,evaluator = evaluator,logger = logger) 
+      train_model(model , hyperparameter, trainloader , hyperparameter["epochs"], batch_size , cuda_device, graph = plot_queue, binary = binary,evaluator = evaluator) 
       """
       ### Test the model
       """
@@ -193,7 +189,6 @@ if __name__ == "__main__":
   'reduction_node_2_1': 'sep_conv_7x7',
   'reduction_node_3_0': 'skip_connect',
   'reduction_node_3_1': 'dil_conv_3x3'}
-
   hyperparameter.update(hpo)
   _compute(hyperparameter, binary = True)
   exit()

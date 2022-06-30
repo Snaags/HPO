@@ -75,45 +75,6 @@ class Metaloader:
           break
 
 
-def collate_fn_padd(batch):
-    '''
-    Padds batch of variable length
-    
-    note: it converts things ToTensor manually here since the ToTensor transform
-    assume it takes in images rather than arbitrary tensors.
-    '''
-    ## get sequence lengths
-    lengths = torch.tensor([ t[0].shape[1] for t in batch ])    ## padd
-    batch_samples = [ torch.transpose(t[0],0,1) for t in batch ]
-    batch_samples = torch.nn.utils.rnn.pad_sequence(batch_samples ,batch_first = True)
-    ## compute mask
-    mask = (batch != 0)
-    labels = []
-    for pair in batch:
-      one_hot_label = pair[1]
-      labels.append(one_hot_label)
-    labels = torch.stack(labels).squeeze()
-    #labels = torch.Tensor([t[1] for t in batch])
-    batch = torch.transpose(batch_samples , 1 , 2 )
-    return batch, labels
-
-def collate_fn_padd_x(batch):
-    '''
-    Padds batch of variable length
-
-    note: it converts things ToTensor manually here since the ToTensor transform
-    assume it takes in images rather than arbitrary tensors.
-    '''
-    ## get sequence lengths
-    lengths = torch.tensor([ t.shape[1] for t in batch ])    ## padd
-    batch_samples = [ torch.transpose(t,0,1) for t in batch ]
-    batch_samples = torch.nn.utils.rnn.pad_sequence(batch_samples ,batch_first = True)
-    ## compute mask
-    mask = (batch != 0)
-     
-
-    batch = torch.transpose(batch_samples , 1 , 2 )
-    return batch
 
 def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tensor , epoch : int, epochs : int, correct :int , total : int , peak_acc : float , loss : Tensor, n_iter, loss_list = None, binary = True):
   def cal_acc(y,t):
