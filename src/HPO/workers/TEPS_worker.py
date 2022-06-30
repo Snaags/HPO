@@ -78,7 +78,7 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
   hpo.update(hyperparameter)
   ##Set up augmentations##
   jitter = aug.Jitter(device = cuda_device,sigma = 0.125, rate = 0.5)
-  crop = aug.Crop(device = cuda_device, rate = 0.8, crop_min = 0.6 , crop_max = 0.98)
+  crop = aug.Crop(device = cuda_device, rate = 0.8, crop_min = 0.2 , crop_max = 0.98)
   scaling = aug.Scaling(device = cuda_device)
   window_warp = aug.WindowWarp(device = cuda_device,rate = 0.9)
   cut_out = aug.CutOut(device = cuda_device)

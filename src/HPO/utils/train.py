@@ -37,13 +37,15 @@ def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tens
   return correct ,total ,peak_acc
 
 
-def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, 
-    batch_size : int, cuda_device = None, augment_on = 0, graph = None, binary = False,evaluator= None):
+def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader , 
+                epochs : int, batch_size : int, cuda_device = None, 
+                augment_on = 0, graph = None, binary = False,evaluator= None, logger = None):
+
   if cuda_device == None:
     cuda_device = torch.cuda.current_device()
   n_iter = len(dataloader) 
   optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["lr"])
-  scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, "max",patience = 3,verbose = True, factor = 0.5,cooldown = 1)
+  scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, "max",patience = 3,verbose = True, factor = 0.1,cooldown = 1)
   if binary == True:
     criterion = nn.BCEWithLogitsLoss().cuda(device = cuda_device)
   else:
@@ -55,7 +57,9 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   correct = 0
   acc = 0
   recall = 0
-  logger = Logger()
+  roc = 0
+  if logger == None:
+    logger = Logger()
   while epoch < epochs:
     if epoch % 3 == 0:
       total = 0
@@ -74,12 +78,12 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
       if i% 5 == 0:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = binary)
       logger.update({"loss": loss.item(), "training_accuracy": (correct/total),"index" : i,
-              "epoch": epoch, "validation_accuracy": acc, "lr":optimizer.param_groups[0]['lr'],"validation recall": recall })
+              "epoch": epoch, "validation_accuracy": acc, "lr":optimizer.param_groups[0]['lr'],"validation recall": recall , "ROC": roc})
     if epoch % 5 == 0:
       if evaluator != None:
-        evaluator.forward_pass(model,subset = 400,binary = binary)
+        evaluator.forward_pass(model,subset = 450,binary = binary)
         evaluator.predictions(model_is_binary = binary,THRESHOLD = 0.4)
-        evaluator.ROC("train")
+        roc =  evaluator.ROC("train")
         acc  =  evaluator.T_ACC()
         recall = evaluator.TPR(1)
         evaluator.reset_cm()

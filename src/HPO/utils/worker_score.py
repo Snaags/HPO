@@ -299,7 +299,7 @@ class Evaluator:
     plt.title("Receiver operating characteristic example")
     plt.legend(loc="lower right")
     plt.savefig("ROC_{}".format(fold))
-
+    return roc_auc
   def forward_pass(self, model , testloader = None, binary = False, subset = None,n_iter = 1):
     if testloader != None:
       self.testloader = testloader
