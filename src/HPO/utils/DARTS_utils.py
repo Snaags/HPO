@@ -4,9 +4,9 @@ Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
 
 
 
-def config_space_2_DARTS(hyperparameters,reduction = False):
-  normal = [0,0,0,0,0,0,0,0]
-  reduce = [0,0,0,0,0,0,0,0]
+def config_space_2_DARTS(hyperparameters,reduction = False, N = 16):
+  normal = [0] * N
+  reduce = [0] * N
   for i in hyperparameters:
     if "normal" in i:
       idx = (int(i[-3])*2) + int(i[-1]) 

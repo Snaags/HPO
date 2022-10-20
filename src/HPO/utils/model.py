@@ -6,7 +6,7 @@ from torch.autograd import Variable
 from HPO.utils.utils import drop_path
 
 
-class Cell(nn.Module):
+class CellAttn(nn.Module):
   """
   genotype : holds cell data
   C_prev_prev : channels of k-2
@@ -16,14 +16,16 @@ class Cell(nn.Module):
   reduction_prev : boolean of whether the last cell was a reduction cell
   """
   def __init__(self, genotype, C_prev_prev, C_prev, C, reduction, reduction_prev):
-    super(Cell, self).__init__()
+    super(CellAttn, self).__init__()
 
     if reduction_prev:
       self.preprocess0 = FactorizedReduce(C_prev_prev, C)
     else:
       self.preprocess0 = ReLUConvBN(C_prev_prev, C, 1, 1, 0)
+    self.attn = Attention()
     self.preprocess1 = ReLUConvBN(C_prev, C, 1, 1, 0)
-    
+    self._channels = [C,C_prev,C_prev_prev] 
+    self._reduc = [reduction,reduction_prev] 
     if reduction:
       op_names, indices = zip(*genotype.reduce)
       concat = genotype.reduce_concat
@@ -48,13 +50,82 @@ class Cell(nn.Module):
   def forward(self, s0, s1, drop_prob):
     s0 = self.preprocess0(s0)
     s1 = self.preprocess1(s1)
-
+    
     states = [s0, s1]
     for i in range(self._steps):
       h1 = states[self._indices[2*i]]
       h2 = states[self._indices[2*i+1]]
       op1 = self._ops[2*i]
       op2 = self._ops[2*i+1]
+    
+      h1 = op1(h1)
+      h2 = op2(h2)
+      if self.training and drop_prob > 0.:
+        if not isinstance(op1, Identity):
+          h1 = drop_path(h1, drop_prob)
+        if not isinstance(op2, Identity):
+          h2 = drop_path(h2, drop_prob)
+      if h1.shape[1] != h2.shape[1]:
+        print(op1,op2)
+        print("Channels k, k-1, k-2: {} {} {}".format(*self._channels))
+        print("Reduction: {} - Previous Reduction: {} ".format(*self._reduc))
+      
+      s = self.attn(torch.cat((h1,h2),dim = 2))
+      #print("Attenion Map Shape: {}".format(s.shape))
+      states += [s]
+    return torch.cat([states[i] for i in self._concat], dim=1)
+
+class Cell(nn.Module):
+  """
+  genotype : holds cell data
+  C_prev_prev : channels of k-2
+  C_prev : channels of k-1
+  C : channels of k (i.e. current layer)
+  reduction : boolean whether this layer is a reduction cell
+  reduction_prev : boolean of whether the last cell was a reduction cell
+  """
+  def __init__(self, genotype, C_prev_prev, C_prev, C, reduction, reduction_prev):
+    super(Cell, self).__init__()
+
+    if reduction_prev:
+      self.preprocess0 = FactorizedReduce(C_prev_prev, C)
+    else:
+      self.preprocess0 = ReLUConvBN(C_prev_prev, C, 1, 1, 0)
+    self.preprocess1 = ReLUConvBN(C_prev, C, 1, 1, 0)
+    self._channels = [C,C_prev,C_prev_prev] 
+    self._reduc = [reduction,reduction_prev] 
+    if reduction:
+      op_names, indices = zip(*genotype.reduce)
+      concat = genotype.reduce_concat
+    else:
+      op_names, indices = zip(*genotype.normal) #get operation names and indexs from genotype
+      concat = genotype.normal_concat
+    self._compile(C, op_names, indices, concat, reduction)
+
+  def _compile(self, C, op_names, indices, concat, reduction):
+    assert len(op_names) == len(indices)
+    self._steps = len(op_names) // 2
+    self._concat = concat
+    self.multiplier = len(concat)
+
+    self._ops = nn.ModuleList()
+    for name, index in zip(op_names, indices):
+      stride = 2 if reduction and index < 2 else 1
+      op = OPS[name](C, stride, True)
+      self._ops += [op]
+    self._indices = indices
+
+  def forward(self, s0, s1, drop_prob):
+    s0 = self.preprocess0(s0)
+    s1 = self.preprocess1(s1)
+    
+    states = [s0, s1]
+    for i in range(self._steps):
+      h1 = states[self._indices[2*i]]
+      h2 = states[self._indices[2*i+1]]
+      op1 = self._ops[2*i]
+      op2 = self._ops[2*i+1]
+    
       h1 = op1(h1)
       h2 = op2(h2)
       if self.training and drop_prob > 0.:
@@ -64,10 +135,70 @@ class Cell(nn.Module):
           h2 = drop_path(h2, drop_prob)
       if h1.shape[2] != h2.shape[2]:
         print(op1,op2)
+        print("Channels k, k-1, k-2: {} {} {}".format(*self._channels))
+        print("Reduction: {} - Previous Reduction: {} ".format(*self._reduc))
       s = h1 + h2
       states += [s]
     return torch.cat([states[i] for i in self._concat], dim=1)
 
+
+class NetworkTS(nn.Module):
+
+  def __init__(self, stem_channels ,C, num_classes, layers, auxiliary, drop_prob ,genotype, binary = False):
+    super(NetworkTS, self).__init__()
+    self._layers = layers
+    self.drop_path_prob = drop_prob
+    #Stem Setup
+    stem_multiplier = 3
+    C_curr = stem_multiplier*C
+    self.stem = nn.Sequential(
+      nn.Conv1d(stem_channels, C_curr, 3, padding=1, bias=False),
+      nn.BatchNorm1d(C_curr)
+    )
+        
+    C_prev_prev, C_prev, C_curr = C_curr, C_curr, C #Initialising channels
+    self.cells = nn.ModuleList()
+    reduction_prev = False
+    
+    for i in range(layers):
+      if i %2 ==0 and i != layers: # Set as reduction layer if model is 1/3 or 2/3 through
+                                        # the network
+        C_curr *= 2 # double channels on reduction layer
+        reduction = True
+      else:
+        reduction = False
+      #Build cell
+      cell = CellAttn(genotype, C_prev_prev, C_prev, C_curr, reduction, reduction_prev)
+      reduction_prev = reduction
+      self.cells += [cell]
+      C_prev_prev, C_prev = C_prev, cell.multiplier*C_curr # Update channels
+      if i == 2*layers//3:
+        C_to_auxiliary = C_prev
+
+    self.global_pooling = nn.AdaptiveAvgPool1d(1)
+    self.c_out = C_prev
+    if binary == True:
+      self.binary = binary
+      self.classifier = nn.Linear(C_prev, 1)
+    else:
+      self.classifier = nn.Linear(C_prev, num_classes)
+  
+  def get_channels(self):
+    return self.c_out
+  def _forward(self, input):
+    logits_aux = None
+    s0 = s1 = self.stem(input)
+    for i, cell in enumerate(self.cells):
+      s0, s1 = s1, cell(s0, s1, self.drop_path_prob)
+    out = self.global_pooling(s1)
+    return out.view(out.size(0),-1)
+
+  def forward(self, input):
+    out = self._forward(input)
+    logits = self.classifier(out)
+    #if self.binary:
+    #  logits = self.outact(logits)
+    return logits
 
 
 class NetworkMain(nn.Module):

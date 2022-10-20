@@ -66,10 +66,10 @@ def init_config():
   jitter = CSH.UniformFloatHyperparameter(name = "jitter",      lower = 0.001  ,upper = 0.5)
   scaling = CSH.UniformFloatHyperparameter(name = "scaling",      lower = 0.001  ,upper = 0.5)
   window_warp_num= CSH.UniformIntegerHyperparameter(name = "window_warp_num",     lower = 2  ,upper = 10)
-  crop = CSH.UniformFloatHyperparameter(name = "crop",      lower = 0.5  ,upper = 0.9)
+  crop = CSH.UniformFloatHyperparameter(name = "crop",      lower = 0.05  ,upper = 0.9)
   mix_up = CSH.UniformFloatHyperparameter(name = "mix_up",      lower = 0.01  ,upper = 0.9)
-  cut_out = CSH.UniformFloatHyperparameter(name = "cut_out",      lower = 0.05  ,upper = 0.5)
-  cut_mix = CSH.UniformFloatHyperparameter(name = "cut_mix",      lower = 0.05  ,upper = 0.5)
+  cut_out = CSH.UniformFloatHyperparameter(name = "cut_out",      lower = 0.05  ,upper = 0.9)
+  cut_mix = CSH.UniformFloatHyperparameter(name = "cut_mix",      lower = 0.05  ,upper = 0.9)
 
   crop_rate = CSH.NormalFloatHyperparameter(name = "crop_rate", lower = 0.0  ,mu = 0.5 , sigma = 0.5,upper = 5)
   jitter_rate= CSH.NormalFloatHyperparameter(name = "jitter_rate",lower = 0.0  ,mu = 0.5 , sigma = 0.5,upper = 5)
@@ -85,49 +85,19 @@ def init_config():
     ###Topology Definition]###
   
   hp_list = [
-        epochs,
         lr,
         p,
-        layers,
-        T_0,
-        T_mult,
-        channels,
-        normal_node_0_0 ,
         jitter ,
         scaling ,
-        window_warp_num,
         crop ,
         mix_up ,
         cut_out ,
-        cut_mix ,
         crop_rate ,
         jitter_rate,
         scaling_rate,
         window_warp_rate,
         mix_up_rate,
-        cut_out_rate,
-        cut_mix_rate,
-        normal_node_0_1 ,
-        normal_index_0_0,
-
-        normal_index_0_1,
-        normal_node_1_0 ,
-
-        normal_node_1_1 ,
-        normal_index_1_0,
-
-        normal_index_1_1,
-        normal_node_2_0 ,
-
-        normal_node_2_1 ,
-        normal_index_2_0,
-
-        normal_index_2_1,
-        normal_node_3_0 ,
-
-        normal_node_3_1 ,
-        normal_index_3_0, 
-        normal_index_3_1]
+        cut_out_rate]
 
   cs.add_hyperparameters(hp_list)
   return cs

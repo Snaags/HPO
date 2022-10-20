@@ -99,9 +99,6 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
   gen = config_space_2_DARTS(hyperparameter,reduction = True)
   print(gen)
 
-  #gen = Genotype(normal=[('avg_pool_3x3', 1), ('avg_pool_3x3', 0), ('avg_pool_3x3', 1), ('dil_conv_3x3', 0), ('avg_pool_3x3', 1), ('dil_conv_5x5', 0), ('sep_conv_5x5', 4), ('dil_conv_5x5', 2)],normal_concat=range(2, 6), reduce=[('max_pool_3x3', 0), ('skip_connect', 1), ('avg_pool_3x3', 0), ('dil_conv_3x3', 1), ('dil_conv_3x3', 2), ('sep_conv_5x5', 1), ('sep_conv_5x5', 2), ('dil_conv_5x5', 1)], reduce_concat=range(2, 6))
-  #genotype = Genotype(normal=[('max_pool_3x3', 1), ('sep_conv_3x3', 0), ('max_pool_3x3', 2), ('max_pool_3x3', 1), ('sep_conv_5x5', 2), ('max_pool_3x3', 1), ('max_pool_3x3', 3), ('max_pool_3x3', 2)], normal_concat=range(2, 6), reduce=[('sep_conv_3x3', 0), ('sep_conv_5x5', 1), ('max_pool_3x3', 2), ('max_pool_3x3', 0), ('sep_conv_5x5', 2), ('max_pool_3x3', 0), ('avg_pool_3x3', 2), ('sep_conv_5x5', 0)], reduce_concat=range(2, 6))
-  #genotype = Genotype(normal=[('max_pool_3x3', 1), ('sep_conv_3x3', 0), ('max_pool_3x3', 2), ('sep_conv_5x5', 1), ('max_pool_3x3', 2), ('max_pool_3x3', 1), ('max_pool_3x3', 3), ('max_pool_3x3', 2)], normal_concat=range(2, 6), reduce=[('max_pool_3x3', 0), ('skip_connect', 1), ('max_pool_3x3', 0), ('max_pool_3x3', 2), ('sep_conv_5x5', 2), ('max_pool_3x3', 0), ('sep_conv_5x5', 0), ('max_pool_3x3', 4)], reduce_concat=range(2, 6))
 
   n_classes = dataset_train.get_n_classes()
   inner = 4

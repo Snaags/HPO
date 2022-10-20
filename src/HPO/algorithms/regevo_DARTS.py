@@ -33,6 +33,9 @@ from HPO.algorithms.algorithm_utils import train_eval
 #
 #
 
+def F1(acc,rec):
+    b = 1
+    return (1+b**2)+ ((acc*rec)/(((b**2)*(acc**-1))+(rec**-1)))
 
 class Model:
   MUTATE_RATE = 0.2
@@ -156,7 +159,7 @@ def load_csv(file , cs):
       population.append(model)
       history.append(model)
   return population, history
-def regularized_evolution(configspace, worker , cycles, population_size, sample_size, sample_batch_size, load_file = None):
+def regularized_evolution(configspace, worker , cycles, population_size, sample_size, sample_batch_size, load_file = None,load = False):
   """Algorithm for regularized evolution (i.e. aging evolution).
 
   Follows "Algorithm 1" in Real et al. "Regularized Evolution for Image
@@ -179,7 +182,7 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
   # Initialize the population with random models.
   if load_file ==None:
     train = train_eval( worker, sample_batch_size, "RegEvo.csv")
-  elif not os.path.exists(load_file):
+  elif not os.path.exists(load_file) or load == False:
     train = train_eval( worker, sample_batch_size, load_file)
   else:
     population , history = load_csv(load_file, CS)
@@ -221,7 +224,10 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
         sample.append(candidate)
 
       # The parent is the best model in the sample.
-      parent = max(sample, key=lambda i: i.accuracy)
+      print("Selecting Parent via F1 Score")
+      parent = max(sample, key=lambda i: F1(i.accuracy,i.recall))
+      print("Scores of Parent F1: {} -- Acc: {} -- Recall: {}".format(F1(parent.accuracy,parent.recall),parent.accuracy,parent.recall))
+      #parent = max(sample, key=lambda i: i.accuracy)
 
       # Create the child model and store it.
       child = Mutate(CS,parent)
@@ -237,7 +243,7 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
       # Remove the oldest model.
       best = max(population, key=lambda i: i.accuracy)
       print("--Current best model--")
-      print("Accuracy: ",best.accuracy)
+      print("Accuracy:{} -- Recall: {} ".format(best.accuracy,best.recall))
       print("Architecture: ", best.arch())
       print("Population Size: ", len(population))
       print("Total Evaluations: ", len(history))
@@ -254,8 +260,8 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
 def main(worker, configspace, load_file = "reg_evo.csv"):
   N = 5 #N best models to return
   pop_size = 100
-  evaluations = 500
-  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =4, sample_batch_size = 4, load_file = load_file)
+  evaluations = 2500
+  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =8, sample_batch_size = 8, load_file = load_file)
   Architectures = []
   accuracy_scores = []
   recall_scores = []

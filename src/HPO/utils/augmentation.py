@@ -7,48 +7,43 @@ import numpy as np
 from operator import itemgetter
 from scipy.interpolate import CubicSpline
 
-
-
-class Jitter(object):
-  def __init__(self,sigma = 0.05,rate = 0.3,device = None):
+class Augmentation(object):
+  def __init__(self,rate,device):
+    self.device = device
     self.rate = rate
-    self.n = torch.distributions.normal.Normal(loc=torch.FloatTensor([0]).cuda(device =device), scale=torch.FloatTensor([sigma]).cuda(device = device))
-    self.__name__ = "jitter"
   def __call__(self,x,y):
-    if random.random() < self.rate:
-      return self.call(x,y)
+    rate = self.rate
+    while random.random() < rate:
+      x,y = self.call(x,y)
+      rate -= 1
     else:
       return x,y
   def call(self,x,y):
+    print("called parent class function :(")
+
+class Jitter(Augmentation):
+  def __init__(self,sigma = 0.05,rate = 0.3,device = None):
+    super(Jitter,self).__init__(rate,device)
+    self.n = torch.distributions.normal.Normal(loc=torch.FloatTensor([0]).cuda(device =device), scale=torch.FloatTensor([sigma]).cuda(device = device))
+    self.__name__ = "jitter"
+  def call(self,x,y):
     return torch.add(x,self.n.sample(x.shape).squeeze()),y 
 
-class Scaling(object):
+class Scaling(Augmentation):
   def __init__(self,sigma = 0.05,rate = 0.3 ,device = None):
-    self.rate = rate
-    self.device = device
+    super(Scaling,self).__init__(rate,device)
     self.n = torch.distributions.normal.Normal(loc=torch.FloatTensor([1]).cuda(device =device), scale=torch.FloatTensor([sigma]).cuda(device = device))
     self.__name__ = "scaling"
-  def __call__(self,x,y):
-    if random.random() < self.rate:
-      return self.call(x,y)
-    else:
-      return x,y
   def call(self,x,y):
     s = self.n.sample((x.shape[0],x.shape[1])).squeeze()
     return torch.mul(x, s),y
 
-class Crop(object):
+class Crop(Augmentation):
   def __init__(self, crop_min = 0.85,rate = 0.3, crop_max = 0.95, device = None):
-    self.device = device
-    self.rate = rate
+    super(Crop,self).__init__(rate,device)
     self.__name__ = "crop"
     self.crop_min = crop_min
     self.crop_max = crop_max
-  def __call__(self,x,y):
-    if random.random() < self.rate:
-      return self.call(x,y)
-    else:
-      return x,y
   def call(self,x,y):
     sig_len = x.shape[1]
     length= random.uniform(self.crop_min,self.crop_max)
@@ -61,41 +56,27 @@ class Crop(object):
     else:
       return  x[:,(sig_len-length):],y
 
-class WindowWarp(object):
+class WindowWarp(Augmentation):
   def __init__(self, num_warps = 3, ratios = [0.5,0.75,2],size = 0.3,rate = 0.3, device = None):
-    self.rate = rate
-    self.device = device
+    super(WindowWarp,self).__init__(rate,device)
     self.__name__ = "window_warp"
     self.ratios = ratios
     self.num_warps = num_warps
     self.size = size
-  def __call__(self,x,y):
-    if random.random() < self.rate:
-      return self.call(x,y)
-    else:
-      return x,y
   def call(self,x,y):
     for i in range(self.num_warps):
         start = random.randint(1, x.shape[1]-10) 
         end = min([x.shape[1],start+random.randint(2, int(x.shape[1]*self.size))])
         out= interpolate(x[:,start:end].unsqueeze(0), scale_factor = random.choice(self.ratios)).cuda(device = self.device).squeeze(0)
         x = torch.cat((x[:,:start],out,x[:,end:]),dim = 1)
-    if x.shape[1] > 10000:
+    if x.shape[1] > 20000:
         print("Window Warp exceeded size: {}".format(x.shape[1]))
-        x = x[:,:,-10000:]
-
     return x,y
-class CutOut(object):
+class CutOut(Augmentation):
   def __init__(self,perc=.1,rate = 0.3,device = None):
-    self.rate = rate
-    self.device = device
+    super(CutOut,self).__init__(rate,device)
     self.perc = perc
     self.__name__ = "cut_out"
-  def __call__(self,x,y):
-    if random.random() < self.rate:
-      return self.call(x,y)
-    else:
-      return x,y
   def call(self,x,y):
     seq_len = x.shape[1]    
     win_len = int(self.perc * seq_len)    
@@ -106,16 +87,20 @@ class CutOut(object):
     x[:,start:end] = 0    
     return x,y 
 
-class MixUp(object):
+class MixUp(Augmentation):
   def __init__(self, m = 0.3 , rate = 0.3 , device = None):
-    self.device = device 
-    self.rate = rate
+    super(MixUp,self).__init__(rate,device)
     self.dist = torch.distributions.beta.Beta(m,m)
     self.mix_sample = None
     self.mix_label = None 
   def __call__(self,x,y):
     if random.random() < self.rate:
       if self.mix_sample == None:
+        self.mix_sample = x
+        self.mix_label = y
+        return x,y
+      elif self.mix_sample.shape[1] != x.shape[1]:
+        print("switching to val size")
         self.mix_sample = x
         self.mix_label = y
         return x,y

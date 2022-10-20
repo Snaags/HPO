@@ -141,7 +141,7 @@ def consistency_loss(logits_s, logits_w, name='ce', T=1.0, p_cutoff=0.0, use_har
 
 
 class Evaluator:
-  def __init__(self,batch_size,n_classes,cuda_device, testloader = None):
+  def __init__(self,batch_size,n_classes,cuda_device = None, testloader = None):
     out_data = []
     self.cuda_device = cuda_device
     self.testloader = testloader
@@ -176,6 +176,16 @@ class Evaluator:
           loss += lossFn(S(logits_1), S(logits_2))
       averaged_loss = loss/(samples*n_augment)
     return averaged_loss
+
+  def map_to_origin_class( self , labels ):
+    c_matrix = np.zeros(shape = (21,2))
+    for pred, label,b_labels in zip(self.prediction, labels,self.labels):
+      p, l = int(pred[0]),int(label)
+      c_matrix[l,p] += 1
+
+    with np.printoptions(linewidth = (10*self.n_classes+20),precision=4, suppress=True):
+      print(c_matrix)
+    return c_matrix 
 
   def loss_over_sample_size(self,model,dataset):
       n = 2
@@ -215,9 +225,8 @@ class Evaluator:
       testloader = torch.utils.data.DataLoader(
                           dataset,collate_fn = collate_fn_padd,batch_sampler = strat_sampler)
       sup_losses = []
-      usup_losses = []
-      usup10_losses = []
-      usup100_losses = []
+      sup10_losses = []
+      sup100_losses = []
       for x,y in testloader:
         chunks = -(len(y)//-MAX_SIZE)
         x_i = x.chunk(chunks)
@@ -225,15 +234,22 @@ class Evaluator:
         subsample = [(x_j,y_j) for x_j, y_j in zip(x_i,y_i)]
            
         s_loss = self.sup_loss(model,subsample)
+        s_loss_10 = self.sup_loss(model,subsample,n_augmment = 10)
+        s_loss_20 = self.sup_loss(model,subsample,n_augmment = 20)
+        print("loss: {}".format(s_loss))
+        print("loss: {}".format(s_loss_10))
+        print("loss: {}".format(s_loss_20))
+        """
         u_loss = self.unsup_loss(model,subsample)
         u10_loss = self.unsup_loss(model,subsample, n_augment = 10)
         u100_loss = self.unsup_loss(model,subsample, n_augment = 100)
         sup_losses.append(s_loss.item())
-        usup_losses.append(u_loss.item())
-        usup10_losses.append(u10_loss.item())
-        usup100_losses.append(u100_loss.item())
+        """
+        sup_losses.append(s_loss.item())
+        sup10_losses.append(s_loss_10.item())
+        sup100_losses.append(s_loss_20.item())
         
-      return sup_losses, usup_losses , usup10_losses, usup100_losses
+      return sup_losses, sup10_losses, sup100_losses
 
   def sup_loss(self, model,loader,n_augment = 1 , binary = False):
     loss = 0 
@@ -299,6 +315,7 @@ class Evaluator:
     plt.title("Receiver operating characteristic example")
     plt.legend(loc="lower right")
     plt.savefig("ROC_{}".format(fold))
+    return fpr,tpr,thresholds, roc_auc
 
   def forward_pass(self, model , testloader = None, binary = False, subset = None,n_iter = 1):
     if testloader != None:
@@ -313,14 +330,16 @@ class Evaluator:
       s = torch.nn.Identity()
       self.model_prob = np.zeros(shape = (len(self.testloader)*self.batch_size*n_iter, self.n_classes)) # [sample , classes]
     self.labels = np.zeros(shape = (len(self.testloader)*self.batch_size*n_iter,1))
-
     #Pass validation set through model getting probabilities and labels
     with torch.no_grad(): #disable back prop to test the model
       for n in range(n_iter):
         for i, (inputs, labels) in enumerate( self.testloader ):
             start_index = i * self.batch_size + (n * len(self.testloader) * self.batch_size)
             end_index = (i * self.batch_size + (n * len(self.testloader) * self.batch_size)) + self.batch_size
-            inputs = inputs.cuda(non_blocking=True, device = self.cuda_device).float()
+            if self.cuda_device != None:
+                inputs = inputs.cuda(non_blocking=True, device = self.cuda_device).float()
+            else:
+                inputs = inputs.cpu()
             self.labels[start_index:end_index , :] = labels.view(self.batch_size,1).cpu().numpy()
             out = s(model(inputs)).cpu().numpy()
             self.model_prob[start_index:end_index,:] = out
@@ -334,19 +353,29 @@ class Evaluator:
   def reset_cm(self):
     self.confusion_matrix = np.zeros(shape = (self.n_classes,self.n_classes)) #Matrix of prediction vs true values
 
-  def predictions(self, model_is_binary = False, THRESHOLD = None):
+  def predictions_threshold_matrix(self, model_is_binary):
+    for i in range(1,20):
+      threshold = i * 0.05
+      self.predictions(model_is_binary = model_is_binary, THRESHOLD = threshold)
+      acc  =  self.T_ACC()
+      recall = self.TPR(1)
+      print("Threshold: {} -- Accuracy: {} -- Recall: {}".format(threshold,acc,recall)) 
+      self.reset_cm()
+
+  def predictions(self, model_is_binary = False, THRESHOLD = None, no_print = False):
       if model_is_binary:
 
         self.prediction = np.where(self.model_prob > THRESHOLD, 1,0)
-        for m,p, l in zip(self.model_prob, self.prediction, self.labels):
-          print("Logit: {} -- Predicted: {} label: {}".format(m,p,l))
+        #for m,p, l in zip(self.model_prob, self.prediction, self.labels):
+        #  print("Logit: {} -- Predicted: {} label: {}".format(m,p,l))
         assert self.prediction.shape == (len(self.model_prob),1), "Shape of prediction is {} when it should be {}".format(self.prediction.shape, (len(self.model_prob),1))
       else:
         self.prediction = np.argmax(self.model_prob, axis = 1).reshape(-1,1)
         assert self.prediction.shape == (len(self.model_prob),1),  "Shape of prediction is {} when it should be {}".format(self.prediction.shape, (len(self.model_prob),1))
       self.update_CM()
-      with np.printoptions(linewidth = (10*self.n_classes+20),precision=4, suppress=True):
-        print(self.confusion_matrix)
+      if not no_print:
+          with np.printoptions(linewidth = (10*self.n_classes+20),precision=4, suppress=True):
+            print(self.confusion_matrix)
 
   def TP(self, value):
     TP = self.confusion_matrix[value,value]

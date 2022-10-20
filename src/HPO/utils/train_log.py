@@ -1,12 +1,14 @@
 import numpy as np 
 import pandas as pd
- 
+import os
 
 class Logger:
   def __init__(self,path = "train_df", save_interval = 40):
     self.data = {}
     self.save_interval = save_interval
     self.path = path
+    while os.path.exists(self.path):
+      self.path = self.path + "0"
     self.iter = 0
   def update(self,data_dict):
     self.iter +=1 
