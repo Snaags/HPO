@@ -13,6 +13,7 @@ from torch import Tensor
 from torch.utils.data import DataLoader, SubsetRandomSampler
 import random
 import HPO.utils.augmentation as aug
+from HPO.utils.train_log import Logger
 from HPO.utils.train_utils import collate_fn_padd
 from HPO.utils.train import train_model
 from HPO.utils.weight_freezing import freeze_FCN, freeze_resnet
@@ -70,42 +71,36 @@ def compute( ID = None, configs=None , gpus=None , res = None  , config = None):
 def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  test_path = None, cuda_device = None,plot_queue = None, model_id = None, binary = True):
   ### Configuration 
   THRESHOLD = 0.4 #Cut off for classification
-  batch_size = 8
+  batch_size = 16
   if cuda_device == None:
      cuda_device = 1# torch.cuda.current_device()
   
   ##Set up augmentations##
-  """
-  jitter = aug.Jitter(device = cuda_device,sigma = 0.1)
-  crop = aug.Crop(device = cuda_device)
-  scaling = aug.Scaling(device = cuda_device)
-  window_warp = aug.WindowWarp(device = cuda_device)
-  cut_out = aug.CutOut(device = cuda_device)
-  """
   jitter = aug.Jitter(device = cuda_device,sigma = 0.125, rate = 0.5)
-  crop = aug.Crop(device = cuda_device, rate = 0.8, crop_min = 0.3 , crop_max = 0.98)
+  crop = aug.Crop(device = cuda_device, rate = 0.8, crop_min = 0.1 , crop_max = 0.98)
   scaling = aug.Scaling(device = cuda_device)
   window_warp = aug.WindowWarp(device = cuda_device,rate = 0.9)
   cut_out = aug.CutOut(device = cuda_device)
-  mix_up = aug.MixUp(device = cuda_device,m = 0.2, rate = 0.3)
-  augmentations = [mix_up,jitter,crop,scaling, window_warp, cut_out]
+  mix_up = aug.MixUp(device = cuda_device,m = 0.2, rate = 0.2)
+  augmentations = [jitter,crop,scaling, window_warp, cut_out]
 
-  dataset_train = Train_TEPS(augmentations = augmentations, samples_per_class = 60,device = cuda_device,one_hot = False,binary = True)
-  dataset_test = Test_TEPS(binary = True,samples_per_class = 500)
-  #dataset_test_full = Test_TEPS()
   torch.cuda.set_device(cuda_device)
 
   print("Cuda Device Value: ", cuda_device)
   gen = config_space_2_DARTS(hyperparameter,reduction = True)
   print(gen)
-
-
   n_classes = dataset_train.get_n_classes()
   inner = 4
   kfold = KFold(n_splits = inner, shuffle = True)
+=======
+  logger = Logger()
+  budget = 10
   multibatch = False
   for fold in range(budget):
       print('---Fold No.--{}----------------------'.format(fold))
+      dataset_train = Train_TEPS(augmentations = augmentations, samples_per_class = 60,device = cuda_device,one_hot = False,binary = True)
+      dataset_test = Test_TEPS(binary = True,samples_per_class = 500)
+      n_classes = dataset_train.get_n_classes()
       torch.cuda.empty_cache()
       if multibatch:
         batches = [2,4,8,16]
@@ -165,7 +160,7 @@ def _compute(hyperparameter,budget = 1, in_model = None , train_path = None,  te
   return acc, recall, sup.item(), unsup.item()#, sup10.item(),unsup10.item()
 
 if __name__ == "__main__":
-  hpo = {'channels': 128, 'lr': 0.0025170869707739693, 'p': 0.00, 'epochs': 200, 'layers': 6}
+  hpo = {'channels': 128, 'lr': 0.0025170869707739693, 'p': 0.00, 'epochs': 200, 'layers': 3}
   hyperparameter = {'normal_index_0_0': 0,
   'normal_index_0_1': 0,
   'normal_index_1_0': 1,

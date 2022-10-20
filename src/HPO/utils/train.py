@@ -97,6 +97,7 @@ def train_model_triplet(model : Model , hyperparameter : dict, dataloader : Data
   print("Num epochs: {}".format(epoch))
   return logger
 
+<<<<<<< HEAD
 def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, 
     batch_size : int, cuda_device = None, augment_on = 0, graph = None, binary = False,evaluator= None,logger = None,run = None):
   if cuda_device == None:
@@ -165,12 +166,10 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
 
 def auto_train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,validation_dataloader ,epochs : int, 
     batch_size : int, cuda_device = None, augment_on = 0, graph = None, binary = False,evaluator= None,logger = None):
-
   if cuda_device == None:
     cuda_device = torch.cuda.current_device()
   n_iter = len(dataloader) 
   optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["lr"])
-  #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, "max",patience = 4,verbose = True, factor = 0.1,cooldown = 2,min_lr = 0.0000000000000001)
   if binary == True:
     criterion = nn.BCEWithLogitsLoss().cuda(device = cuda_device)
   else:
@@ -184,6 +183,7 @@ def auto_train_model(model : Model , hyperparameter : dict, dataloader : DataLoa
   correct = 0
   acc = 0
   recall = 0
+  roc = 0
   if logger == None:
     logger = Logger()
   while epoch < epochs:
@@ -192,7 +192,6 @@ def auto_train_model(model : Model , hyperparameter : dict, dataloader : DataLoa
       correct = 0
     for i, (samples, labels) in enumerate( dataloader ):
       sample_val , label_val = next(iter(validation_dataloader))
-       
       batch_size = samples.shape[0]
       optimizer.zero_grad()
       outputs = model(samples.float()).cuda(device = cuda_device)
@@ -222,14 +221,16 @@ def auto_train_model(model : Model , hyperparameter : dict, dataloader : DataLoa
       if i% 5 == 0:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = binary)
       logger.update({"loss": loss.item(), "training_accuracy": (correct/total),"index" : i,
-              "epoch": epoch, "validation_accuracy": acc, "lr":optimizer.param_groups[0]['lr'],"validation recall": recall })
+              "epoch": epoch, "validation_accuracy": acc, "lr":optimizer.param_groups[0]['lr'],"validation recall": recall , "ROC": roc})
     if epoch % 5 == 0:
       if evaluator != None:
-        evaluator.forward_pass(model,subset = 400,binary = binary)
+        evaluator.forward_pass(model,subset = 450,binary = binary)
         evaluator.predictions(model_is_binary = binary,THRESHOLD = 0.4)
         if binary:
           evaluator.ROC("train")
         acc = evaluator.T_ACC()
+        roc =  evaluator.ROC("train")
+        acc  =  evaluator.T_ACC()
         recall = evaluator.TPR(1)
         evaluator.reset_cm()
         print("")
