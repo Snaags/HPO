@@ -1,4 +1,5 @@
 import csv
+import math
 import os 
 import copy
 import torch
@@ -35,6 +36,10 @@ from HPO.algorithms.algorithm_utils import train_eval
 
 def F1(acc,rec):
     b = 1
+    if acc != None and rec != None:
+      acc += 0.0001
+      rec += 0.0001
+      
     return (1+b**2)+ ((acc*rec)/(((b**2)*(acc**-1))+(rec**-1)))
 
 class Model:
@@ -152,6 +157,11 @@ def load_csv(file , cs):
       acc = float(row[0])
       rec = float(row[1])
       arch = eval(row[2])
+      #if "channels" in arch:
+      #  arch["channels"] = int(math.log(arch["channels"],2))
+      #arch.pop("lr")
+      #arch.pop("epochs")
+      #arch.pop("p")
       model = Model(cs)
       model.set_arch(Configuration(cs,arch))
       model.accuracy = acc
@@ -190,6 +200,7 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
     a = []
     r = []
     c= []
+    print(history)
     for model in history:
       a.append(model.accuracy)
       r.append(model.recall)
@@ -259,9 +270,9 @@ def regularized_evolution(configspace, worker , cycles, population_size, sample_
 
 def main(worker, configspace, load_file = "reg_evo.csv"):
   N = 5 #N best models to return
-  pop_size = 100
+  pop_size = 500
   evaluations = 2500
-  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =8, sample_batch_size = 8, load_file = load_file)
+  history = regularized_evolution(configspace, worker, cycles = evaluations, population_size =  pop_size, sample_size =25, sample_batch_size = 8, load_file = load_file, load = True)
   Architectures = []
   accuracy_scores = []
   recall_scores = []

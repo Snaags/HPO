@@ -97,7 +97,6 @@ def train_model_triplet(model : Model , hyperparameter : dict, dataloader : Data
   print("Num epochs: {}".format(epoch))
   return logger
 
-<<<<<<< HEAD
 def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, 
     batch_size : int, cuda_device = None, augment_on = 0, graph = None, binary = False,evaluator= None,logger = None,run = None):
   if cuda_device == None:

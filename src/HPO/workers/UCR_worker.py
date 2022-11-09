@@ -87,8 +87,8 @@ def _compute(hyperparameter,dataset_train = None,  dataset_test = None,trainload
   train_args = [False, cuda_device ,None,1]
   test_args = [False, cuda_device , None,1]
   dataset_train, test_dataset = datasets.load_all(name,train_args,test_args)
-  hpo = {'channels': 2**hyperparameter["channels"], 'lr': 0.0025170869707739693, 'p': 0.00, 'epochs': 15}
-  hyperparameter.update(hpo)
+  hpo = {'channels': 2**hyperparameter["channels"], 'lr': 0.0025170869707739693, 'p': 0.00, 'epochs': 25}
+  #hyperparameter.update(hpo)
 
 
   print("Cuda Device Value: ", cuda_device)
@@ -107,13 +107,13 @@ def _compute(hyperparameter,dataset_train = None,  dataset_test = None,trainload
                       batch_size=batch_size,drop_last = True)
   n_classes = test_dataset.get_n_classes()
   evaluator = Evaluator(batch_size, test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
-  model = NetworkMain(dataset_train.get_n_features(),hyperparameter["channels"],num_classes= dataset_train.n_classes, 
-                        layers = hyperparameter["layers"], auxiliary = False,drop_prob = hyperparameter["p"], genotype = gen, binary = binary)
+  model = NetworkMain(dataset_train.get_n_features(),hpo["channels"],num_classes= dataset_train.n_classes, 
+                        layers = hyperparameter["layers"], auxiliary = False,drop_prob = hpo["p"], genotype = gen, binary = binary)
   model = model.cuda(device = cuda_device)
   """
   ### Train the model
   """
-  train_model(model , hyperparameter, trainloader , hyperparameter["epochs"], batch_size , cuda_device, binary = binary,evaluator = evaluator,logger = False) 
+  train_model(model , hpo, trainloader , hpo["epochs"], batch_size , cuda_device, binary = binary,evaluator = evaluator,logger = False) 
   torch.cuda.empty_cache()
   model.eval()
   evaluator.forward_pass(model, testloader,binary)

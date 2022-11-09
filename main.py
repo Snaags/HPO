@@ -1,4 +1,4 @@
-from HPO.algorithms.Random import main as  _algorithm
+from HPO.algorithms.regevo_DARTS import main as  _algorithm
 from HPO.workers.UCR_worker import compute as _worker
 from HPO.searchspaces.AttnNAS_config import init_config as _config
 config = _config()
@@ -7,11 +7,11 @@ algorithm = _algorithm
 from multiprocessing import Pool
 import numpy as np
 import logging
-logging.basicConfig(filename='example.log', encoding='utf-8', level=logging.DEBUG)
+#logging.basicConfig(filename='example.log', encoding='utf-8', level=logging.DEBUG)
 
 def main(): 
 
-  algorithm(worker, config,"FM_test.csv")
+  algorithm(worker, config,"FM_test_new.csv")
   
 
 def meta_cv():

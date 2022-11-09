@@ -25,6 +25,7 @@ OPS = {
   'SE_8' : lambda C, stride, affine: SE(C,8,stride = stride,affine = affine),
   'SE_16' : lambda C, stride, affine: SE(C,16,stride = stride,affine = affine),
   'SE_32' : lambda C, stride, affine: SE(C,32,stride = stride,affine = affine),
+  'channel_mlp' : lambda C, stride, affine: MLPChannel(C,2,stride = stride,affine = affine),
   'attention_channel' : lambda C, stride, affine: AttentionChannel(C,stride = stride),
   'attention_space' : lambda C, stride, affine: AttentionSpace(C,stride = stride),
   
@@ -160,6 +161,30 @@ class SE(nn.Module):
     x = x[:,:,::self.stride] 
     return x* y.expand_as(x)
 
+class MLPChannel(nn.Module):
+  def __init__(self, C,r,stride,affine = True ):
+    super(MLPChannel,self).__init__()
+    self.GP = nn.AdaptiveAvgPool1d(1)
+    self.fc1 = nn.Linear(C, C*r, bias = False)
+    self.act = nn.GELU()
+    self.fc2 = nn.Linear(C*r, C ,bias = False)
+    self.sig = nn.Sigmoid()
+    self.stride = stride
+    if self.stride > 1:
+      self.reduce = nn.AvgPool1d(kernel_size = self.stride,stride = self.stride,padding = 0)
+      
+  def forward(self,x):
+    if self.stride > 1:
+      x = self.reduce(x)
+    #Squeeze
+    y = self.GP(x).squeeze()# [Batch,C]
+    #torch.mean(x,axis = 2)  
+    
+    y = self.fc1(y)
+    y = self.act(y)
+    y = self.fc2(y)
+    y = self.sig(y).unsqueeze(dim = 2)
+    return x* y.expand_as(x)
 
 class SE_mask(nn.Module):
   def __init__(self, C,r,stride,affine = True ):

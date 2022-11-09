@@ -2,7 +2,6 @@ Metadata-Version: 2.1
 Name: HPO
 Version: 0.0.0
 Summary: Package for testing NAS and HPO workers, search spaces and algorithms together.
-Home-page: UNKNOWN
 Author: Christopher MacKinnon
 License: GPL3
 Platform: linux
@@ -15,6 +14,3 @@ Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
 Requires-Python: >=3.6
 Provides-Extra: testing
-
-UNKNOWN
-
