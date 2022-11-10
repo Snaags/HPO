@@ -97,18 +97,23 @@ def train_model_triplet(model : Model , hyperparameter : dict, dataloader : Data
   print("Num epochs: {}".format(epoch))
   return logger
 
-def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, 
-    batch_size : int, cuda_device = None, augment_on = 0, graph = None, binary = False,evaluator= None,logger = None,run = None):
+def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
+     cuda_device = None, evaluator= None,logger = None,run = None):
+  #INITIALISATION
+  EPOCHS = hyperparameter["EPOCHS"]
+  BATCH_SIZE = hyperparameter["BATCH_SIZE"] 
+  BINARY = hyperparameter["BINARY"]
   if cuda_device == None:
     cuda_device = torch.cuda.current_device()
   n_iter = len(dataloader) 
-  optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["lr"])
-  #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, "max",patience = 4,verbose = True, factor = 0.1,cooldown = 2,min_lr = 0.0000000000000001)
-  scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,epochs)
-  if binary == True:
+  #CONFIGURATION OF OPTIMISER AND LOSS FUNCTION
+  optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["LR"])
+  scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,EPOCHS)
+  if hyperparameter["BINARY"] == True:
     criterion = nn.BCEWithLogitsLoss().cuda(device = cuda_device)
   else:
     criterion = nn.CrossEntropyLoss()
+  #INITIALISE TRAINING VARIABLES
   epoch = 0
   peak_acc = 0
   loss_list = []
@@ -118,26 +123,26 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   recall = 0
   if logger == None:
     logger = Logger()
-  while epoch < epochs:
+  #MAIN TRAINING LOOP
+  while epoch < EPOCHS:
     if epoch % 3 == 0:
       total = 0
       correct = 0
     for i, (samples, labels) in enumerate( dataloader ):
-      batch_size = samples.shape[0]
       optimizer.zero_grad()
       outputs = model(samples.float()).cuda(device = cuda_device)
-      if binary:
-        loss = criterion(outputs.view(batch_size), labels.float()).cuda(device = cuda_device)
+      if BINARY == True:
+        loss = criterion(outputs.view(BATCH_SIZE), labels.float()).cuda(device = cuda_device)
       else:
         loss = criterion(outputs, labels).cuda(device = cuda_device)
       loss.backward()
       optimizer.step()
 
       if i% 5 == 0:
-        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = binary)
+        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,EPOCHS , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = BINARY)
     
       if i% 5 == 0:
-        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,epochs , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = binary)
+        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,EPOCHS , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = BINARY)
       if logger != False:
         logger.update({"loss": loss.item(), "training_accuracy": (correct/total),"index" : i,
               "epoch": epoch, "validation_accuracy": acc, "lr":optimizer.param_groups[0]['lr'],"validation recall": recall })
@@ -146,8 +151,8 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
     if epoch % 5 == 0:
         if evaluator != None:
           model.eval()
-          evaluator.forward_pass(model,binary = binary)
-          evaluator.predictions(model_is_binary = binary,THRESHOLD = 0.4)
+          evaluator.forward_pass(model,binary = BINARY)
+          evaluator.predictions(model_is_binary = BINARY,THRESHOLD = hyperparameter["THRESHOLD"])
           #if binary:
           #  evaluator.ROC("train")
           acc = evaluator.T_ACC()

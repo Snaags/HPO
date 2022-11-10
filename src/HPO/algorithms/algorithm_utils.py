@@ -1,9 +1,9 @@
 from multiprocessing import Queue, Process
-#from threading import Thread as Process
-#from queue import Queue
 import time
 import csv
+import json
 from pynvml import *
+
 def assign_gpu():
   nvmlInit()
   max_memory = 2000000000
@@ -23,20 +23,18 @@ def assign_gpu():
   return gpu_list
 
 class train_eval:
-  def __init__(self, worker, num_worker, filename, handle_dataset = False,test = None):
-    global test_data 
-    test_data = test
+  def __init__(self, worker ,json_config):
+    with open(json_config) as f:
+      SETTINGS = json.load(f)["SEARCH_CONFIG"]
+    self.num_worker = SETTINGS["CORES"]
+    self.filename = "{}/{}".format(SETTINGS["PATH"],SETTINGS["FILE_NAME"])
+    self.JSON_CONFIG = json_config
     self.config_queue = Queue()
-    self.handle_dataset = handle_dataset
-    if handle_dataset == True:
-      self.datasets = Queue()
     self.gpu_slots = Queue()
-    self.num_worker = num_worker
     self.results = Queue()
     self.acc_list_full = []
     self.recall_list_full = []
     self.config_list_full = []
-    self.filename = filename
     self.worker = worker
 
   def resume(self, acc, recall, config):
@@ -63,36 +61,18 @@ class train_eval:
       self.config_queue.put(i.get_dictionary())
     
     #Initialise GPU slots
-    """
-    for i in gpu:
-      slots = i
-      idx = gpu.index(slots)
-      while slots != 0:
-        self.gpu_slots.put(idx)
-        slots  -= 1 
-        gpu[idx] = slots
-    """
     while True:
       slot = self.allocate_gpu()
       if slot == None:
         break
       else:
         self.gpu_slots.put(slot)
-    if self.handle_dataset == False:
-      for i in range(self.num_worker):
+    #Initialise Processes
+    for i in range(self.num_worker):
         print("Number of workers: {}".format(self.num_worker))
-        self.processes.append(Process(target = self.worker , args = (i, self.config_queue , self.gpu_slots, self.results)))
-    else:
-    #Dataset can be train , validation or both as a list of lists [train, validation]
-    
-      for i in datasets:
-        self.datasets.put(i)
-        print(self.datasets.qsize())
-      for i in range(self.num_worker):
-        print("Number of workers: {}".format(self.num_worker))
-        self.processes.append(Process(target = self.worker , args = (i, self.config_queue , self.gpu_slots, self.results,self.datasets)))
-  
-    ###Main Evaluation loop
+        self.processes.append(Process(target = self.worker , args = (i, self.config_queue , self.gpu_slots, self.results,self.JSON_CONFIG)))
+
+    ###Main Evaluation Loop###
     for i in self.processes:
       i.start()
     while not self.config_queue.empty():

@@ -2,14 +2,13 @@ from HPO.utils.visualisation import plot_scores
 import csv
 from ConfigSpace import ConfigurationSpace
 from HPO.algorithms.algorithm_utils import train_eval
-
-def main(worker, configspace : ConfigurationSpace, filename = "random.csv"):
-  
-  TOTAL_EVALUATIONS = 500
-  cores = 8
-  
-  train = train_eval( worker , cores , filename = filename)
-  configs = configspace.sample_configuration(TOTAL_EVALUATIONS)
+import json
+def main(worker, configspace : ConfigurationSpace, json_config):
+  with open(json_config) as f:
+    SETTINGS = json.load(f)["SEARCH_CONFIG"]
+    
+  train = train_eval( worker , json_config)
+  configs = configspace.sample_configuration(SETTINGS["TOTAL_EVALUATIONS"])
   scores ,recall , pop= train.eval(configs)
   print("Best Score: ", max(scores))      
   plot_scores(scores)
