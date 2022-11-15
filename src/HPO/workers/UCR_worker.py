@@ -85,7 +85,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
 
   ##Dataset Initialisation
   datasets = UEA_Handler("/home/cmackinnon/scripts/datasets/UEA/")
-  name = 'HandMovementDirection'
+  name = SETTINGS["DATASET_CONFIG"]["NAME"]
   train_args = [False, cuda_device ,None,1]
   test_args = [False, cuda_device , None,1]
   dataset_train, test_dataset = datasets.load_all(name,train_args,test_args)
@@ -113,7 +113,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   """
   ### Train the model
   """
-  train_model(model , SETTINGS, trainloader , cuda_device,evaluator = evaluator,logger = False) 
+  train_model(model , SETTINGS, trainloader , cuda_device,logger = False) 
   torch.cuda.empty_cache()
   model.eval()
   evaluator.forward_pass(model, testloader,SETTINGS["BINARY"])

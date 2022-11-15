@@ -83,7 +83,7 @@ class train_eval:
       i.join()    
       i.close() 
     self.write2file()
-    return self.match_output_order_to_input(population)
+    return self.acc_list, self.recall_list, self.config_list#self.match_output_order_to_input(population)
  
   def match_output_order_to_input(self, in_pop):
     out_acc = []

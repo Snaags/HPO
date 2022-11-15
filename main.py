@@ -27,11 +27,25 @@ def main(JSON_CONFIG):
   data["SEARCH_SPACE"] = str(config)
   experiment_json = "experiments/{}/configuration.json".format(date)
   with open(experiment_json,"w") as f:
-    json.dump(data,f)
+    json.dump(data,f, indent=4)
   logging.basicConfig(filename='experiments/{}/experiment.log'.format(date),  level=logging.DEBUG)
   
   #START SEARCH
   algorithm(worker, config,experiment_json)
+
+
+
+if __name__ == "__main__":
+
+  #PASS JSON CONFIGURATION FILE NAME TO MAIN
+  if os.path.isdir(sys.argv[1]):
+    files = os.listdir(sys.argv[1])  
+    for runs in files:
+      main("{}/{}".format(sys.argv[1],runs))
+    
+  else:
+    main(sys.argv[1])
+
   
 
 def meta_cv():
@@ -75,7 +89,3 @@ def meta_cv():
       logging.info("HPO CV score [TOP {} model] - ACC: {} - REC: {}".format(top,hpo_score,hpo_rec))
       print("MetaCV test set score [TOP {} model] - ACC: {} - REC: {}".format(top,acc,rec))
       logging.info("MetaCV test set score [TOP {} model] - ACC: {} - REC: {}".format(top,acc,rec))
-if __name__ == "__main__":
-  #PASS JSON CONFIGURATION FILE NAME TO MAIN
-  main(sys.argv[1])
-

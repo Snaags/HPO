@@ -99,6 +99,7 @@ def train_model_triplet(model : Model , hyperparameter : dict, dataloader : Data
 
 def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
      cuda_device = None, evaluator= None,logger = None,run = None):
+
   #INITIALISATION
   EPOCHS = hyperparameter["EPOCHS"]
   BATCH_SIZE = hyperparameter["BATCH_SIZE"] 
@@ -106,6 +107,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   if cuda_device == None:
     cuda_device = torch.cuda.current_device()
   n_iter = len(dataloader) 
+
   #CONFIGURATION OF OPTIMISER AND LOSS FUNCTION
   optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["LR"])
   scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,EPOCHS)
@@ -113,6 +115,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
     criterion = nn.BCEWithLogitsLoss().cuda(device = cuda_device)
   else:
     criterion = nn.CrossEntropyLoss()
+
   #INITIALISE TRAINING VARIABLES
   epoch = 0
   peak_acc = 0
@@ -121,8 +124,9 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   correct = 0
   acc = 0
   recall = 0
-  if logger == None:
+  if logger != False or logger == None:
     logger = Logger()
+
   #MAIN TRAINING LOOP
   while epoch < EPOCHS:
     if epoch % 3 == 0:
@@ -138,10 +142,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
       loss.backward()
       optimizer.step()
 
-      if i% 5 == 0:
-        correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,EPOCHS , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = BINARY)
-    
-      if i% 5 == 0:
+      if i% 5 == 0 and False:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,EPOCHS , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = BINARY)
       if logger != False:
         logger.update({"loss": loss.item(), "training_accuracy": (correct/total),"index" : i,

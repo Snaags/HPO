@@ -9,12 +9,16 @@
     "BATCH_SIZE": 8 ,
     "EPOCHS" :50,
     "THRESHOLD":0.4,
-    "BINARY": false
+    "BINARY": false,
+    "DATASET_CONFIG":
+    	{
+	"NAME":"HandMovementDirection"
+	}
     },
   "SEARCH_CONFIG":
     {
     "FILE_NAME":"evaluations.csv",
     "TOTAL_EVALUATIONS":500,
-    "CORES":12
+    "CORES":10
     }
 }
