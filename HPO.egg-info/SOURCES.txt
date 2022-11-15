@@ -1,6 +1,0 @@
-pyproject.toml
-setup.py
-HPO.egg-info/PKG-INFO
-HPO.egg-info/SOURCES.txt
-HPO.egg-info/dependency_links.txt
-HPO.egg-info/top_level.txt
