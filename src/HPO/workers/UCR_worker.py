@@ -1,4 +1,4 @@
-
+import json
 import numpy as np 
 from HPO.data.UEA.download import UEA_Handler
 import time
@@ -28,8 +28,9 @@ from HPO.utils.worker_utils import LivePlot
 Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
 
 
-def compute( ID = None, configs=None , gpus=None , res = None  , config = None):
+def compute( ID, configs , gpus , res   , JSON_CONFIG):
   device = None
+  config = None
   print("Starting process: {}".format(ID))
   while not configs.empty():
     try:
@@ -52,7 +53,7 @@ def compute( ID = None, configs=None , gpus=None , res = None  , config = None):
       print("Starting config with device: {}".format(device))
       complete = False
       crashes = 0
-      acc , rec =  _compute(hyperparameter = config , cuda_device = device)
+      acc , rec =  _compute(hyperparameter = config , cuda_device = device,JSON_CONFIG = JSON_CONFIG)
       while not complete:
         try:
           
@@ -70,25 +71,24 @@ def compute( ID = None, configs=None , gpus=None , res = None  , config = None):
   torch.cuda.empty_cache()
 
 
-def _compute(hyperparameter,dataset_train = None,  dataset_test = None,trainloader = None, cuda_device = None, binary = False, evaluator= None):
+def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
+  
   ### Configuration 
-  THRESHOLD = 0.4 #Cut off for classification
-  batch_size = 16
+  with open(JSON_CONFIG) as f:
+    SETTINGS = json.load(f)["WORKER_CONFIG"]
+  
   if cuda_device == None:
-     cuda_device = 1# torch.cuda.current_device()
+     cuda_device = 1
   torch.cuda.empty_cache()
 
-  #dataset_test_full = Test_TEPS()
   torch.cuda.set_device(cuda_device)
 
+  ##Dataset Initialisation
   datasets = UEA_Handler("/home/cmackinnon/scripts/datasets/UEA/")
-  #adatasets.list_datasets()
-  name = 'FingerMovements'
+  name = SETTINGS["DATASET_CONFIG"]["NAME"]
   train_args = [False, cuda_device ,None,1]
   test_args = [False, cuda_device , None,1]
   dataset_train, test_dataset = datasets.load_all(name,train_args,test_args)
-  hpo = {'channels': 2**hyperparameter["channels"], 'lr': 0.0025170869707739693, 'p': 0.00, 'epochs': 25}
-  #hyperparameter.update(hpo)
 
 
   print("Cuda Device Value: ", cuda_device)
@@ -98,26 +98,26 @@ def _compute(hyperparameter,dataset_train = None,  dataset_test = None,trainload
   n_classes = dataset_train.get_n_classes()
   multibatch = False
   torch.cuda.empty_cache()
-  if trainloader == None:
-      trainloader = torch.utils.data.DataLoader(
+  trainloader = torch.utils.data.DataLoader(
                           dataset_train,collate_fn = collate_fn_padd,shuffle = True,
-                          batch_size=batch_size, drop_last = True)
+                          batch_size=SETTINGS["BATCH_SIZE"], drop_last = True)
   testloader = torch.utils.data.DataLoader(
                       test_dataset,collate_fn = collate_fn_padd,shuffle = True,
-                      batch_size=batch_size,drop_last = True)
+                      batch_size= SETTINGS["BATCH_SIZE"] ,drop_last = True)
   n_classes = test_dataset.get_n_classes()
-  evaluator = Evaluator(batch_size, test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
-  model = NetworkMain(dataset_train.get_n_features(),hpo["channels"],num_classes= dataset_train.n_classes, 
-                        layers = hyperparameter["layers"], auxiliary = False,drop_prob = hpo["p"], genotype = gen, binary = binary)
+  evaluator = Evaluator(SETTINGS["BATCH_SIZE"], test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
+
+  model = NetworkMain(dataset_train.get_n_features(),2**hyperparameter["channels"], num_classes= dataset_train.n_classes, 
+                        layers = hyperparameter["layers"], auxiliary = False,drop_prob = SETTINGS["P"], genotype = gen, binary = SETTINGS["BINARY"])
   model = model.cuda(device = cuda_device)
   """
   ### Train the model
   """
-  train_model(model , hpo, trainloader , hpo["epochs"], batch_size , cuda_device, binary = binary,evaluator = evaluator,logger = False) 
+  train_model(model , SETTINGS, trainloader , cuda_device,logger = False) 
   torch.cuda.empty_cache()
   model.eval()
-  evaluator.forward_pass(model, testloader,binary)
-  evaluator.predictions(model_is_binary = binary , THRESHOLD = THRESHOLD)
+  evaluator.forward_pass(model, testloader,SETTINGS["BINARY"])
+  evaluator.predictions(model_is_binary = SETTINGS["BINARY"] , THRESHOLD = SETTINGS["THRESHOLD"])
   total = evaluator.T()
   acc  =  evaluator.T_ACC()
   recall = evaluator.TPR(1)

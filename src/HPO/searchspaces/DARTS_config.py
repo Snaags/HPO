@@ -88,16 +88,8 @@ def init_config():
     ###Topology Definition]###
   
   hp_list = [
-        c1,
-        epochs,
-        lr,
-        p,
         layers,
-        T_0,
-        T_mult,
-        batch_size,
         channels,
-        augmentations,
         normal_node_0_0 ,
         normal_node_0_1 ,
         normal_index_0_0,

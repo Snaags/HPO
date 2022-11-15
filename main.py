@@ -1,17 +1,51 @@
-from HPO.algorithms.regevo_DARTS import main as  _algorithm
-from HPO.workers.UCR_worker import compute as _worker
-from HPO.searchspaces.AttnNAS_config import init_config as _config
-config = _config()
-worker = _worker
-algorithm = _algorithm
+import importlib
 from multiprocessing import Pool
 import numpy as np
 import logging
-#logging.basicConfig(filename='example.log', encoding='utf-8', level=logging.DEBUG)
+import sys
+import os
+import json
+from datetime import datetime
 
-def main(): 
+def main(JSON_CONFIG):
+  #CREATE EXPERIMENT DIRECTORY AND LOAD JSON DATA
+  date = "".join(str(datetime.now()).split(" "))
+  os.system("mkdir experiments/{}".format(date))
+  with open(JSON_CONFIG) as conf:
+    data = json.load(conf)
+  #IMPORT MODULES
+  _worker = importlib.import_module("HPO.workers.{}".format(data["WORKER_MODULE_NAME"])) 
+  _config =importlib.import_module("HPO.searchspaces.{}".format(data["CONFIG_MODULE_NAME"])) 
+  _algorithm = importlib.import_module("HPO.algorithms.{}".format(data["SEARCH_MODULE_NAME"])) 
+  #DEFINE FUNCTIONS FROM MODULES
+  algorithm = _algorithm.main
+  worker = _worker.compute
+  config = _config.init_config()  
+  #STORE DATA IN EXPERIMENT JSON FILE 
+  data["DATE"] = date
+  data["SEARCH_CONFIG"]["PATH"] = "experiments/{}".format(date)
+  data["SEARCH_SPACE"] = str(config)
+  experiment_json = "experiments/{}/configuration.json".format(date)
+  with open(experiment_json,"w") as f:
+    json.dump(data,f, indent=4)
+  logging.basicConfig(filename='experiments/{}/experiment.log'.format(date),  level=logging.DEBUG)
+  
+  #START SEARCH
+  algorithm(worker, config,experiment_json)
 
-  algorithm(worker, config,"FM_test_new.csv")
+
+
+if __name__ == "__main__":
+
+  #PASS JSON CONFIGURATION FILE NAME TO MAIN
+  if os.path.isdir(sys.argv[1]):
+    files = os.listdir(sys.argv[1])  
+    for runs in files:
+      main("{}/{}".format(sys.argv[1],runs))
+    
+  else:
+    main(sys.argv[1])
+
   
 
 def meta_cv():
@@ -55,5 +89,3 @@ def meta_cv():
       logging.info("HPO CV score [TOP {} model] - ACC: {} - REC: {}".format(top,hpo_score,hpo_rec))
       print("MetaCV test set score [TOP {} model] - ACC: {} - REC: {}".format(top,acc,rec))
       logging.info("MetaCV test set score [TOP {} model] - ACC: {} - REC: {}".format(top,acc,rec))
-if __name__ == "__main__":
-  main()
