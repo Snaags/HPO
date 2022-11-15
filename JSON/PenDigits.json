@@ -1,0 +1,1 @@
+{"WORKER_MODULE_NAME": "UCR_worker", "SEARCH_MODULE_NAME": "Random", "CONFIG_MODULE_NAME": "AttnNAS_config", "WORKER_CONFIG": {"P": 0, "LR": 0.0025, "BATCH_SIZE": 8, "EPOCHS": 50, "THRESHOLD": 0.4, "BINARY": false, "DATASET_CONFIG": {"NAME": "PenDigits"}}, "SEARCH_CONFIG": {"FILE_NAME": "evaluations.csv", "TOTAL_EVALUATIONS": 500, "CORES": 12}}
