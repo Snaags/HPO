@@ -19,7 +19,8 @@ class UEA(Dataset):
       y.append(np.load("{}{}_samples.npy".format(self.PATH,name)))
     self.x = torch.from_numpy(np.concatenate(x,axis = 0)).cuda(device = device)
     self.y = torch.from_numpy(np.concatenate(y,axis = 0)).cuda(device = device)
-
+    self.n_classes = len(torch.unique(self.y))
+    self.n_features = self.x.shape[1]
   def __getitem__(self,index):
     if augmentation:
       for f in augmentation:
@@ -27,9 +28,13 @@ class UEA(Dataset):
     return self.x[index], self.y[index]
 
   def __len__(self):
-    len(self.y)
+    return len(self.y)
 
-
+  def get_n_classes(self):
+    return self.n_classes
+    
+  def get_n_features(self):
+    return self.n_features
 class UEA_Train(UEA):
   def __init__(self, name,device,**kwargs):
     name = "{}_{}".format(name,"train")
