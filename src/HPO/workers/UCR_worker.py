@@ -1,7 +1,8 @@
 import json
 import numpy as np 
-from HPO.data.UEA.download import UEA_Handler
+from HPO.data.UEA_datasets import UEA_Train, UEA_Test, UEA_Full
 import time
+import sys
 import os 
 import matplotlib.pyplot as plt
 from HPO.utils.model import NetworkMain
@@ -84,22 +85,24 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   torch.cuda.set_device(cuda_device)
 
   ##Dataset Initialisation
-  datasets = UEA_Handler("/home/cmackinnon/scripts/datasets/UEA/")
+  #datasets = UEA_Handler("/home/cmackinnon/scripts/datasets/UEA/")
   name = SETTINGS["DATASET_CONFIG"]["NAME"]
-  train_args = [False, cuda_device ,None,1]
-  test_args = [False, cuda_device , None,1]
-  dataset_train, test_dataset = datasets.load_all(name,train_args,test_args)
+  #train_args = [False, cuda_device ,None,1]
+  # test_args = [False, cuda_device , None,1]
+  train_dataset = UEA_Train(name,cuda_device)
+  test_dataset = UEA_Test(name,cuda_device)
+  #test_dataset = datasets.load_all(name,train_args,test_args)
 
 
   print("Cuda Device Value: ", cuda_device)
   gen = config_space_2_DARTS(hyperparameter,reduction = True)
   print(gen)
 
-  n_classes = dataset_train.get_n_classes()
+  n_classes = train_dataset.get_n_classes()
   multibatch = False
   torch.cuda.empty_cache()
   trainloader = torch.utils.data.DataLoader(
-                          dataset_train,collate_fn = collate_fn_padd,shuffle = True,
+                          train_dataset,collate_fn = collate_fn_padd,shuffle = True,
                           batch_size=SETTINGS["BATCH_SIZE"], drop_last = True)
   testloader = torch.utils.data.DataLoader(
                       test_dataset,collate_fn = collate_fn_padd,shuffle = True,
@@ -107,7 +110,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   n_classes = test_dataset.get_n_classes()
   evaluator = Evaluator(SETTINGS["BATCH_SIZE"], test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
 
-  model = NetworkMain(dataset_train.get_n_features(),2**hyperparameter["channels"], num_classes= dataset_train.n_classes, 
+  model = NetworkMain(train_dataset.get_n_features(),2**hyperparameter["channels"], num_classes= train_dataset.get_n_classes, 
                         layers = hyperparameter["layers"], auxiliary = False,drop_prob = SETTINGS["P"], genotype = gen, binary = SETTINGS["BINARY"])
   model = model.cuda(device = cuda_device)
   """
@@ -128,3 +131,5 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   return acc, recall
 
 
+if __name__ == "__main__":
+  _compute(sys.argv[1])
