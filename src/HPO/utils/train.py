@@ -104,6 +104,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   EPOCHS = hyperparameter["EPOCHS"]
   BATCH_SIZE = hyperparameter["BATCH_SIZE"] 
   BINARY = hyperparameter["BINARY"]
+  PRINT_TRAIN = hyperparameter["PRINT_TRAIN"]
   if cuda_device == None:
     cuda_device = torch.cuda.current_device()
   n_iter = len(dataloader) 
@@ -142,7 +143,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
       loss.backward()
       optimizer.step()
 
-      if i% 5 == 0 and False:
+      if i% PRINT_TRAIN == 0 and PRINT_TRAIN:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,EPOCHS , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = BINARY)
       if logger != False:
         logger.update({"loss": loss.item(), "training_accuracy": (correct/total),"index" : i,

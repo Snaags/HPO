@@ -7,6 +7,16 @@ import numpy as np
 from operator import itemgetter
 from scipy.interpolate import CubicSpline
 
+
+def initialise_augmentations(augmentation_data)->list:
+  if augmentation_data:
+    augs = []
+    for i in augmentation_data:
+      augs.append(eval(i)(**augmentation_data[i]) )
+    return augs
+  else:
+    return False
+
 class Augmentation(object):
   def __init__(self,rate,device):
     self.device = device
@@ -39,7 +49,7 @@ class Scaling(Augmentation):
     return torch.mul(x, s),y
 
 class Crop(Augmentation):
-  def __init__(self, crop_min = 0.85,rate = 0.3, crop_max = 0.95, device = None):
+  def __init__(self, crop_min = 0.5,rate = 0.3, crop_max = 0.95, device = None):
     super(Crop,self).__init__(rate,device)
     self.__name__ = "crop"
     self.crop_min = crop_min
