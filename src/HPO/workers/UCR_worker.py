@@ -26,12 +26,12 @@ from sklearn.model_selection import StratifiedKFold as KFold
 from collections import namedtuple
 from HPO.utils.worker_score import Evaluator 
 from HPO.utils.worker_utils import LivePlot
-from worker_wrapper import __compute
+from HPO.workers.worker_wrapper import __compute
 Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
 
 
 def compute(*args, **kwargs):
-  __compute(*args, **kwargs, compute_func = _compute)
+  __compute(*args, **kwargs, _compute = _compute)
 
 
 def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
@@ -51,7 +51,11 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   name = SETTINGS["DATASET_CONFIG"]["NAME"]
   #train_args = [False, cuda_device ,None,1]
   # test_args = [False, cuda_device , None,1]
-  train_dataset = UEA_Train(name,cuda_device,augmentation = aug.initialise_augmentations(SETTINGS["AUGMENTATIONS"]))
+  if "AUGMENTATIONS" in SETTINGS:
+    augs = aug.initialise_augmentations(SETTINGS["AUGMENTATIONS"])
+  else: 
+    augs = None 
+  train_dataset = UEA_Train(name,cuda_device,augmentation = augs )
   test_dataset = UEA_Test(name,cuda_device)
   #test_dataset = datasets.load_all(name,train_args,test_args)
 
