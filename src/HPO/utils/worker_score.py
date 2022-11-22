@@ -1,7 +1,6 @@
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 import matplotlib.pyplot as plt 
 import numpy as np
-from HPO.algorithms.NASWOT import naswot
 import torch
 import torch.nn.functional as F
 from HPO.utils.time_series_augmentation_torch import  jitter, scaling, window_warp,crop, cutout
@@ -154,8 +153,9 @@ class Evaluator:
     self.confusion_matrix = np.zeros(shape = (n_classes,n_classes)) #Matrix of prediction vs true values
   
   def score_naswot(self,model,loader):
-    nw = naswot(model,loader,self.batch_size,self.cuda_device)
-    return nw.score()
+    #nw = naswot(model,loader,self.batch_size,self.cuda_device)
+    #return nw.score()
+    return 0
   
   def unsup_loss(self, model,loader,binary = False, n_augment = 1):
     loss = 0 

@@ -1,4 +1,4 @@
-def __compute( ID, configs , gpus , res   , JSON_CONFIG, compute_func):
+def __compute( ID, configs , gpus , res   , JSON_CONFIG, _compute):
   device = None
   config = None
   print("Starting process: {}".format(ID))
