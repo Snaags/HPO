@@ -3,8 +3,10 @@ results/
 experiments/*
 !experiements/example_experiment
 *.swp
+*.pynb
 *.csv
 *.png
+*.json
 *.ts
 *.arff
 *.pyc
