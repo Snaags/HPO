@@ -89,11 +89,11 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   name = SETTINGS["DATASET_CONFIG"]["NAME"]
   #train_args = [False, cuda_device ,None,1]
   # test_args = [False, cuda_device , None,1]
-  train_dataset = UEA_Train(name,cuda_device)
+  train_dataset = UEA_Train(name,cuda_device,augmentation = aug.initialise_augmentations(SETTINGS["AUGMENTATIONS"]))
   test_dataset = UEA_Test(name,cuda_device)
   #test_dataset = datasets.load_all(name,train_args,test_args)
 
-
+  
   print("Cuda Device Value: ", cuda_device)
   gen = config_space_2_DARTS(hyperparameter,reduction = True)
   print(gen)
@@ -109,14 +109,13 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
                       batch_size= SETTINGS["BATCH_SIZE"] ,drop_last = True)
   n_classes = test_dataset.get_n_classes()
   evaluator = Evaluator(SETTINGS["BATCH_SIZE"], test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
-
-  model = NetworkMain(train_dataset.get_n_features(),2**hyperparameter["channels"], num_classes= train_dataset.get_n_classes, 
-                        layers = hyperparameter["layers"], auxiliary = False,drop_prob = SETTINGS["P"], genotype = gen, binary = SETTINGS["BINARY"])
+  print("classes: {}".format(train_dataset.get_n_classes()))
+  model = NetworkMain(train_dataset.get_n_features(),2**hyperparameter["channels"], num_classes= train_dataset.get_n_classes(), layers = hyperparameter["layers"], auxiliary = False,drop_prob = SETTINGS["P"], genotype = gen, binary = SETTINGS["BINARY"])
   model = model.cuda(device = cuda_device)
   """
   ### Train the model
   """
-  train_model(model , SETTINGS, trainloader , cuda_device,logger = False) 
+  train_model(model , SETTINGS, trainloader , cuda_device,logger = False, evaluator = evaluator if SETTINGS["LIVE_EVAL"] else None) 
   torch.cuda.empty_cache()
   model.eval()
   evaluator.forward_pass(model, testloader,SETTINGS["BINARY"])
@@ -132,4 +131,6 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
 
 
 if __name__ == "__main__":
-  _compute(sys.argv[1])
+  with open(sys.argv[1]) as f:
+    HP = json.load(f)["CONFIG"]
+  _compute(HP,1,sys.argv[1])
