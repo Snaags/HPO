@@ -1,4 +1,7 @@
+from HPO.utils.seed import set_seed
+
 def __compute( ID, configs , gpus , res   , JSON_CONFIG, _compute):
+  set_seed(JSON_CONFIG)
   device = None
   config = None
   print("Starting process: {}".format(ID))
