@@ -39,6 +39,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   ### Configuration 
   with open(JSON_CONFIG) as f:
     SETTINGS = json.load(f)["WORKER_CONFIG"]
+    SAVE_PATH = json.load(f)["SEARCH_CONFIG"]["PATH"]
   
   if cuda_device == None:
      cuda_device = 1
@@ -93,6 +94,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   print("Accuracy: ", "%.4f" % ((acc)*100), "%")
   print("Recall: ", "%.4f" % ((recall)*100), "%")
 
+  torch.save(model.state_dict(),"{}/weights/{}".format(SAVE_PATH,acc))
   return acc, recall
 
 

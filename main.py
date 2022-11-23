@@ -12,6 +12,7 @@ def main(JSON_CONFIG):
   #CREATE EXPERIMENT DIRECTORY AND LOAD JSON DATA
   date = "".join(str(datetime.now()).split(" "))
   os.system("mkdir experiments/{}".format(date))
+  os.system("mkdir experiments/{}/weights".format(date))
   with open(JSON_CONFIG) as conf:
     data = json.load(conf)
   #IMPORT MODULES
