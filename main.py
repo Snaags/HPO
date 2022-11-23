@@ -32,7 +32,7 @@ def main(JSON_CONFIG):
   with open(experiment_json,"w") as f:
     json.dump(data,f, indent=4)
   logging.basicConfig(filename='experiments/{}/experiment.log'.format(date),  level=logging.DEBUG)
-  time.wait(1) 
+  time.sleep(1) 
   set_seed(experiment_json)
   #START SEARCH
   algorithm(worker, config,experiment_json)

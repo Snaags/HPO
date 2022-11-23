@@ -38,8 +38,9 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   
   ### Configuration 
   with open(JSON_CONFIG) as f:
-    SETTINGS = json.load(f)["WORKER_CONFIG"]
-    SAVE_PATH = json.load(f)["SEARCH_CONFIG"]["PATH"]
+    data = json.load(f)
+    SETTINGS = data["WORKER_CONFIG"]
+    SAVE_PATH = data["SEARCH_CONFIG"]["PATH"]
   
   if cuda_device == None:
      cuda_device = 1
