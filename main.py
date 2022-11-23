@@ -1,4 +1,5 @@
 import importlib
+import time
 from multiprocessing import Pool
 from HPO.utils.seed import set_seed
 import numpy as np
@@ -30,9 +31,9 @@ def main(JSON_CONFIG):
   experiment_json = "experiments/{}/configuration.json".format(date)
   with open(experiment_json,"w") as f:
     json.dump(data,f, indent=4)
-  set_seed(experiment_json)
   logging.basicConfig(filename='experiments/{}/experiment.log'.format(date),  level=logging.DEBUG)
-  
+  time.wait(1) 
+  set_seed(experiment_json)
   #START SEARCH
   algorithm(worker, config,experiment_json)
 
