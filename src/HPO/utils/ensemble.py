@@ -111,6 +111,6 @@ class Ensemble(nn.Module):
 
 if __name__ == "__main__":
 	import sys
-	be = BuildEnsemble(sys.argv[1])
-	ensemble_model = be.get_ensemble(10)
-	for x,y in 
+	be = EnsembleManager(sys.argv[1])
+	be.get_ensemble(10)
+	be.evaluate(32)
