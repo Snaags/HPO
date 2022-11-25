@@ -348,6 +348,8 @@ class Evaluator:
                 self.labels = self.labels[:end_index,:]
                 self.model_prob = self.model_prob[:end_index, :]
                 break
+  def set_cm(self, prediction, labels):
+    self.confusion_matrix = confusion_matrix(labels,prediction,labels = list(range(self.n_classes)))
   def update_CM(self):
     self.confusion_matrix += confusion_matrix(self.labels, self.prediction,labels = list(range(self.n_classes))) 
   def reset_cm(self):
