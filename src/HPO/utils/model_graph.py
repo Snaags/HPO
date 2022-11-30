@@ -1,6 +1,6 @@
 import torch.nn as nn
 from HPO.utils.operations import *
-
+import networkx as nx 
 class SEMIX(nn.Module):
   def __init__(self, C_in,C_out,r =2 ,stride =1,affine = True ):
     super(SE,self).__init__()
@@ -14,12 +14,29 @@ class SEMIX(nn.Module):
     #Squeeze
     y = self.GP(x2).squeeze()# [Batch,C]
     #torch.mean(x,axis = 2)  
-    
     y = self.fc1(y)
     y = self.act(y)
     y = self.fc2(y)
     y = self.sig(y).unsqueeze(dim = 2)
     return x1* y.expand_as(x1)
+
+
+def get_reduction(edges):
+  flat = {}
+  nodes = set([node for edge in edges for node in edge])
+  print(nodes)
+  g = nx.Graph()
+  g.add_edges_from(edges)
+  for i in nodes:
+      flat[i] = [n for n in g.neighbors(i)]
+  print(flat)
+  reduction = []
+  for i in flat:
+      if len(flat[i]) == 2:
+          if len(flat[flat[i][0]]) == 2 and not i in reduction:
+              print(i,flat[i])
+              reduction.append(flat[i][0])
+  return reduction
 
 class ModelGraph(nn.Module):
   def __init__(self,n_features, n_channels, n_classes, graph : list, OPS : list,binary = False):
@@ -27,10 +44,13 @@ class ModelGraph(nn.Module):
     self.ops = nn.ModuleList()
     self.combine_ops = nn.ModuleDict() 
     self.global_pooling = nn.AdaptiveAvgPool1d(1)
+    self.reduction = get_reduction(graph)
     for edge, _op in zip(graph,OPS):
       if edge[0] == "S":#INIT CHANNELS
         C = n_channels
-      
+      if edge[0] in self.reduction:
+        stride = 2
+        C  = c_curr
       op = OPS[name](C, stride, True)
       self.ops.append()
     if binary == True:
