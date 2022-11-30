@@ -26,6 +26,7 @@ def main(JSON_CONFIG):
   config = _config.init_config()  
   #STORE DATA IN EXPERIMENT JSON FILE 
   data["DATE"] = date
+  data["START_TIME"] = time.time()
   data["SEARCH_CONFIG"]["PATH"] = "experiments/{}".format(date)
   data["SEARCH_SPACE"] = str(config)
   experiment_json = "experiments/{}/configuration.json".format(date)
@@ -36,7 +37,11 @@ def main(JSON_CONFIG):
   set_seed(experiment_json)
   #START SEARCH
   algorithm(worker, config,experiment_json)
-
+  with open(JSON_CONFIG) as conf:
+    data = json.load(conf)
+  data["END_TIME"] = time.time()
+  with open(JSON_CONFIG,"w") as f:
+    json.dump(data,f,indent=4)
 
 
 if __name__ == "__main__":

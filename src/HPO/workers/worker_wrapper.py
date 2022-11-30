@@ -1,4 +1,5 @@
 from HPO.utils.seed import set_seed
+import torch
 
 def __compute( ID, configs , gpus , res   , JSON_CONFIG, _compute):
   set_seed(JSON_CONFIG)
@@ -26,7 +27,7 @@ def __compute( ID, configs , gpus , res   , JSON_CONFIG, _compute):
       print("Starting config with device: {}".format(device))
       complete = False
       crashes = 0
-      acc , rec =  _compute(hyperparameter = config , cuda_device = device,JSON_CONFIG = JSON_CONFIG)
+      acc , rec, params =  _compute(hyperparameter = config , cuda_device = device,JSON_CONFIG = JSON_CONFIG)
       while not complete:
         try:
           
@@ -39,7 +40,7 @@ def __compute( ID, configs , gpus , res   , JSON_CONFIG, _compute):
             print("Final Crash giving score of zero")
             acc , rec = 0 , 0 
             complete = True
-      res.put([config , acc , rec ]) 
+      res.put([config , acc , rec ,params]) 
 
   torch.cuda.empty_cache()
 

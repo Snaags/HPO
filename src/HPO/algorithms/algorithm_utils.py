@@ -34,6 +34,7 @@ class train_eval:
     self.results = Queue()
     self.acc_list_full = []
     self.recall_list_full = []
+    self.param_list_full= []
     self.config_list_full = []
     self.worker = worker
 
@@ -52,13 +53,16 @@ class train_eval:
   def eval(self, population, datasets = None):
     self.acc_list = []
     self.recall_list = []
+    self.param_list = []
     self.config_list = []
        
     self.processes = []
     gpu = assign_gpu()
     self.gpu =gpu
-    for i in population:
-      self.config_queue.put(i.get_dictionary())
+    for ID,i in enumerate(population):
+      c = i.get_dictionary()
+      c["ID"] = len(self.config_list_full) + ID
+      self.config_queue.put(c)
     
     #Initialise GPU slots
     while True:
@@ -105,15 +109,17 @@ class train_eval:
       out = self.results.get()
       self.acc_list.append(out[1])
       self.recall_list.append(out[2])
+      self.param_list.append(out[3])
       self.config_list.append(out[0])
       self.acc_list_full.append(out[1])
       self.recall_list_full.append(out[2])
+      self.param_list_full.append(out[3])
       self.config_list_full.append(out[0])
       print("Number of models evaluated: ", len(self.acc_list_full))
       with open(self.filename, "w") as csvfile:
         writer = csv.writer(csvfile)
-        for acc , recall , config in zip(self.acc_list_full , self.recall_list_full , self.config_list_full):
-          writer.writerow([acc, recall , config]) 
+        for acc , recall , config , param in zip(self.acc_list_full , self.recall_list_full , self.config_list_full,self.param_list_full):
+          writer.writerow([acc, recall , config,param]) 
   
 
   
