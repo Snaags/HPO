@@ -35,7 +35,7 @@ def compute(*args, **kwargs):
 
 
 def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
-  
+  print("ID is: {}".format(hyperparameter["ID"]))  
   ### Configuration 
   with open(JSON_CONFIG) as f:
     data = json.load(f)
@@ -83,6 +83,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   """
   ### Train the model
   """
+  params = sum(p.numel() for p in model.parameters() if p.requires_grad)
   train_model(model , SETTINGS, trainloader , cuda_device,logger = False, evaluator = evaluator if SETTINGS["LIVE_EVAL"] else None) 
   torch.cuda.empty_cache()
   model.eval()
@@ -94,9 +95,8 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   recall_total = evaluator.P(1)
   print("Accuracy: ", "%.4f" % ((acc)*100), "%")
   print("Recall: ", "%.4f" % ((recall)*100), "%")
-
-  torch.save(model.state_dict(),"{}/weights/{}".format(SAVE_PATH,acc))
-  return acc, recall
+  torch.save(model.state_dict(),"{}/weights/{:.02f}-{}".format(SAVE_PATH,acc,hyperparameter["ID"]))
+  return acc, recall,params
 
 
 if __name__ == "__main__":
