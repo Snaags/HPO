@@ -16,8 +16,6 @@ def main(worker, configspace : ConfigurationSpace, json_config):
   best_score = max(scores)
   best_config = pop[scores.index(max(scores))]
   best_rec = recall[scores.index(max(scores))]
-  #print(best_config)
-  return best_config, best_score, best_rec
  
 
 
