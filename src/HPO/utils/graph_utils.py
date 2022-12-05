@@ -45,7 +45,16 @@ class Order:
     while sum(self.states) < len(self.paths):
       self.iterate_paths()
   def get_edges(self):
-    return self.sorted_edges 
+    return self.sorted_edges
+
+  def get_path_edges(self):
+    out_paths = []
+
+    for path in self.node_paths:
+        hold = []
+        for c,node in enumerate(path[:-1]):
+            hold.append(node,path[c+1])
+
   def iterate_paths(self):
     blocked = []
     self.states = []
