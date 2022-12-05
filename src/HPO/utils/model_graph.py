@@ -27,36 +27,53 @@ class ModelGraph(nn.Module):
   def __init__(self,n_features, n_channels, n_classes, graph : list, OPS : list,binary = False):
     self.states = {}
     self.order_cal = Order(Graph)
+    self.edges = self.order_cal.get_edges()
     self.ops = nn.ModuleList()
+    self.n_channels
     self.combine_ops = nn.ModuleDict() 
     self.global_pooling = nn.AdaptiveAvgPool1d(1)
-    self.reduction = get_reduction(graph)
-    C_curr = n_channels
-    for edge, _op in zip(graph,OPS):
-      if edge[0] == "S":#INIT CHANNELS
-        C = n_channels
-      if self.reduction[edge[0]]:
-        stride = 2
-        C  = c_curr*2
-      op = OPS[name](C, stride, True)
-      self.ops.append(op)
+    self.reduction = get_reduction(self.edges)
+    C = n_channels
+
+
+
     if binary == True:
       self.binary = binary
-      self.classifier = nn.Linear(C_prev, 1)
+      self.classifier = nn.Linear(C, 1)
     else:
-      self.classifier = nn.Linear(C_prev, n_classes)
+      self.classifier = nn.Linear(C, n_classes)
   
   def _compile(self,length):
     #CHANNELS SHOULD INIT TO N_CHANNEL 
     #REDUCTION SHOULD OCCUR ALONG PATHS if a node has 1 input and 1 output and the previous node is not reduction
     batch = 32
+    OP_NAMES_ORDERED = 
+    c_curr = self.n_channels
     x = torch.rand(size = (batch, self.n_features,length))
+    self.states["S"] = x
+    for iteration,(op , edge) in enumerate(zip(OP_NAMES_ORDERED ,self.edges)):
+      if edge[0] == "S":#INIT CHANNELS
+        C = n_channels
+      if self.reduction[edge[0]]:
+        stride = 2
+      op = OPS[name](C, stride, True)
+      self.ops.append(op)
 
- 
+
+  def compile_1c_size(self):
+    for edge, _op in zip(Graph,OPS):
+      if edge[0] == "S":#INIT CHANNELS
+        C = n_channels
+      if self.reduction[edge[0]]:
+        stride = 2
+      op = OPS[name](C, stride, True)
+      self.ops.append(op)
+
   def combine(self,x1,x2):
     """
     Accepts two tensors [B,C,L] and returns [B,C,L1,L2]
     """
+
     batch_size  = x1.shape[0]
     channels = x1.shape[1]
     out = torch.bmm(x1.view(-1,x1.shape[-1],1),x2.view(-1,1,x2.shape[-1]))
@@ -65,7 +82,7 @@ class ModelGraph(nn.Module):
 
   def forward(self,x):
     self.states["S"] = x
-    for iteration,(op , edge) in enumerate(zip(self.ops ,self.graph)):
+    for iteration,(op , edge) in enumerate(zip(self.ops ,self.edges)):
       h = op(self.states[edge[0]])
       #CASE 1 - 1 INPUT
       if not (edge[1] in self.states.keys()):
@@ -76,7 +93,7 @@ class ModelGraph(nn.Module):
       #CASE 3 - 2 INPUTS, SAME LENGTH (CONCAT CHANNELS)
       elif self.states[edge[1]].shape[2] = h.shape[2]:
         self.states[edge[1]] = torch.cat((self.states[edge[1]], h),dim = 1)
-      #CASE 4 - 2 INPUTS SAMPLE CHANNELS (MATMUL 2D CONV)
+      #CASE 4 - 2 INPUTS SAME CHANNELS (MATMUL 2D CONV)
       elif self.states[edge[1]].shape[1] = h.shape[1]:
         h = self.combine(self.states[edge[1]], h)
         if not iteration in self.combine_ops:
@@ -90,6 +107,10 @@ class ModelGraph(nn.Module):
         if not iteration in self.combine_ops:
           self.combine_ops[iterations] = SEMIX(channels_in,channels_out)
         self.states[edge[1]] = self.combine_ops[iteration](self.states[edge[1]],h)
+      #FC LAYER
+      x = self.global_pooling(self.states["T"])
+      x = self.classifier(x)
+      return x
       
     
     
