@@ -1,5 +1,4 @@
 import random
-import numpy as np
 import networkx as nx
 import copy
 from enum import Enum
@@ -11,7 +10,7 @@ class Path:
     self.current_index = 0
     
   def get_unknown_states(self):
-    return self.nodes[self.current_index+1:]
+    return self.nodes[self.current_index:]
 
   def _next(self):
     source = self.nodes[self.current_index]
@@ -28,51 +27,6 @@ class Path:
       return True
 
 
-def topological_sort(V, E):
-  """
-  L ← Empty list that will contain the sorted elements
-  S ← Set of all nodes with no incoming edge
-  
-  while S is not empty do
-      remove a node n from S
-      add n to L
-      for each node m with an edge e from n to m do
-          remove edge e from the graph
-          if m has no other incoming edges then
-              insert m into S
-  
-  if graph has edges then
-      return error   (graph has at least one cycle)
-  else 
-      return L   (a topologically sorted order)
-  """
-  S = ["S"]
-  L = []
-
-  while len(S) > 0:
-      n = S.pop()
-      L.append(n)
-      for e in g.neighbours(n):
-        pass
-
-def get_sorted_edges(edges):
-  g = nx.DiGraph()
-  g.add_edges_from(edges)
-  sorted_edges = []
-  node_generate = nx.topological_sort(g)
-  node_l = [n for n in node_generate]
-  print(node_l)
-  node_generate = nx.topological_sort(g)
-  while len(edges) > 0:
-    for V in node_generate:
-      edges = [ e for e in edges if e not in sorted_edges]
-      for E in edges:
-        if E[0] == V:
-          sorted_edges.append(E)
-
-  return sorted_edges
-     
-
 class Order: 
   """
   class for defining the order in which the edges should be computed
@@ -88,11 +42,11 @@ class Order:
       self.paths.append(Path(path))
     self.sorted_edges = []
     self.states = []
-    print(len(self.paths))
     while sum(self.states) < len(self.paths):
+      print(self.sorted_edges)
       self.iterate_paths()
   def get_edges(self):
-    return list(dict.fromkeys(self.sorted_edges))
+    return self.sorted_edges
 
   def get_path_edges(self):
     out_paths = []
@@ -126,7 +80,7 @@ class Order:
 def flatten(l):
     return [item for sublist in l for item in sublist]
 
-def get_reduction(edges,step):
+def get_reduction(edges):
     g = nx.Graph()
     g.add_edges_from(edges)
     nodes = set([node for edge in edges for node in edge])    
@@ -191,8 +145,8 @@ def traverse(x, g, ROUTES):
         x += path
         traverse(x,g,ROUTES)
 
-def gen_iter(edges,g, rate):
-    if random.random() > rate:
+def gen_iter(edges,g):
+    if random.random() > 0.3:
         #INSERT NODE
         edge = random.choice(edges)
         NEW_ID = len(edges)+1
