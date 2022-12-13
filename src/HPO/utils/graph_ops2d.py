@@ -79,7 +79,7 @@ class BatchNorm(nn.Module):
 class DepthConv(nn.Module):
   def __init__(self, c, kernel_size, padding,stride,dilation= 1, affine=True):
     super(DepthConv, self).__init__()
-    padding = (kernel_size*stride*dilation)//2
+    padding = (kernel_size*stride)//2
     self.conv = nn.Conv2d(c,c, kernel_size=kernel_size, stride=stride, padding=padding, groups=c, bias=False)
 
   def forward(self, x):

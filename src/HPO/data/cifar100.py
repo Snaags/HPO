@@ -22,7 +22,7 @@ class CIFAR100(Dataset):
     #LOAD IMAGES FROM FILE AND RESHAPE TO [SAMPLES, CHANNELS, ROWS, COLUMNS]
     self.x = torch.from_numpy(
         data_train[b'data'].reshape(-1,3,32,32)
-        ).cuda(device = device)
+        ).cuda(device = device).float()
     #LOAD LABELS
     self.y = torch.from_numpy(
         np.asarray(data_train[b'fine_labels'] )

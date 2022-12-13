@@ -35,7 +35,8 @@ def compute(*args, **kwargs):
 
 
 def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
-  print("ID is: {}".format(hyperparameter["ID"]))  
+  if "ID" in hyperparameter:
+    print("ID is: {}".format(hyperparameter["ID"]))  
   ### Configuration 
   with open(JSON_CONFIG) as f:
     data = json.load(f)
@@ -47,7 +48,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   torch.cuda.empty_cache()
 
   torch.cuda.set_device(cuda_device)
-
+    
   ##Dataset Initialisation
   #datasets = UEA_Handler("/home/cmackinnon/scripts/datasets/UEA/")
   name = SETTINGS["DATASET_CONFIG"]["NAME"]
@@ -65,7 +66,8 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   print("Cuda Device Value: ", cuda_device)
   gen = config_space_2_DARTS(hyperparameter,reduction = True)
   print(gen)
-
+  ##NOTE THIS NEEDS TO BE TEMP
+  hyperparameter["layers"] = 1
   n_classes = train_dataset.get_n_classes()
   multibatch = False
   torch.cuda.empty_cache()
@@ -78,7 +80,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   n_classes = test_dataset.get_n_classes()
   evaluator = Evaluator(SETTINGS["BATCH_SIZE"], test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
   print("classes: {}".format(train_dataset.get_n_classes()))
-  model = NetworkMain(train_dataset.get_n_features(),2**hyperparameter["channels"], num_classes= train_dataset.get_n_classes(), layers = hyperparameter["layers"], auxiliary = False,drop_prob = SETTINGS["P"], genotype = gen, binary = SETTINGS["BINARY"])
+  model = NetworkMain(train_dataset.get_n_features(),train_dataset.get_n_features(), num_classes= train_dataset.get_n_classes(), layers = hyperparameter["layers"], auxiliary = False,drop_prob = SETTINGS["P"], genotype = gen, binary = SETTINGS["BINARY"])
   model = model.cuda(device = cuda_device)
   """
   ### Train the model
@@ -101,5 +103,5 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
 
 if __name__ == "__main__":
   with open(sys.argv[1]) as f:
-    HP = json.load(f)["CONFIG"]
+    HP = json.load(f)["WORKER_CONFIG"]
   _compute(HP,1,sys.argv[1])

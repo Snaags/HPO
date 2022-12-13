@@ -64,7 +64,7 @@ def train_model_triplet(model : Model , hyperparameter : dict, dataloader : Data
     for i, (samples, labels) in enumerate( dataloader ):
       batch_size = samples.shape[0]
       optimizer.zero_grad()
-      outputs = model(samples.float()).cuda(device = cuda_device)
+      outputs = model(samples)
       if binary:
         loss = criterion(outputs.view(batch_size), labels.float()).cuda(device = cuda_device)
       else:
@@ -104,7 +104,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   EPOCHS = hyperparameter["EPOCHS"]
   BATCH_SIZE = hyperparameter["BATCH_SIZE"] 
   BINARY = hyperparameter["BINARY"]
-  PRINT_TRAIN = hyperparameter["PRINT_TRAIN"]
+  PRINT_RATE_TRAIN = hyperparameter["PRINT_RATE_TRAIN"]
   if cuda_device == None:
     cuda_device = torch.cuda.current_device()
   n_iter = len(dataloader) 
@@ -115,7 +115,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   if hyperparameter["BINARY"] == True:
     criterion = nn.BCEWithLogitsLoss().cuda(device = cuda_device)
   else:
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss().cuda(device = cuda_device)
 
   #INITIALISE TRAINING VARIABLES
   epoch = 0
@@ -135,22 +135,22 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
       correct = 0
     for i, (samples, labels) in enumerate( dataloader ):
       optimizer.zero_grad()
-      outputs = model(samples.float()).cuda(device = cuda_device)
+      outputs = model(samples)
       if BINARY == True:
-        loss = criterion(outputs.view(BATCH_SIZE), labels.float()).cuda(device = cuda_device)
+        loss = criterion(outputs.view(BATCH_SIZE), labels.float())
       else:
-        loss = criterion(outputs, labels).cuda(device = cuda_device)
+        loss = criterion(outputs, labels)
       loss.backward()
       optimizer.step()
 
-      if i% PRINT_TRAIN == 0 and PRINT_TRAIN:
+      if i % PRINT_RATE_TRAIN == 0 and PRINT_RATE_TRAIN:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,EPOCHS , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = BINARY)
       if logger != False:
         logger.update({"loss": loss.item(), "training_accuracy": (correct/total),"index" : i,
               "epoch": epoch, "validation_accuracy": acc, "lr":optimizer.param_groups[0]['lr'],"validation recall": recall })
-    if epoch % 1 == 0 and run != None:
+    if hyperparameter["WEIGHT_AVERAGING_RATE"] and epoch % hyperparameter["WEIGHT_AVERAGING_RATE"] == 0:
         torch.save(model.state_dict() ,"SWA/run-{}-checkpoint-{}".format(run, epoch))
-    if epoch % 5 == 0:
+    if epoch % hyperparameter["MODEL_VALIDATION_RATE"] == 0 and hyperparameter["MODEL_VALIDATION_RATE"] and epoch != 0:
         if evaluator != None:
           model.eval()
           evaluator.forward_pass(model,binary = BINARY)

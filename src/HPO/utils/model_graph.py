@@ -52,14 +52,18 @@ class ModelGraph(nn.Module):
     self.global_pooling = nn.AdaptiveAvgPool2d(1)
     self.reduction = get_reduction(self.edges,2)
     C = n_channels
+    input_res = 64
+    padding =  32
     ##Maybe try this as optional
     if n_features == n_channels:
       self.stem = OPS["skip_connect"](n_features,1,True) 
     elif data_dim ==  2:
-      self.stem = nn.Conv2d(n_features,n_channels,1)
+      self.stem = nn.Conv2d(n_features,n_channels,1,stride = 2 ,padding = padding)
     else:
       self.stem = nn.Conv1d(n_features,n_channels,1)
     self.device = device
+    self.stem = self.stem.cuda(device)
+    self.n_features = n_features
     self._compile(length = signal_length)
     C = self.states["T"].shape[1]
     print(C)
@@ -72,18 +76,23 @@ class ModelGraph(nn.Module):
   def _compile(self,length):
     #CHANNELS SHOULD INIT TO N_CHANNEL 
     #REDUCTION SHOULD OCCUR ALONG PATHS if a node has 1 input and 1 output and the previous node is not reduction
-    batch = 128
+    batch = 16
     self.combine_index = 0
-    x = torch.rand(size = (batch, self.n_channels,32,32)).cuda(self.device)
+    x = torch.rand(size = (batch, self.n_features,32,32)).cuda(self.device)
+    x = self.stem(x)
     OP_NAMES_ORDERED = transform_idx(self.graph,self.edges,self.OP_NAMES)
     OP_KEYS = transform_idx(self.graph,self.edges,self.op_keys)
     c_curr = self.n_channels
     self.states["S"] = x
     self.current_iteration = -1
     hold = 0
+    self.required_states = {}
     for iteration,(name , edge,keys) in enumerate(zip(OP_NAMES_ORDERED ,self.edges,OP_KEYS)):
       #print("Total number of edges: {}".format(len(self.edges)))
       print(edge,self.combine_index,self.states[edge[0]].shape,name)
+      self.required_states[iteration] = []
+      for todo in self.edges[iteration:]:
+        self.required_states[iteration].append(todo[0])
       hold = self.combine_index
       if edge[0] == "S":#INIT CHANNELS
         C = self.n_channels
@@ -190,9 +199,12 @@ class ModelGraph(nn.Module):
     hold = 0
     #while self.current_iteration < len(self.edges)-1:
     for iteration, (op,edge) in enumerate(zip(self.ops,self.edges)):
-      #iteration, op , edge  = self.next_op()
-      #print(edge,self.combine_index,self.states[edge[0]].shape,op)
       hold = self.combine_index
+      """
+      for i in self.states:
+        if not i in self.required_states[iteration] and i != "T":
+          del self.states[i]
+      """  
       self._forward(op,edge,iteration)
     #FC LAYER
     x = self.global_pooling(self.states["T"])

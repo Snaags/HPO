@@ -48,51 +48,55 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   torch.cuda.empty_cache()
 
   torch.cuda.set_device(cuda_device)
+  torch.set_float32_matmul_precision('high')
   #torch.autograd.set_detect_anomaly(True)
   #with torch.autograd.profiler.profile() as prof:
   for i in range(1):
-    ##Dataset Initialisation
-    #datasets = UEA_Handler("/home/cmackinnon/scripts/datasets/UEA/")
-    name = SETTINGS["DATASET_CONFIG"]["NAME"]
-    #train_args = [False, cuda_device ,None,1]
-    # test_args = [False, cuda_device , None,1]
-    if "AUGMENTATIONS" in SETTINGS:
-      augs = aug.initialise_augmentations(SETTINGS["AUGMENTATIONS"])
-    else: 
-      augs = None 
-    train_dataset = CIFAR100_Train(cuda_device)
-    test_dataset = CIFAR100_Test(cuda_device)
-    #test_dataset = datasets.load_all(name,train_args,test_args)
+      ##Dataset Initialisation
+      #datasets = UEA_Handler("/home/cmackinnon/scripts/datasets/UEA/")
+      name = SETTINGS["DATASET_CONFIG"]["NAME"]
+      #train_args = [False, cuda_device ,None,1]
+      # test_args = [False, cuda_device , None,1]
+      if "AUGMENTATIONS" in SETTINGS:
+        augs = aug.initialise_augmentations(SETTINGS["AUGMENTATIONS"])
+      else: 
+        augs = None 
+      train_dataset = CIFAR100_Train(cuda_device)
+      test_dataset = CIFAR100_Test(cuda_device)
+      #test_dataset = datasets.load_all(name,train_args,test_args)
 
-    
-    print("Cuda Device Value: ", cuda_device)
+      
+      print("Cuda Device Value: ", cuda_device)
 
-    n_classes = train_dataset.get_n_classes()
-    multibatch = False
-    torch.cuda.empty_cache()
-    trainloader = torch.utils.data.DataLoader(
-                            train_dataset,collate_fn = collate_fn_padd,shuffle = True,
-                            batch_size=SETTINGS["BATCH_SIZE"], drop_last = True)
-    testloader = torch.utils.data.DataLoader(
-                        test_dataset,collate_fn = collate_fn_padd,shuffle = True,
-                        batch_size= SETTINGS["BATCH_SIZE"] ,drop_last = True)
-    n_classes = test_dataset.get_n_classes()
-    evaluator = Evaluator(SETTINGS["BATCH_SIZE"], test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
-    print("classes: {}".format(train_dataset.get_n_classes()))
-    g = GraphConfigSpace(150)
-    s = g.sample_configuration()
-    s = s[0]
-    model = ModelGraph(train_dataset.get_n_features(),32,train_dataset.get_n_classes(),217,s["graph"],s["ops"],device = cuda_device)
+      n_classes = train_dataset.get_n_classes()
+      multibatch = False
+      torch.cuda.empty_cache()
+      trainloader = torch.utils.data.DataLoader(
+                              train_dataset,shuffle = True,
+                              batch_size=SETTINGS["BATCH_SIZE"], drop_last = True)
+      testloader = torch.utils.data.DataLoader(
+                          test_dataset,shuffle = True,
+                          batch_size= SETTINGS["BATCH_SIZE"] ,drop_last = True)
+      n_classes = test_dataset.get_n_classes()
+      evaluator = Evaluator(SETTINGS["BATCH_SIZE"], test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
+      print("classes: {}".format(train_dataset.get_n_classes()))
+      g = GraphConfigSpace(150)
+      s = g.sample_configuration()
+      s = s[0]
+      model = ModelGraph(train_dataset.get_n_features(),256,train_dataset.get_n_classes(),217,s["graph"],s["ops"],device = cuda_device)
 
-    #model = torch.compile(model)
-    model = model.cuda(device = cuda_device)
-    """
-    ### Train the model
-    """
-    params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print("Size: {}".format(params))
-    train_model(model , SETTINGS, trainloader , cuda_device,logger = False, evaluator = evaluator if SETTINGS["LIVE_EVAL"] else None) 
-  #print(prof.key_averages().table(sort_by="self_cpu_time_total"))
+      model = model.cuda(device = cuda_device)
+      model = torch.compile(model)
+      torch._dynamo.config.verbose=True
+      #explanation, out_guards, graphs, ops_per_graph,break_reasons, explanation_verbose = torch._dynamo.explain(model, torch.rand(16,3,32,32).cuda(3))
+      """
+      ### Train the model
+      """
+      #print(explanation_verbose)
+      params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+      print("Size: {}".format(params))
+      train_model(model , SETTINGS, trainloader , cuda_device,logger = False, evaluator = evaluator if SETTINGS["LIVE_EVAL"] else None) 
+    #print(prof.key_averages().table(sort_by="self_cpu_time_total"))
   torch.cuda.empty_cache()
   model.eval()
   evaluator.forward_pass(model, testloader,SETTINGS["BINARY"])
@@ -112,4 +116,4 @@ if __name__ == "__main__":
     with open(sys.argv[1]) as f:
       HP = json.load(f)["WORKER_CONFIG"]
       HP["ID"] = i
-    _compute(HP,3,sys.argv[1])
+    _compute(HP,2,sys.argv[1])

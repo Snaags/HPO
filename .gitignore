@@ -1,6 +1,7 @@
 src/HPO/model_zoo/*
 results/
 experiments/*
+example/*
 !experiements/example_experiment
 *.swp
 *.pynb
