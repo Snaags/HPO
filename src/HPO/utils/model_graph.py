@@ -210,6 +210,7 @@ class ModelGraph(nn.Module):
     x = self.global_pooling(self.states["T"])
     x = self.classifier(x.squeeze())
     return x
+
       
     
     

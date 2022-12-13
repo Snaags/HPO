@@ -68,6 +68,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   print(gen)
   ##NOTE THIS NEEDS TO BE TEMP
   hyperparameter["layers"] = 1
+
   n_classes = train_dataset.get_n_classes()
   multibatch = False
   torch.cuda.empty_cache()
