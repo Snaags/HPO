@@ -1,29 +1,10 @@
 import torch.nn as nn
-#from HPO.utils.graph_ops import *
-from HPO.utils.graph_ops2d import *
+import HPO.utils.graph_ops as OPS1D
+import HPO.utils.graph_ops2d as OPS2D
 import copy
 import networkx as nx 
 from HPO.utils.graph_utils import get_reduction, Order, get_sorted_edges
-class SEMIX(nn.Module):
-  def __init__(self, C_in,C_out,r =2 ,stride =1,affine = True ):
-    super(SEMIX,self).__init__()
-    #print("Building Squeeze Excite with input {} and output: {}".format(C_in,C_out))
-    self.GP = nn.AdaptiveAvgPool2d(1)
-    self.fc1 = nn.Linear(C_in, C_in//2, bias = False)
-    self.act = nn.GELU()
-    self.fc2 = nn.Linear(C_in//2, C_out ,bias = False)
-    self.sig = nn.Sigmoid()
-    self.stride = stride
-  def forward(self,x1,x2):
-    #Squeeze
-    y = self.GP(x2).squeeze()# [Batch,C]
-    #torch.mean(x,axis = 2)  
-    y = self.fc1(y)
-    y = self.act(y)
-    y = self.fc2(y)
-    y = self.sig(y).unsqueeze(dim = 2).unsqueeze(dim = 3)
-    return x1* y.expand_as(x1)
-def transform_idx(original_list,original_list_permuted,new_list):
+
   """
   Takes in 3 arrays of the same shape and elements, an list_array which has been sorted in some way
   to make a new original_list_permuted and applies the same transform to the new_list as has been done 
@@ -34,95 +15,118 @@ def transform_idx(original_list,original_list_permuted,new_list):
   return list(np.asarray(new_list)[transform_idx])
 
 class ModelGraph(nn.Module):
-  def __init__(self,n_features, n_channels, n_classes,signal_length, graph : list, op_graph : list,device,binary = False,data_dim = 2):
+  def __init__(self,n_features, n_channels, n_classes,signal_length, graph : list, op_graph : list,device,binary = False,data_dim = 1):
     super(ModelGraph,self).__init__()
-    self.states = {}
+    #INITIALISING MODEL VARIABLES
+    self.device = device
+    self.data_dim = data_dim
+    self.n_features = n_features
     self.graph = copy.copy(graph)
     self.edges = get_sorted_edges(graph)
-    self.ops = nn.ModuleList()
     self.current_iteration = -1
     self.op_graph = op_graph
     self.n_channels = n_channels
     self.OP_NAMES = []
     self.op_keys = []
+
+    #EXTRACT OPERATIONS ORDER BASED ON GRAPH
     for i in range(len(self.graph)):
       self.OP_NAMES.append(op_graph["op_{}".format(i)])
       self.op_keys.append(i)
+
+    #STRUCTURES FOR HOLDING DATA STATES AND OPERATIONS
+    self.states = {}
+    self.ops = nn.ModuleList()
     self.combine_ops = nn.ModuleDict() 
-    self.global_pooling = nn.AdaptiveAvgPool2d(1)
-    self.reduction = get_reduction(self.edges,2)
-    C = n_channels
-    input_res = 64
-    padding =  32
-    ##Maybe try this as optional
-    if n_features == n_channels:
-      self.stem = OPS["skip_connect"](n_features,1,True) 
-    elif data_dim ==  2:
-      self.stem = nn.Conv2d(n_features,n_channels,1,stride = 2 ,padding = padding)
+    
+    #BUILD STEM
+    """
+    This is a way of increasing the capacity of a model but upping the resolution of the image off the bat.
+    Not sure why the stride is 2 but that was just how it was implemented in the efficient-net implementation I saw
+    Probably more useful for image data honestly, so will probably just move it inside the if statement for now
+    """
+    if data_dim == 2:
+      STEM_PADDING = 32
+      STEM_STRIDE = 2 
+      self.stem = nn.Conv2d(n_features,n_channels,1,stride = STEM_STRIDE ,padding = STEM_PADDING)
     else:
-      self.stem = nn.Conv1d(n_features,n_channels,1)
-    self.device = device
+      self.stem = nn.Conv1d(n_features,n_channels,1) #Will just leave this at defaults for now
     self.stem = self.stem.cuda(device)
-    self.n_features = n_features
+
+    #DEFINE OP_MODULE BASED ON DATA_DIM
+    if self.data_dim == 2:
+      OP_MODULE = OPS2D
+    else:
+      OP_MODULE = OPS1D
+
+    #BUILDS THE OPERATIONS ALONG EDGES BASED ON N_CHANNELS OF PREVIOUS OP
     self._compile(length = signal_length)
+       
+
+    #BUILD CLASSIFIER
     C = self.states["T"].shape[1]
-    print(C)
+    if data_dim == 2:
+      self.global_pooling = nn.AdaptiveAvgPool2d(1)
+    else:
+      self.global_pooling = nn.AdaptiveAvgPool1d(1)
     if binary == True:
       self.binary = binary
       self.classifier = nn.Linear(C, 1)
     else:
       self.classifier = nn.Linear(C, n_classes)
   
-  def _compile(self,length):
-    #CHANNELS SHOULD INIT TO N_CHANNEL 
-    #REDUCTION SHOULD OCCUR ALONG PATHS if a node has 1 input and 1 output and the previous node is not reduction
+  def _compile(self,size):
+    """
+    Builds the operations along edge paths, 
+    """
+    #GENERATE RANDOM DATA TO PASS THROUGH THE NETWORK
     batch = 16
     self.combine_index = 0
-    x = torch.rand(size = (batch, self.n_features,32,32)).cuda(self.device)
+    if self.data_dim == 2:
+      x = torch.rand(size = (batch, self.n_features,size,size)).cuda(self.device)
+    else:
+      x = torch.rand(size = (batch, self.n_features,size)).cuda(self.device)
     x = self.stem(x)
+
+    #REORDERS THE OPERATION LIST AND THE LIST OF OPERATION PARAMETERS TO MATCH THE TOPOLOGICALLY SORTED GRAPH
     OP_NAMES_ORDERED = transform_idx(self.graph,self.edges,self.OP_NAMES)
     OP_KEYS = transform_idx(self.graph,self.edges,self.op_keys)
-    c_curr = self.n_channels
+    
+
     self.states["S"] = x
-    self.current_iteration = -1
-    hold = 0
     self.required_states = {}
     for iteration,(name , edge,keys) in enumerate(zip(OP_NAMES_ORDERED ,self.edges,OP_KEYS)):
-      #print("Total number of edges: {}".format(len(self.edges)))
-      print(edge,self.combine_index,self.states[edge[0]].shape,name)
+     
+      #print(edge,self.combine_index,self.states[edge[0]].shape,name)
+      """
+      #This tracks the datastates that aren't required at each step so they can be deleted 
+      #but it can only be used for inference since they are all needed to calculate the gradient.
       self.required_states[iteration] = []
       for todo in self.edges[iteration:]:
         self.required_states[iteration].append(todo[0])
-      hold = self.combine_index
+      """
+
+      #GET NUMBER OF CHANNELS FROM PREVIOUS DATA STATE
       if edge[0] == "S":#INIT CHANNELS
         C = self.n_channels
       else:
         C = self.states[edge[0]].shape[1]
-        
+      
+      #DEFINE THE PARAMETERS OF THE OPERATION  
       stride = self.op_graph["op_{}_stride".format(keys)]
       kernel = self.op_graph["op_{}_kernel".format(keys)]
       dil = self.op_graph["op_{}_dil".format(keys)]
-      #print("Length and padding needed: ",self.states[edge[0]].shape[2], (stride*kernel*2**dil)//2)
-      #print("K,S,D",kernel,stride,dil)
+
+      #BUILD THE OPERATION
       if self.states[edge[0]].shape[2] > (stride*kernel):
-        op = OPS[name](C, kernel,stride,dil , True).cuda(self.device)
+        op = OP_MODULE.OPS[name](C, kernel,stride,dil , True).cuda(self.device)
       else:
-        op = OPS[name](C, kernel,1,1 , True).cuda(self.device)
+        op = OP_MODULE.OPS[name](C, kernel,1,1 , True).cuda(self.device)
         
+      #ADD OP TO THE MODULE LIST AND PASS THROUGH DATA
       self.ops.append(op)
       self._forward_build(op,edge,iteration)
 
-
-  def compile_1c_size(self):
-    for edge, _op in zip(graph,OPS):
-      if edge[0] == "S":#INIT CHANNELS
-        C = n_channels
-
-      if self.reduction[edge[0]]:
-        stride = 2
-      op = OPS[name](C, stride, True)
-       
-      self.ops.append(op)
 
   def combine(self,x1,x2):
     """
@@ -160,11 +164,11 @@ class ModelGraph(nn.Module):
         self.combine_ops[str(iteration)] = nn.Conv2d(channels,channels,kernel,groups = channels)
       self.states[edge[1]] = self.combine_ops[self.combine_index](h).squeeze()
       
-    #CASE 5 - DIFFERENT C AND L (SE NETWORK)
+    #CASE 5 - DIFFERENT C AND L (SE OPERATION)
     else:
       channels_in = h.shape[1]
       channels_out = self.states[edge[1]].shape[1]
-      self.combine_ops[str(edge)] = (SEMIX(channels_in,channels_out)).cuda(self.device)
+      self.combine_ops[str(edge)] = (OP_MODULE.SEMIX(channels_in,channels_out)).cuda(self.device)
       self.states[edge[1]] = self.combine_ops[str(edge)](self.states[edge[1]],h)
       self.combine_index+=1
 

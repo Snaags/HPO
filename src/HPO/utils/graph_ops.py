@@ -61,6 +61,26 @@ class GELU(nn.Module):
   def forward(self,x):
     return self.act(x)
 
+class SEMIX(nn.Module):
+  def __init__(self, C_in,C_out,r =2 ,stride =1,affine = True ):
+    super(SEMIX,self).__init__()
+    #print("Building Squeeze Excite with input {} and output: {}".format(C_in,C_out))
+    self.GP = nn.AdaptiveAvgPool1d(1)
+    self.fc1 = nn.Linear(C_in, C_in//2, bias = False)
+    self.act = nn.GELU()
+    self.fc2 = nn.Linear(C_in//2, C_out ,bias = False)
+    self.sig = nn.Sigmoid()
+    self.stride = stride
+  def forward(self,x1,x2):
+    #Squeeze
+    y = self.GP(x2).squeeze()# [Batch,C]
+    #torch.mean(x,axis = 2)  
+    y = self.fc1(y)
+    y = self.act(y)
+    y = self.fc2(y)
+    y = self.sig(y).unsqueeze(dim = 2)
+    return x1* y.expand_as(x1)
+
 
 class LayerNorm(nn.Module):
   def __init__(self,c,affine):

@@ -43,6 +43,28 @@ class Identity(nn.Module):
     return x
 
 
+
+class SEMIX(nn.Module):
+  def __init__(self, C_in,C_out,r =2 ,stride =1,affine = True ):
+    super(SEMIX,self).__init__()
+    #print("Building Squeeze Excite with input {} and output: {}".format(C_in,C_out))
+    self.GP = nn.AdaptiveAvgPool2d(1)
+    self.fc1 = nn.Linear(C_in, C_in//2, bias = False)
+    self.act = nn.GELU()
+    self.fc2 = nn.Linear(C_in//2, C_out ,bias = False)
+    self.sig = nn.Sigmoid()
+    self.stride = stride
+  def forward(self,x1,x2):
+    #Squeeze
+    y = self.GP(x2).squeeze()# [Batch,C]
+    #torch.mean(x,axis = 2)  
+    y = self.fc1(y)
+    y = self.act(y)
+    y = self.fc2(y)
+    y = self.sig(y).unsqueeze(dim = 2).unsqueeze(dim = 3)
+    return x1* y.expand_as(x1)
+def transform_idx(original_list,original_list_permuted,new_list):
+
 class Zero(nn.Module):
 
   def __init__(self, stride):
