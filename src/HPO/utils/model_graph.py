@@ -5,6 +5,7 @@ import copy
 import networkx as nx 
 from HPO.utils.graph_utils import get_reduction, Order, get_sorted_edges
 
+def transform_idx(original_list,original_list_permuted,new_list):
   """
   Takes in 3 arrays of the same shape and elements, an list_array which has been sorted in some way
   to make a new original_list_permuted and applies the same transform to the new_list as has been done 
