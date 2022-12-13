@@ -3,6 +3,7 @@ results/
 experiments/*
 example/*
 !experiements/example_experiment
+.pynb_checkpoints/
 *.swp
 *.pynb
 *.csv
