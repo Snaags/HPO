@@ -63,10 +63,8 @@ class SEMIX(nn.Module):
     y = self.fc2(y)
     y = self.sig(y).unsqueeze(dim = 2).unsqueeze(dim = 3)
     return x1* y.expand_as(x1)
-def transform_idx(original_list,original_list_permuted,new_list):
 
 class Zero(nn.Module):
-
   def __init__(self, stride):
     super(Zero, self).__init__()
     self.stride = stride
