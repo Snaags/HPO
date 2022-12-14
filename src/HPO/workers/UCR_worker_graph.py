@@ -79,12 +79,12 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
     n_classes = test_dataset.get_n_classes()
     evaluator = Evaluator(SETTINGS["BATCH_SIZE"], test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
     print("classes: {}".format(train_dataset.get_n_classes()))
-    g = GraphConfigSpace(350)
+    g = GraphConfigSpace(50)
     s = g.sample_configuration()
     s = s[0]
-    model = ModelGraph(train_dataset.get_n_features(),128,train_dataset.get_n_classes(),217,s["graph"],s["ops"],device = cuda_device)
+    model = ModelGraph(train_dataset.get_n_features(),64,train_dataset.get_n_classes(),train_dataset.x.shape[2],s["graph"],s["ops"],device = cuda_device)
 
-    #model = torch.compile(model)
+    model = torch.compile(model)
     model = model.cuda(device = cuda_device)
     """
     ### Train the model

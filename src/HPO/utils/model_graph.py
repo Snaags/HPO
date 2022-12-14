@@ -100,7 +100,7 @@ class ModelGraph(nn.Module):
     self.required_states = {}
     for iteration,(name , edge,keys) in enumerate(zip(OP_NAMES_ORDERED ,self.edges,OP_KEYS)):
      
-      #print(edge,self.combine_index,self.states[edge[0]].shape,name)
+      print(edge,self.combine_index,self.states[edge[0]].shape,name)
       """
       #This tracks the datastates that aren't required at each step so they can be deleted 
       #but it can only be used for inference since they are all needed to calculate the gradient.
@@ -139,7 +139,8 @@ class ModelGraph(nn.Module):
     batch_size  = x1.shape[0]
     channels = x1.shape[1]
     out = torch.bmm(x1.view(-1,x1.shape[-1],1),x2.view(-1,1,x2.shape[-1]))
-    return out.view(batch_size,channels,out.shape[-2],out.shape[-1])
+    proper_size_out = out.view(batch_size,channels,out.shape[-2],out.shape[-1])
+    return proper_size_out
 
   def next_op(self):
     self.current_iteration +=1
@@ -158,14 +159,16 @@ class ModelGraph(nn.Module):
     elif self.states[edge[1]].shape[2] == h.shape[2] and False:
       self.states[edge[1]] = torch.cat((self.states[edge[1]], h),dim = 1)
     #CASE 4 - 2 INPUTS SAME CHANNELS (MATMUL 2D CONV)
-    elif self.states[edge[1]].shape[1] == h.shape[1] and False:
+    elif self.states[edge[1]].shape[1] == h.shape[1]:
       h = self.combine(self.states[edge[1]], h)
       if not self.combine_index in self.combine_ops:
+        #BUILD KERNEL OF SIZE L1,L2 THEN SETS LARGER DIM TO 1
         kernel = torch.tensor(h.shape[-2:])
         channels = h.shape[1]
-        kernel[torch.argmax(kernel)] = 1
-        self.combine_ops[str(iteration)] = nn.Conv2d(channels,channels,kernel,groups = channels)
-      self.states[edge[1]] = self.combine_ops[self.combine_index](h).squeeze()
+        kernel[torch.argmax(kernel)] = 3
+        self.combine_ops[str(edge)] = nn.Conv2d(channels,channels,kernel,groups = channels).cuda(self.device)
+      self.states[edge[1]] = self.combine_ops[str(edge)](h).squeeze()
+      self.combine_index+=1
       
     #CASE 5 - DIFFERENT C AND L (SE OPERATION)
     else:
@@ -187,8 +190,9 @@ class ModelGraph(nn.Module):
     elif self.states[edge[1]].shape[2] == h.shape[2] and False:
       self.states[edge[1]] = torch.cat((self.states[edge[1]], h),dim = 1)
     #CASE 4 - 2 INPUTS SAME CHANNELS (MATMUL 2D CONV)
-    elif self.states[edge[1]].shape[1] == h.shape[1] and False:
+    elif self.states[edge[1]].shape[1] == h.shape[1]:
       h = self.combine(self.states[edge[1]], h)
+      self.states[edge[1]] = self.combine_ops[str(edge)](h).squeeze()
     else:
       #try:
       self.states[edge[1]] = self.combine_ops[str(edge)](self.states[edge[1]],h)

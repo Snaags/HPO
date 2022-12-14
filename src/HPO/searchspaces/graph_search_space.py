@@ -53,7 +53,7 @@ def init_config(n_ops = 30):
   for i in range(n_ops):  
     hp_list.append(CSH.CategoricalHyperparameter('op_{}'.format(i), choices=conv_ops))
     hp_list.append(CSH.UniformIntegerHyperparameter('op_{}_kernel'.format(i), lower = 2 , upper = 4))#kernel
-    hp_list.append(CSH.UniformIntegerHyperparameter('op_{}_stride'.format(i), lower = 1 , upper = 2))#stride
+    hp_list.append(CSH.UniformIntegerHyperparameter('op_{}_stride'.format(i), lower = 1 , upper = 4))#stride
     hp_list.append(CSH.UniformIntegerHyperparameter('op_{}_dil'.format(i), lower = 0 , upper = 4))#dilation
   cs.add_hyperparameters(hp_list)
   return cs
