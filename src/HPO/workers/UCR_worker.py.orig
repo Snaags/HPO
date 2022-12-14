@@ -35,8 +35,12 @@ def compute(*args, **kwargs):
 
 
 def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
+<<<<<<< HEAD
   if "ID" in hyperparameter:
     print("ID is: {}".format(hyperparameter["ID"]))  
+=======
+  print("ID is: {}".format(hyperparameter["ID"]))  
+>>>>>>> c70ed74e75b3df8a53477748326260f52205066a
   ### Configuration 
   with open(JSON_CONFIG) as f:
     data = json.load(f)
@@ -66,9 +70,12 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   print("Cuda Device Value: ", cuda_device)
   gen = config_space_2_DARTS(hyperparameter,reduction = True)
   print(gen)
+<<<<<<< HEAD
   ##NOTE THIS NEEDS TO BE TEMP
   hyperparameter["layers"] = 1
+=======
 
+>>>>>>> c70ed74e75b3df8a53477748326260f52205066a
   n_classes = train_dataset.get_n_classes()
   multibatch = False
   torch.cuda.empty_cache()
@@ -81,7 +88,11 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   n_classes = test_dataset.get_n_classes()
   evaluator = Evaluator(SETTINGS["BATCH_SIZE"], test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
   print("classes: {}".format(train_dataset.get_n_classes()))
-  model = NetworkMain(train_dataset.get_n_features(),256, num_classes= train_dataset.get_n_classes(), layers = hyperparameter["layers"], auxiliary = False,drop_prob = SETTINGS["P"], genotype = gen, binary = SETTINGS["BINARY"])
+<<<<<<< HEAD
+  model = NetworkMain(train_dataset.get_n_features(),train_dataset.get_n_features(), num_classes= train_dataset.get_n_classes(), layers = hyperparameter["layers"], auxiliary = False,drop_prob = SETTINGS["P"], genotype = gen, binary = SETTINGS["BINARY"])
+=======
+  model = NetworkMain(train_dataset.get_n_features(),2**hyperparameter["channels"], num_classes= train_dataset.get_n_classes(), layers = hyperparameter["layers"], auxiliary = False,drop_prob = SETTINGS["P"], genotype = gen, binary = SETTINGS["BINARY"])
+>>>>>>> c70ed74e75b3df8a53477748326260f52205066a
   model = model.cuda(device = cuda_device)
   """
   ### Train the model
@@ -104,5 +115,9 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
 
 if __name__ == "__main__":
   with open(sys.argv[1]) as f:
+<<<<<<< HEAD
     HP = json.load(f)["WORKER_CONFIG"]
+=======
+    HP = json.load(f)["CONFIG"]
+>>>>>>> c70ed74e75b3df8a53477748326260f52205066a
   _compute(HP,1,sys.argv[1])

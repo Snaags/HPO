@@ -1,4 +1,6 @@
 import torch.nn as nn
+import torch
+import numpy as np
 import HPO.utils.graph_ops as OPS1D
 import HPO.utils.graph_ops2d as OPS2D
 import copy
@@ -56,12 +58,12 @@ class ModelGraph(nn.Module):
 
     #DEFINE OP_MODULE BASED ON DATA_DIM
     if self.data_dim == 2:
-      OP_MODULE = OPS2D
+      self.OP_MODULE = OPS2D
     else:
-      OP_MODULE = OPS1D
+      self.OP_MODULE = OPS1D
 
     #BUILDS THE OPERATIONS ALONG EDGES BASED ON N_CHANNELS OF PREVIOUS OP
-    self._compile(length = signal_length)
+    self._compile(signal_length)
        
 
     #BUILD CLASSIFIER
@@ -120,9 +122,9 @@ class ModelGraph(nn.Module):
 
       #BUILD THE OPERATION
       if self.states[edge[0]].shape[2] > (stride*kernel):
-        op = OP_MODULE.OPS[name](C, kernel,stride,dil , True).cuda(self.device)
+        op = self.OP_MODULE.OPS[name](C, kernel,stride,dil , True).cuda(self.device)
       else:
-        op = OP_MODULE.OPS[name](C, kernel,1,1 , True).cuda(self.device)
+        op = self.OP_MODULE.OPS[name](C, kernel,1,1 , True).cuda(self.device)
         
       #ADD OP TO THE MODULE LIST AND PASS THROUGH DATA
       self.ops.append(op)
@@ -169,7 +171,7 @@ class ModelGraph(nn.Module):
     else:
       channels_in = h.shape[1]
       channels_out = self.states[edge[1]].shape[1]
-      self.combine_ops[str(edge)] = (OP_MODULE.SEMIX(channels_in,channels_out)).cuda(self.device)
+      self.combine_ops[str(edge)] = (self.OP_MODULE.SEMIX(channels_in,channels_out)).cuda(self.device)
       self.states[edge[1]] = self.combine_ops[str(edge)](self.states[edge[1]],h)
       self.combine_index+=1
 

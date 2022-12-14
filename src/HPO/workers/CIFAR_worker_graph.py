@@ -83,11 +83,11 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
       g = GraphConfigSpace(150)
       s = g.sample_configuration()
       s = s[0]
-      model = ModelGraph(train_dataset.get_n_features(),256,train_dataset.get_n_classes(),217,s["graph"],s["ops"],device = cuda_device)
+      model = ModelGraph(train_dataset.get_n_features(),32,train_dataset.get_n_classes(),217,s["graph"],s["ops"],device = cuda_device,data_dim =2)
 
       model = model.cuda(device = cuda_device)
       model = torch.compile(model)
-      torch._dynamo.config.verbose=True
+      #torch._dynamo.config.verbose=True
       #explanation, out_guards, graphs, ops_per_graph,break_reasons, explanation_verbose = torch._dynamo.explain(model, torch.rand(16,3,32,32).cuda(3))
       """
       ### Train the model

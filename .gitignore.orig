@@ -1,0 +1,18 @@
+src/HPO/model_zoo/*
+results/
+experiments/*
+<<<<<<< HEAD
+example/*
+!experiements/example_experiment
+.ipynb_checkpoints/
+=======
+!experiements/example_experiment
+>>>>>>> c70ed74e75b3df8a53477748326260f52205066a
+*.swp
+*.pynb
+*.csv
+*.png
+*.json
+*.ts
+*.arff
+*.pyc

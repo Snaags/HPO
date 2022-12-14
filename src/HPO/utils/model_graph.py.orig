@@ -1,0 +1,309 @@
+import torch.nn as nn
+<<<<<<< HEAD
+#from HPO.utils.graph_ops import *
+from HPO.utils.graph_ops2d import *
+import copy
+import networkx as nx 
+from HPO.utils.graph_utils import get_reduction, Order, get_sorted_edges
+class SEMIX(nn.Module):
+  def __init__(self, C_in,C_out,r =2 ,stride =1,affine = True ):
+    super(SEMIX,self).__init__()
+    #print("Building Squeeze Excite with input {} and output: {}".format(C_in,C_out))
+    self.GP = nn.AdaptiveAvgPool2d(1)
+    self.fc1 = nn.Linear(C_in, C_in//2, bias = False)
+    self.act = nn.GELU()
+    self.fc2 = nn.Linear(C_in//2, C_out ,bias = False)
+=======
+from HPO.utils.operations import *
+import networkx as nx 
+from HPO.utils.graph_utils import get_reduction, Order
+class SEMIX(nn.Module):
+  def __init__(self, C_in,C_out,r =2 ,stride =1,affine = True ):
+    super(SE,self).__init__()
+    self.GP = nn.AdaptiveAvgPool1d(1)
+    self.fc1 = nn.Linear(C_in, C_in//r, bias = False)
+    self.act = nn.GELU()
+    self.fc2 = nn.Linear(C_in//r, C_out ,bias = False)
+>>>>>>> c70ed74e75b3df8a53477748326260f52205066a
+    self.sig = nn.Sigmoid()
+    self.stride = stride
+  def forward(self,x1,x2):
+    #Squeeze
+    y = self.GP(x2).squeeze()# [Batch,C]
+    #torch.mean(x,axis = 2)  
+    y = self.fc1(y)
+    y = self.act(y)
+    y = self.fc2(y)
+<<<<<<< HEAD
+    y = self.sig(y).unsqueeze(dim = 2).unsqueeze(dim = 3)
+    return x1* y.expand_as(x1)
+def transform_idx(original_list,original_list_permuted,new_list):
+  """
+  Takes in 3 arrays of the same shape and elements, an list_array which has been sorted in some way
+  to make a new original_list_permuted and applies the same transform to the new_list as has been done 
+  to the original_array.
+  """
+  transform_idx = [original_list_permuted.index(i) for i in original_list]
+  print(transform_idx)
+  return list(np.asarray(new_list)[transform_idx])
+
+class ModelGraph(nn.Module):
+  def __init__(self,n_features, n_channels, n_classes,signal_length, graph : list, op_graph : list,device,binary = False,data_dim = 2):
+    super(ModelGraph,self).__init__()
+    self.states = {}
+    self.graph = copy.copy(graph)
+    self.edges = get_sorted_edges(graph)
+    self.ops = nn.ModuleList()
+    self.current_iteration = -1
+    self.op_graph = op_graph
+    self.n_channels = n_channels
+    self.OP_NAMES = []
+    self.op_keys = []
+    for i in range(len(self.graph)):
+      self.OP_NAMES.append(op_graph["op_{}".format(i)])
+      self.op_keys.append(i)
+    self.combine_ops = nn.ModuleDict() 
+    self.global_pooling = nn.AdaptiveAvgPool2d(1)
+    self.reduction = get_reduction(self.edges,2)
+    C = n_channels
+    input_res = 64
+    padding =  32
+    ##Maybe try this as optional
+    if n_features == n_channels:
+      self.stem = OPS["skip_connect"](n_features,1,True) 
+    elif data_dim ==  2:
+      self.stem = nn.Conv2d(n_features,n_channels,1,stride = 2 ,padding = padding)
+    else:
+      self.stem = nn.Conv1d(n_features,n_channels,1)
+    self.device = device
+    self.stem = self.stem.cuda(device)
+    self.n_features = n_features
+    self._compile(length = signal_length)
+    C = self.states["T"].shape[1]
+    print(C)
+=======
+    y = self.sig(y).unsqueeze(dim = 2)
+    return x1* y.expand_as(x1)
+
+
+
+class ModelGraph(nn.Module):
+  def __init__(self,n_features, n_channels, n_classes, graph : list, OPS : list,binary = False):
+    self.states = {}
+    self.order_cal = Order(Graph)
+    self.edges = self.order_cal.get_edges()
+    self.ops = nn.ModuleList()
+    self.n_channels
+    self.combine_ops = nn.ModuleDict() 
+    self.global_pooling = nn.AdaptiveAvgPool1d(1)
+    self.reduction = get_reduction(self.edges)
+    C = n_channels
+
+
+
+>>>>>>> c70ed74e75b3df8a53477748326260f52205066a
+    if binary == True:
+      self.binary = binary
+      self.classifier = nn.Linear(C, 1)
+    else:
+      self.classifier = nn.Linear(C, n_classes)
+  
+  def _compile(self,length):
+    #CHANNELS SHOULD INIT TO N_CHANNEL 
+    #REDUCTION SHOULD OCCUR ALONG PATHS if a node has 1 input and 1 output and the previous node is not reduction
+<<<<<<< HEAD
+    batch = 16
+    self.combine_index = 0
+    x = torch.rand(size = (batch, self.n_features,32,32)).cuda(self.device)
+    x = self.stem(x)
+    OP_NAMES_ORDERED = transform_idx(self.graph,self.edges,self.OP_NAMES)
+    OP_KEYS = transform_idx(self.graph,self.edges,self.op_keys)
+    c_curr = self.n_channels
+    self.states["S"] = x
+    self.current_iteration = -1
+    hold = 0
+    self.required_states = {}
+    for iteration,(name , edge,keys) in enumerate(zip(OP_NAMES_ORDERED ,self.edges,OP_KEYS)):
+      #print("Total number of edges: {}".format(len(self.edges)))
+      print(edge,self.combine_index,self.states[edge[0]].shape,name)
+      self.required_states[iteration] = []
+      for todo in self.edges[iteration:]:
+        self.required_states[iteration].append(todo[0])
+      hold = self.combine_index
+      if edge[0] == "S":#INIT CHANNELS
+        C = self.n_channels
+      else:
+        C = self.states[edge[0]].shape[1]
+        
+      stride = self.op_graph["op_{}_stride".format(keys)]
+      kernel = self.op_graph["op_{}_kernel".format(keys)]
+      dil = self.op_graph["op_{}_dil".format(keys)]
+      #print("Length and padding needed: ",self.states[edge[0]].shape[2], (stride*kernel*2**dil)//2)
+      #print("K,S,D",kernel,stride,dil)
+      if self.states[edge[0]].shape[2] > (stride*kernel):
+        op = OPS[name](C, kernel,stride,dil , True).cuda(self.device)
+      else:
+        op = OPS[name](C, kernel,1,1 , True).cuda(self.device)
+        
+      self.ops.append(op)
+      self._forward_build(op,edge,iteration)
+
+
+  def compile_1c_size(self):
+    for edge, _op in zip(graph,OPS):
+      if edge[0] == "S":#INIT CHANNELS
+        C = n_channels
+
+      if self.reduction[edge[0]]:
+        stride = 2
+      op = OPS[name](C, stride, True)
+       
+=======
+    batch = 32
+    OP_NAMES_ORDERED = 
+    c_curr = self.n_channels
+    x = torch.rand(size = (batch, self.n_features,length))
+    self.states["S"] = x
+    for iteration,(op , edge) in enumerate(zip(OP_NAMES_ORDERED ,self.edges)):
+      if edge[0] == "S":#INIT CHANNELS
+        C = n_channels
+      if self.reduction[edge[0]]:
+        stride = 2
+      op = OPS[name](C, stride, True)
+      self.ops.append(op)
+
+
+  def compile_1c_size(self):
+    for edge, _op in zip(Graph,OPS):
+      if edge[0] == "S":#INIT CHANNELS
+        C = n_channels
+      if self.reduction[edge[0]]:
+        stride = 2
+      op = OPS[name](C, stride, True)
+>>>>>>> c70ed74e75b3df8a53477748326260f52205066a
+      self.ops.append(op)
+
+  def combine(self,x1,x2):
+    """
+    Accepts two tensors [B,C,L] and returns [B,C,L1,L2]
+    """
+
+    batch_size  = x1.shape[0]
+    channels = x1.shape[1]
+    out = torch.bmm(x1.view(-1,x1.shape[-1],1),x2.view(-1,1,x2.shape[-1]))
+    return out.view(batch_size,channels,out.shape[-2],out.shape[-1])
+
+<<<<<<< HEAD
+  def next_op(self):
+    self.current_iteration +=1
+    op, edge = self.ops[self.current_iteration] , self.edges[self.current_iteration]
+    return self.current_iteration, op, edge 
+  
+  def _forward_build(self,op,edge,iteration):
+    h = op(self.states[edge[0]])
+    #CASE 1 - 1 INPUT
+    if not (edge[1] in self.states.keys()):
+      self.states[edge[1]] = h
+    #CASE 2 - 2 INPUTS OF SAME SIZE (ADD)
+    elif self.states[edge[1]].shape == h.shape:
+      self.states[edge[1]] = self.states[edge[1]] + h
+    #CASE 3 - 2 INPUTS, SAME LENGTH (CONCAT CHANNELS)
+    elif self.states[edge[1]].shape[2] == h.shape[2] and False:
+      self.states[edge[1]] = torch.cat((self.states[edge[1]], h),dim = 1)
+    #CASE 4 - 2 INPUTS SAME CHANNELS (MATMUL 2D CONV)
+    elif self.states[edge[1]].shape[1] == h.shape[1] and False:
+      h = self.combine(self.states[edge[1]], h)
+      if not self.combine_index in self.combine_ops:
+        kernel = torch.tensor(h.shape[-2:])
+        channels = h.shape[1]
+        kernel[torch.argmax(kernel)] = 1
+        self.combine_ops[str(iteration)] = nn.Conv2d(channels,channels,kernel,groups = channels)
+      self.states[edge[1]] = self.combine_ops[self.combine_index](h).squeeze()
+      
+    #CASE 5 - DIFFERENT C AND L (SE NETWORK)
+    else:
+      channels_in = h.shape[1]
+      channels_out = self.states[edge[1]].shape[1]
+      self.combine_ops[str(edge)] = (SEMIX(channels_in,channels_out)).cuda(self.device)
+      self.states[edge[1]] = self.combine_ops[str(edge)](self.states[edge[1]],h)
+      self.combine_index+=1
+
+  def _forward(self, op,edge,iteration):
+    h = op(self.states[edge[0]])
+    #CASE 1 - 1 INPUT
+    if not (edge[1] in self.states.keys()):
+      self.states[edge[1]] = h
+    #CASE 2 - 2 INPUTS OF SAME SIZE (ADD)
+    elif self.states[edge[1]].shape == h.shape:
+      self.states[edge[1]] = self.states[edge[1]] + h
+    #CASE 3 - 2 INPUTS, SAME LENGTH (CONCAT CHANNELS)
+    elif self.states[edge[1]].shape[2] == h.shape[2] and False:
+      self.states[edge[1]] = torch.cat((self.states[edge[1]], h),dim = 1)
+    #CASE 4 - 2 INPUTS SAME CHANNELS (MATMUL 2D CONV)
+    elif self.states[edge[1]].shape[1] == h.shape[1] and False:
+      h = self.combine(self.states[edge[1]], h)
+    else:
+      #try:
+      self.states[edge[1]] = self.combine_ops[str(edge)](self.states[edge[1]],h)
+      #except:
+      #  print(h.shape,op)
+      #  exit()
+      self.combine_index+=1
+
+  def forward(self,x):
+    #print("Starting Training -- shape:{}".format(x.shape))
+    self.combine_index = 0
+    self.states = {}
+    self.states["S"] = self.stem(x)
+    self.current_iteration = -1
+    hold = 0
+    #while self.current_iteration < len(self.edges)-1:
+    for iteration, (op,edge) in enumerate(zip(self.ops,self.edges)):
+      hold = self.combine_index
+      """
+      for i in self.states:
+        if not i in self.required_states[iteration] and i != "T":
+          del self.states[i]
+      """  
+      self._forward(op,edge,iteration)
+    #FC LAYER
+    x = self.global_pooling(self.states["T"])
+    x = self.classifier(x.squeeze())
+    return x
+=======
+
+  def forward(self,x):
+    self.states["S"] = x
+    for iteration,(op , edge) in enumerate(zip(self.ops ,self.edges)):
+      h = op(self.states[edge[0]])
+      #CASE 1 - 1 INPUT
+      if not (edge[1] in self.states.keys()):
+        self.states[edge[1]] = h
+      #CASE 2 - 2 INPUTS OF SAME SIZE (ADD)
+      elif self.states[edge[1]].shape = h.shape:
+        self.states[edge[1]] += h
+      #CASE 3 - 2 INPUTS, SAME LENGTH (CONCAT CHANNELS)
+      elif self.states[edge[1]].shape[2] = h.shape[2]:
+        self.states[edge[1]] = torch.cat((self.states[edge[1]], h),dim = 1)
+      #CASE 4 - 2 INPUTS SAME CHANNELS (MATMUL 2D CONV)
+      elif self.states[edge[1]].shape[1] = h.shape[1]:
+        h = self.combine(self.states[edge[1]], h)
+        if not iteration in self.combine_ops:
+          kernel = h.shape[-2:]
+          channels = h.shape[1]
+          kernel[torch.argmax(kernel)] = 1
+          self.combine_ops[iterations] = nn.conv2d(channels,channels,kernel_size,groups = channels)
+        self.states[edge[1]] = self.combine_ops[iteration](self.states[edge[1]],h)
+      #CASE 5 - DIFFERENT C AND L (SE NETWORK)
+      else:
+        if not iteration in self.combine_ops:
+          self.combine_ops[iterations] = SEMIX(channels_in,channels_out)
+        self.states[edge[1]] = self.combine_ops[iteration](self.states[edge[1]],h)
+      #FC LAYER
+      x = self.global_pooling(self.states["T"])
+      x = self.classifier(x)
+      return x
+>>>>>>> c70ed74e75b3df8a53477748326260f52205066a
+      
+    
+    
