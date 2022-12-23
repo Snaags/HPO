@@ -59,8 +59,12 @@ class train_eval:
     self.processes = []
     gpu = assign_gpu()
     self.gpu =gpu
+    print(population)
     for ID,i in enumerate(population):
-      c = i.get_dictionary()
+      if type(i) != dict:
+        c = i.get_dictionary()
+      else:
+        c = i 
       c["ID"] = len(self.config_list_full) + ID
       self.config_queue.put(c)
     

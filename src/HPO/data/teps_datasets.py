@@ -145,7 +145,7 @@ class TEPS(Dataset):
       for func in self.augmentations:
         x,y = func(x,y)
     if self.one_hot == False:
-      return x , y.long()
+      return x , y
     return x , y
 
   

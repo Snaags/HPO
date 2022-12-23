@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 import random 
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
-
+"""
 class BTC(Dataset):
   def __init__(self, window_size, prediction_distance, split = 5,augmentation = False,samples_per_class = None ,device = None):
     self.path ="{}/scripts/datasets/BTC/BTC.npy".format(os.environ["HOME"])
@@ -59,13 +59,6 @@ class BTC(Dataset):
     self.current_index += 1
     
     ##DEBUG
-    """
-    print("Dims of x: {}".format(x.shape))
-    print(y)
-    for i in range(10):
-      plt.plot(self.x_index_address[self.current_index-1][i,:])
-    plt.show()
-    """
 
   def generate_percent_labels(self, classes = [0.01,0.1,0.25,0.5,0.75,0.9,0.99,1]):
     abs_change = np.diff(self.x[:,3])
@@ -103,15 +96,42 @@ class BTC(Dataset):
     return self.n_features
   def __len__(self):
     return self.n_samples
+"""
 
+class BTC(Dataset):
+  def __init__(self,window_size,split,augmentation,device):
+    self.x = np.load("/home/cmackinnon/scripts/dataset/BTC/BTC_x.npy")
+    self.y = np.load("/home/cmackinnon/scripts/dataset/BTC/BTC_y.npy")
+    self.n_classes = 2
+    if split > 0.5:
+        self.x,self.y = self.x[int(split*self.x.shape[0]):], self.y[int(split*self.y.shape[0]):]
+    else:
+        self.x,self.y = self.x[:int(split*self.x.shape[0])], self.y[:int(split*self.y.shape[0])]
+    self.n_samples = self.x.shape[0] - window_size
+  def __getitem__(self, index):
+    x = self.x[index:window_size+index]
+    y = self.y[index+window_size]
+    if self.augmentation:
+      for func in self.augmentation:
+        x, y = func(x,y)
+    return x, y
+  
+  def get_n_classes(self):
+    return self.n_classes
+  def get_n_samples(self):
+    return self.n_samples
+  def get_n_features(self):
+    return self.n_features
+  def __len__(self):
+    return self.n_samples
 
 class Train(BTC):
 
-  def __init__(self, window_size = 500, split = 0.95 , pred_dist = 1, augmentation = False ,samples_per_class = None,device = None): 
-    super().__init__(window_size, split = split, prediction_distance = pred_dist, augmentation = augmentation , samples_per_class = samples_per_class, device =device)
+  def __init__(self, window_size = 500, split = 0.95 , augmentation = False device = None): 
+    super().__init__(window_size, split = split, augmentation = augmentation, device =device)
 
 class Test(BTC):
-  def __init__(self, window_size = 500, split = 0.05, pred_dist = 1,augmentation = False,samples_per_class = None,device = None): 
-    super().__init__(window_size, split = split, prediction_distance = pred_dist, augmentation = augmentation , samples_per_class = samples_per_class, device =device)
+  def __init__(self, window_size = 500, split = 0.05, augmentation = False,device = None): 
+    super().__init__(window_size, split = split, augmentation = augmentation , device =device)
 
 

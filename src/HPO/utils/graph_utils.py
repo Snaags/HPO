@@ -191,15 +191,50 @@ def traverse(x, g, ROUTES):
         x += path
         traverse(x,g,ROUTES)
 
-def gen_iter(edges,g, rate):
+def gen_iter(edges,g = None, rate=0.2,enable_new_sources = False):
+    if g == None:
+      g = nx.DiGraph(edges)
     if random.random() > rate:
+        #NEW PATH BETWEEN EXISTING NODES
+        sorted_nodes = [x for x in nx.topological_sort(g)]
+        number_valid = len(sorted_nodes) - 2 #["T"] is not valid as start and index at 0 
+        start_index = random.randint(0,number_valid)
+        new_source = sorted_nodes[start_index]
+        existing = [n for n in g.neighbors(new_source)]
+        valid = [n for n in sorted_nodes[start_index+1:] if not n in existing and not "S" in str(n)]
+        if len(valid) != 0:
+          new_end = random.choice(valid)
+          edges.append((new_source,new_end))
+        else:
+          #INSERT NODE
+          edge = random.choice(edges)
+          NEW_ID = len(edges)+1
+          idx = edges.index(edge)
+          edges[idx] = (edge[0],NEW_ID)
+          edges.append((NEW_ID,edge[1]))
+    elif random.random() > rate:
         #INSERT NODE
         edge = random.choice(edges)
         NEW_ID = len(edges)+1
-        edges.append((edge[0],NEW_ID))
+        idx = edges.index(edge)
+        edges[idx] = (edge[0],NEW_ID)
         edges.append((NEW_ID,edge[1]))
-        edges.remove(edge)
-    else:
+    elif enable_new_sources: #NEW SOURCE
+        sorted_nodes = [x for x in nx.topological_sort(g)]
+        current_source_num = 1
+        for i in sorted_nodes:
+          if "S" in str(i):
+            current_source_num += 1
+        sorted_nodes_no_source = [x for x in nx.topological_sort(g) if not "S" in str(x)]
+        edges.append(("S{}".format(current_source_num),random.choice(sorted_nodes_no_source)))
+    
+
+    return list(set(edges))
+"""
+def gen_iter(edges,g = None, rate=0.2):
+    if g == None:
+      g = nx.DiGraph(edges)
+    if random.random() > rate:
         #NEW PATH BETWEEN EXISTING NODES
         nodes = list(set([node for edge in edges for node in edge]))
         nodes.remove("T")
@@ -207,10 +242,32 @@ def gen_iter(edges,g, rate):
         nodes = set([node for edge in edges for node in edge])
         invalid = get_valid(new_source,g)
         valid = nodes - invalid
-        new_dest = random.choice(list(valid))
-        edges.append((new_source,new_dest))
+        valid = [ i for i in valid if not (new_source, i) in edges]
+        print(new_source, valid)
+        if len(valid) == 0:
+          #INSERT NODE
+          edge = random.choice(edges)
+          NEW_ID = len(edges)+1
+          #print("new node: {}".format(NEW_ID))
+          #edges.append((edge[0],NEW_ID))
+          idx = edges.index(edge)
+          edges[idx] = (edge[0],NEW_ID)
+          edges.append((NEW_ID,edge[1]))
+        else:
+          new_dest = random.choice(list(valid))
+          #print("new edge: {}".format((new_source,new_dest)))
+          edges.append((new_source,new_dest))
+    else:
+        #INSERT NODE
+        edge = random.choice(edges)
+        NEW_ID = len(edges)+1
+        #print("new node: {}".format(NEW_ID))
+        #edges.append((edge[0],NEW_ID))
+        idx = edges.index(edge)
+        edges[idx] = (edge[0],NEW_ID)
+        edges.append((NEW_ID,edge[1]))
     return list(set(edges))
-            
+    """        
 
 
 

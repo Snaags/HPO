@@ -4,23 +4,8 @@ import ConfigSpace.hyperparameters as CSH
 import ConfigSpace as CS
 import networkx as nx
 
-class GraphConfigSpace:
-  def __init__(self,n_operations = 30):
-    self.init_state = [("S",1)(1,"T")]
-  def sample_configuration(self,n_samples=1):
-    samples = []
-    while len(samples) < n_samples:
-      config = copy.copy(self.init_state)
-      while len(config) < n_operations:
-        config = gen_iter(config)
-      samples.append(config)
-    return samples
-  
-  
 
-
-
-def init_config(n_ops = 30):
+def get_ops(n_ops = 30):
 
   cs = CS.ConfigurationSpace()
 
@@ -55,6 +40,7 @@ def init_config(n_ops = 30):
     hp_list.append(CSH.UniformIntegerHyperparameter('op_{}_kernel'.format(i), lower = 2 , upper = 4))#kernel
     hp_list.append(CSH.UniformIntegerHyperparameter('op_{}_stride'.format(i), lower = 1 , upper = 4))#stride
     hp_list.append(CSH.UniformIntegerHyperparameter('op_{}_dil'.format(i), lower = 0 , upper = 4))#dilation
+    #hp_list.append(CSH.UniformIntegerHyperparameter('op_{}_channels'.format(i), lower = 2 , upper = 5))#channels
   cs.add_hyperparameters(hp_list)
   return cs
 
@@ -65,21 +51,23 @@ class GraphConfigSpace:
     self.g = nx.DiGraph
     self.n_operations = n_operations
     self.init_state = [("S",1),(1,"T")]
-    self.ops_cs = init_config(n_operations)
+    self.ops_cs = get_ops(n_operations)
   def sample_configuration(self,n_samples=1):
     samples = []
     while len(samples) < n_samples:
       graph = copy.copy(self.init_state)
-      rate = 1.6
+      rate = 1
       while len(graph) < self.n_operations:
-        rate  -= 0.005
+        rate = 0.5 
         self.g = nx.DiGraph()
         self.g.add_edges_from(graph)
         graph = gen_iter(graph,self.g,rate)
       ops = self.ops_cs.sample_configuration()
-      
       samples.append({"graph":graph,"ops":ops.get_dictionary()})
     return samples
   
   
 
+def init_config(n = 15):
+  graph = GraphConfigSpace(n)
+  return graph

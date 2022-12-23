@@ -135,6 +135,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
       correct = 0
     for i, (samples, labels) in enumerate( dataloader ):
       optimizer.zero_grad()
+      #samples, labels = samples.cuda(cuda_device).float(), labels.cuda(cuda_device).long()
       outputs = model(samples)
       if BINARY == True:
         loss = criterion(outputs.view(BATCH_SIZE), labels.float())
@@ -143,14 +144,14 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
       loss.backward()
       optimizer.step()
 
-      if i % PRINT_RATE_TRAIN == 0 and PRINT_RATE_TRAIN:
+      if PRINT_RATE_TRAIN and i % PRINT_RATE_TRAIN == 0:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,EPOCHS , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = BINARY)
       if logger != False:
         logger.update({"loss": loss.item(), "training_accuracy": (correct/total),"index" : i,
               "epoch": epoch, "validation_accuracy": acc, "lr":optimizer.param_groups[0]['lr'],"validation recall": recall })
     if hyperparameter["WEIGHT_AVERAGING_RATE"] and epoch % hyperparameter["WEIGHT_AVERAGING_RATE"] == 0:
         torch.save(model.state_dict() ,"SWA/run-{}-checkpoint-{}".format(run, epoch))
-    if epoch % hyperparameter["MODEL_VALIDATION_RATE"] == 0 and hyperparameter["MODEL_VALIDATION_RATE"] and epoch != 0:
+    if hyperparameter["MODEL_VALIDATION_RATE"] and epoch % hyperparameter["MODEL_VALIDATION_RATE"] == 0 and epoch != 0:
         if evaluator != None:
           model.eval()
           evaluator.forward_pass(model,binary = BINARY)

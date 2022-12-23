@@ -2,7 +2,7 @@ import json
 from HPO.utils.model_graph import ModelGraph
 from HPO.searchspaces.graph_search_space import GraphConfigSpace
 import numpy as np 
-from HPO.data.UEA_datasets import UEA_Train, UEA_Test, UEA_Full
+from HPO.data.btc_datasets import Train, Test
 import time
 import sys
 import os 

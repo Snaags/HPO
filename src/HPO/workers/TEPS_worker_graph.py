@@ -12,7 +12,7 @@ from HPO.utils.DARTS_utils import config_space_2_DARTS
 from HPO.utils.FCN import FCN 
 import pandas as pd
 import torch
-from HPO.data.teps_datasets import Train_TEPS , Test_TEPS
+from HPO.data.TEPS import TEPS 
 import torch.nn as nn
 from torch import Tensor
 from torch.utils.data import DataLoader, SubsetRandomSampler
@@ -60,8 +60,8 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
       augs = aug.initialise_augmentations(SETTINGS["AUGMENTATIONS"])
     else: 
       augs = None 
-    train_dataset = UEA_Train(name,cuda_device,augmentation = augs )
-    test_dataset = UEA_Test(name,cuda_device)
+    train_dataset = TEPS(train = True,cuda_device = cuda_device,augmentation = augs )
+    test_dataset = TEPS(train = False,cuda_device = cuda_device)
     #test_dataset = datasets.load_all(name,train_args,test_args)
 
     
@@ -82,7 +82,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
     #g = GraphConfigSpace(50)
     #s = g.sample_configuration()
     #s = s[0]
-    model = ModelGraph(train_dataset.get_n_features(),4,train_dataset.get_n_classes(),train_dataset.x.shape[2],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device)
+    model = ModelGraph(train_dataset.get_n_features(),16,train_dataset.get_n_classes(),train_dataset.x.shape[2],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device)
     if SETTINGS["COMPILE"]:
       model = torch.compile(model)
     model = model.cuda(device = cuda_device)

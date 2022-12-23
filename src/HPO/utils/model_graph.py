@@ -21,6 +21,7 @@ class ModelGraph(nn.Module):
   def __init__(self,n_features, n_channels, n_classes,signal_length, graph : list, op_graph : list,device,binary = False,data_dim = 1):
     super(ModelGraph,self).__init__()
     #INITIALISING MODEL VARIABLES
+    self.DEBUG = False
     self.device = device
     self.data_dim = data_dim
     self.n_features = n_features
@@ -99,8 +100,8 @@ class ModelGraph(nn.Module):
     self.states["S"] = x
     self.required_states = {}
     for iteration,(name , edge,keys) in enumerate(zip(OP_NAMES_ORDERED ,self.edges,OP_KEYS)):
-     
-      print(edge,self.combine_index,self.states[edge[0]].shape,name)
+      if self.DEBUG:
+        print(edge,self.combine_index,self.states[edge[0]].shape,name)
       """
       #This tracks the datastates that aren't required at each step so they can be deleted 
       #but it can only be used for inference since they are all needed to calculate the gradient.
@@ -159,10 +160,10 @@ class ModelGraph(nn.Module):
     elif self.states[edge[1]].shape[2] == h.shape[2] and False:
       self.states[edge[1]] = torch.cat((self.states[edge[1]], h),dim = 1)
     #CASE 4 - 2 INPUTS SAME CHANNELS (MATMUL 2D CONV)
-    elif self.states[edge[1]].shape[1] == h.shape[1]:
+    elif self.states[edge[1]].shape[1] == h.shape[1] and False:
       h = self.combine(self.states[edge[1]], h)
       if not self.combine_index in self.combine_ops:
-        #BUILD KERNEL OF SIZE L1,L2 THEN SETS LARGER DIM TO 1
+        #BUILD KERNEL OF SIZE L1,L2 THEN SETS LARGER DIM TO 3
         kernel = torch.tensor(h.shape[-2:])
         channels = h.shape[1]
         kernel[torch.argmax(kernel)] = 3
@@ -190,7 +191,7 @@ class ModelGraph(nn.Module):
     elif self.states[edge[1]].shape[2] == h.shape[2] and False:
       self.states[edge[1]] = torch.cat((self.states[edge[1]], h),dim = 1)
     #CASE 4 - 2 INPUTS SAME CHANNELS (MATMUL 2D CONV)
-    elif self.states[edge[1]].shape[1] == h.shape[1]:
+    elif self.states[edge[1]].shape[1] == h.shape[1] and False:
       h = self.combine(self.states[edge[1]], h)
       self.states[edge[1]] = self.combine_ops[str(edge)](h).squeeze()
     else:

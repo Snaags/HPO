@@ -1,4 +1,5 @@
 import torch
+from HPO.utils.model_graph import ModelGraph
 import torch.nn.functional as F
 from HPO.data.UEA_datasets import UEA_Train, UEA_Test, UEA_Full
 import time
@@ -30,10 +31,11 @@ import json
 from HPO.data.UEA_datasets import UEA_Train, UEA_Test, UEA_Full
 import csv
 class EnsembleManager:
-        def __init__(self , JSON_CONFIG):
+        def __init__(self , JSON_CONFIG,device):
                 with open(JSON_CONFIG,"r") as f:
                         data = json.load(f)
                 self.path = JSON_CONFIG[:-18]
+                self.cuda_device =device
                 self.accuracy,  self.recall, self.configs = self.load_hps(self.path)
                 self.SETTINGS = data["WORKER_CONFIG"]
                 self.test_dataset = UEA_Test(name = self.SETTINGS["DATASET_CONFIG"]["NAME"],device = 0)
@@ -79,7 +81,7 @@ class EnsembleManager:
                     for row in reader:
                         scores.append(float(row[0]))
                         recall.append(float(row[1]))
-                        config.append(eval("".join(row[2:])))
+                        config.append(eval("".join(row[2])))
             return scores, recall, config
     
         def find_all(self,acc):
@@ -91,26 +93,31 @@ class EnsembleManager:
 
         def try_build(self,index):
             hyperparameter = self.configs[index]
+            print(hyperparameter)
             ID = hyperparameter["ID"]
             weights = os.listdir("{}weights/".format(self.path))
             num_len = len(str(ID))
             for inst in weights:
-              if int(inst[-num_len:]) == int(ID):
+              if int(inst.split("-")[-1]) == int(ID):
+                print(inst,ID)
                 match = inst
                 break
-            try:
-              state = torch.load("{}weights/{}".format(self.path,match))
+
+            state = torch.load("{}weights/{}".format(self.path,match))
+            if "graph" in hyperparameter.keys():
+              print("loading graph")
+              model = ModelGraph( self.num_features, self.num_features,self.num_classes, self.test_dataset.x.shape[2],hyperparameter["graph"],hyperparameter["ops"],device = self.cuda_device)
+            else: 
+              print("loading cell")
               gen = config_space_2_DARTS(hyperparameter, reduction = True)
               model = NetworkMain(self.num_features,
-                              2**hyperparameter["channels"], num_classes= self.num_classes,
-                            layers = hyperparameter["layers"], auxiliary = False,
-                            drop_prob = self.SETTINGS["P"],genotype = gen, 
-                            binary = self.SETTINGS["BINARY"])
-              model.load_state_dict(state)
-              print("Loaded Weights")
-            except:
-              print("Weight mismatch")
-              return None, False
+                            2**hyperparameter["channels"], num_classes= self.num_classes,
+                          layers = hyperparameter["layers"], auxiliary = False,
+                          drop_prob = self.SETTINGS["P"],genotype = gen, 
+                          binary = self.SETTINGS["BINARY"])
+            model.load_state_dict(state)
+            #print("Loaded Weights")
+            #print("Weight mismatch")
             return model, True
 
         def load_state(path,ID):
@@ -147,6 +154,6 @@ class Ensemble(nn.Module):
 
 if __name__ == "__main__":
 	import sys
-	be = EnsembleManager(sys.argv[1])
+	be = EnsembleManager(sys.argv[1],0)
 	be.get_ensemble(10)
 	be.evaluate(2)
