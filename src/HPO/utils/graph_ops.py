@@ -54,6 +54,26 @@ class Zero(nn.Module):
       return x.mul(0.)
     return x[:,:,::self.stride].mul(0.)
 
+class DownSampleResolution(nn.Module):
+  """
+  This operation uses a depthwise convolution to reduce the signal resolution when needed.
+  Given a stride of 2 its a kernel of 2 etc. 
+  """
+  def __init__(self, stride, c_in):
+    self.conv1 = nn.Conv1d(c_in,c_in*stride, kernel_size =kernel_size, stride = stride, bias = False, groups = c)
+  def forward(self,x):
+    return self.conv1(x)
+
+class ReSampleChannels(nn.Module):
+  """
+  This operation uses a pointwise convolution to change the number of channels when needed.
+  Given a stride of 2 its a kernel of 2 etc. 
+  """
+  def __init__(self, stride, c_in,c_out):
+    self.conv1 = nn.Conv1d(c_in,c_out, kernel_size = 1, stride = 1, bias = False)
+  def forward(self,x):
+    return self.conv1(x)
+
 class GELU(nn.Module):
   def __init__(self):
     super(GELU,self).__init__()

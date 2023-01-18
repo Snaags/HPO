@@ -7,6 +7,7 @@ import copy
 import networkx as nx 
 from HPO.utils.graph_utils import get_reduction, Order, get_sorted_edges
 
+
 def transform_idx(original_list,original_list_permuted,new_list):
   """
   Takes in 3 arrays of the same shape and elements, an list_array which has been sorted in some way
@@ -18,7 +19,7 @@ def transform_idx(original_list,original_list_permuted,new_list):
   return list(np.asarray(new_list)[transform_idx])
 
 class ModelGraph(nn.Module):
-  def __init__(self,n_features, n_channels, n_classes,signal_length, graph : list, op_graph : list,device,binary = False,data_dim = 1):
+  def __init__(self,n_features, n_channels, n_classes,signal_length, graph : list, op_graph : list, op_node,device,binary = False,data_dim = 1,sigmoid = False):
     super(ModelGraph,self).__init__()
     #INITIALISING MODEL VARIABLES
     self.DEBUG = False
@@ -32,6 +33,7 @@ class ModelGraph(nn.Module):
     self.n_channels = n_channels
     self.OP_NAMES = []
     self.op_keys = []
+    self.op_node = op_node
 
     #EXTRACT OPERATIONS ORDER BASED ON GRAPH
     for i in range(len(self.graph)):
@@ -40,6 +42,7 @@ class ModelGraph(nn.Module):
 
     #STRUCTURES FOR HOLDING DATA STATES AND OPERATIONS
     self.states = {}
+    self.nodes  = {}
     self.ops = nn.ModuleList()
     self.combine_ops = nn.ModuleDict() 
     
@@ -78,6 +81,9 @@ class ModelGraph(nn.Module):
       self.classifier = nn.Linear(C, 1)
     else:
       self.classifier = nn.Linear(C, n_classes)
+    if sigmoid:
+      self.actfc = nn.Tanh()
+    self.sigmoid = sigmoid
   
   def _compile(self,size):
     """
@@ -96,7 +102,7 @@ class ModelGraph(nn.Module):
     OP_NAMES_ORDERED = transform_idx(self.graph,self.edges,self.OP_NAMES)
     OP_KEYS = transform_idx(self.graph,self.edges,self.op_keys)
     
-
+    
     self.states["S"] = x
     self.required_states = {}
     for iteration,(name , edge,keys) in enumerate(zip(OP_NAMES_ORDERED ,self.edges,OP_KEYS)):
@@ -109,7 +115,7 @@ class ModelGraph(nn.Module):
       for todo in self.edges[iteration:]:
         self.required_states[iteration].append(todo[0])
       """
-
+      self.node_ops     
       #GET NUMBER OF CHANNELS FROM PREVIOUS DATA STATE
       if edge[0] == "S":#INIT CHANNELS
         C = self.n_channels
@@ -120,6 +126,7 @@ class ModelGraph(nn.Module):
       stride = self.op_graph["op_{}_stride".format(keys)]
       kernel = self.op_graph["op_{}_kernel".format(keys)]
       dil = self.op_graph["op_{}_dil".format(keys)]
+      c_out = self.op_graph["op_{}_channels".format(keys)]
 
       #BUILD THE OPERATION
       if self.states[edge[0]].shape[2] > (stride*kernel):
@@ -221,6 +228,8 @@ class ModelGraph(nn.Module):
     #FC LAYER
     x = self.global_pooling(self.states["T"])
     x = self.classifier(x.squeeze())
+    if self.sigmoid:
+      x = self.actfc(x)
     return x
 
       

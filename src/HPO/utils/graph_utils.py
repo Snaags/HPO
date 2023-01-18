@@ -212,7 +212,7 @@ def gen_iter(edges,g = None, rate=0.2,enable_new_sources = False):
           idx = edges.index(edge)
           edges[idx] = (edge[0],NEW_ID)
           edges.append((NEW_ID,edge[1]))
-    elif random.random() > rate:
+    elif random.random() > rate or not enable_new_sources:
         #INSERT NODE
         edge = random.choice(edges)
         NEW_ID = len(edges)+1

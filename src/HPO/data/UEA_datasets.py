@@ -56,3 +56,4 @@ class UEA_Full(UEA):
   def __init__(self, name,device,**kwargs):
     name = ["{}_{}".format(name,"train") , "{}_{}".format(name,"test")]
     super(UEA_Full,self).__init__(name = name, device = device,**kwargs)
+

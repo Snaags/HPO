@@ -127,7 +127,7 @@ def Mutate(cs, parent_model : Model) -> Model:
      
   def graph_mutation(model : Model) -> Model:
     old = copy.deepcopy(model.graph)
-    model.graph = gen_iter(model.graph)
+    model.graph = gen_iter(model.graph,enable_new_sources = False,rate = 0.5)
     if len(old) == len(model.graph):
       print("graph mutate failed")
       print(old)

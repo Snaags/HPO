@@ -151,6 +151,39 @@ class Evaluator:
     self.n_classes = n_classes
     self.n_total = 0 #Total number of values
     self.confusion_matrix = np.zeros(shape = (n_classes,n_classes)) #Matrix of prediction vs true values
+
+  def regression(self,model,index,hp):
+    path = hp["PATH"]
+    outputs= []
+    outputs_raw= []
+    raw_data = torch.swapaxes(self.testloader.dataset.x,1,0).detach().cpu().numpy()
+    lossFn = F.mse_loss
+    loss = 0
+    labels = []
+    with torch.no_grad():
+      for sample, label in self.testloader:
+        out_raw = model(sample)
+        out = F.tanh(model(sample))
+        labels.append(label)
+        loss += lossFn(out,label.squeeze())
+        outputs.append(out)
+        outputs_raw.append(out_raw)
+    print("Validation loss: {}".format(loss)) 
+    preds = torch.cat(outputs).detach().cpu().numpy()
+    preds_raw = torch.cat(outputs_raw).detach().cpu().numpy()
+    labels = torch.cat(labels).detach().cpu().numpy()
+    fig, ax = plt.subplots(nrows =3, figsize = (19,10))
+    ax[0].plot(preds,label = "Prediction")
+    ax[0].plot(labels,label = "Ground Truth")
+    plt.legend()
+    ax[1].plot(raw_data[:,3],label = "Ticker")
+    ax[2].plot(labels,label = "Ground Truth")
+    ax[2].plot(preds_raw,label = "Prediction")
+    plt.legend()
+    plt.savefig("{}/Regression Results {} (MSE: {}).png".format(path,index,loss.item()))
+    plt.close()
+    
+
   
   def score_naswot(self,model,loader):
     #nw = naswot(model,loader,self.batch_size,self.cuda_device)

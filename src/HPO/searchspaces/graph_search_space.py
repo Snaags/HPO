@@ -68,6 +68,6 @@ class GraphConfigSpace:
   
   
 
-def init_config(n = 15):
+def init_config(n = 30):
   graph = GraphConfigSpace(n)
   return graph
