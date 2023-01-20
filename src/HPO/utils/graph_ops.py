@@ -6,9 +6,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 OPS = {
-  'avg_pool' : lambda C,kernel, stride,dil, affine: nn.AvgPool1d((2**kernel)-1, stride=stride, padding = (2**kernel//2) -1, count_include_pad=False),
+  'avg_pool_3_1' : lambda C,kernel, stride,dil, affine: nn.AvgPool1d((2**kernel)-1, stride=stride, padding = (2**kernel//2) -1, count_include_pad=False),
  
-  'max_pool' : lambda C,kernel, stride,dil, affine: nn.MaxPool1d((2**kernel)-1, stride=stride,padding = ((2**kernel)//2) -1),
+  'max_pool_3_1' : lambda C,kernel, stride,dil, affine: nn.MaxPool1d((2**kernel)-1, stride=stride,padding = ((2**kernel)//2) -1),
   'gelu' : lambda C,kernel, stride,dil, affine: GELU(),
   'batch_norm' : lambda C,kernel, stride,dil, affine: BatchNorm(C,affine = affine),
   'point_conv' : lambda C,kernel, stride,dil, affine: PointConv(C, stride ,affine = affine),
@@ -67,7 +67,6 @@ class DownSampleResolution(nn.Module):
 class ReSampleChannels(nn.Module):
   """
   This operation uses a pointwise convolution to change the number of channels when needed.
-  Given a stride of 2 its a kernel of 2 etc. 
   """
   def __init__(self, stride, c_in,c_out):
     self.conv1 = nn.Conv1d(c_in,c_out, kernel_size = 1, stride = 1, bias = False)

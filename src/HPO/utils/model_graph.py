@@ -8,6 +8,30 @@ import networkx as nx
 from HPO.utils.graph_utils import get_reduction, Order, get_sorted_edges
 
 
+
+class Node(nn.Module):
+  """
+  Resolution should never increase here
+  """
+  def __init__(self,name, join, stride, length_out,channels):
+    super(Node,self).__init__()
+    self.name = name
+    self.join_op = join
+    self.stride = stride
+    self.scale_length
+    self.out_channels = channels 
+    self.activation = None
+    self.normalisation = None
+    self.state = 0
+    
+  def forward(self,x):
+    """
+    if the node has a stride of 2 then everything gets halfed in resolution.
+    """
+     
+    
+
+
 def transform_idx(original_list,original_list_permuted,new_list):
   """
   Takes in 3 arrays of the same shape and elements, an list_array which has been sorted in some way
@@ -55,7 +79,7 @@ class ModelGraph(nn.Module):
     if data_dim == 2:
       STEM_PADDING = 32
       STEM_STRIDE = 2 
-      self.stem = nn.Conv2d(n_features,n_channels,1,stride = STEM_STRIDE ,padding = STEM_PADDING)
+      self.stem = nn.Conv2d(n_features,n_channels,2,stride = STEM_STRIDE ,padding = STEM_PADDING)
     else:
       self.stem = nn.Conv1d(n_features,n_channels,1) #Will just leave this at defaults for now
     self.stem = self.stem.cuda(device)
@@ -98,35 +122,17 @@ class ModelGraph(nn.Module):
       x = torch.rand(size = (batch, self.n_features,size)).cuda(self.device)
     x = self.stem(x)
 
-    #REORDERS THE OPERATION LIST AND THE LIST OF OPERATION PARAMETERS TO MATCH THE TOPOLOGICALLY SORTED GRAPH
-    OP_NAMES_ORDERED = transform_idx(self.graph,self.edges,self.OP_NAMES)
-    OP_KEYS = transform_idx(self.graph,self.edges,self.op_keys)
-    
-    
     self.states["S"] = x
-    self.required_states = {}
     for iteration,(name , edge,keys) in enumerate(zip(OP_NAMES_ORDERED ,self.edges,OP_KEYS)):
       if self.DEBUG:
         print(edge,self.combine_index,self.states[edge[0]].shape,name)
-      """
-      #This tracks the datastates that aren't required at each step so they can be deleted 
-      #but it can only be used for inference since they are all needed to calculate the gradient.
-      self.required_states[iteration] = []
-      for todo in self.edges[iteration:]:
-        self.required_states[iteration].append(todo[0])
-      """
-      self.node_ops     
+      
       #GET NUMBER OF CHANNELS FROM PREVIOUS DATA STATE
       if edge[0] == "S":#INIT CHANNELS
         C = self.n_channels
       else:
         C = self.states[edge[0]].shape[1]
       
-      #DEFINE THE PARAMETERS OF THE OPERATION  
-      stride = self.op_graph["op_{}_stride".format(keys)]
-      kernel = self.op_graph["op_{}_kernel".format(keys)]
-      dil = self.op_graph["op_{}_dil".format(keys)]
-      c_out = self.op_graph["op_{}_channels".format(keys)]
 
       #BUILD THE OPERATION
       if self.states[edge[0]].shape[2] > (stride*kernel):
