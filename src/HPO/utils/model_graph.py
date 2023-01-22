@@ -8,17 +8,37 @@ import networkx as nx
 from HPO.utils.graph_utils import get_reduction, Order, get_sorted_edges
 
 
+def propagate_resolution(g,down_sample_nodes)
+  res_dict = {}
+  for n in g.nodes():
+      res_dict[n] = 1
+  nodes = list(nx.topological_sort(g))
+  for i in nodes:
+      if i in down_sample_nodes:
+          update_list = list(nx.bfs_tree(g, source=i).nodes())
+          for _nodes in update_list:
+              res_dict[_nodes] *=2
+  g = nx.DiGraph()
+  g.add_edges_from(edges)
+  plt.figure(figsize = (19,12))
+  nx.draw(
+      g, edge_color='black', width=1, linewidths=1,
+      node_size=500, node_color='pink', alpha=0.9,
+      labels={node: "{}({})".format(node,res_dict[node]) for node in g.nodes()}
+      )
+  plt.axis('off')
+  plt.savefig("resolutions")
+  return res_dict
 
 class Node(nn.Module):
   """
   Resolution should never increase here
   """
-  def __init__(self,name, join, stride, length_out,channels):
+  def __init__(self,name, join, stride, length,channels):
     super(Node,self).__init__()
     self.name = name
     self.join_op = join
-    self.stride = stride
-    self.scale_length
+    self.scale_length = length
     self.out_channels = channels 
     self.activation = None
     self.normalisation = None

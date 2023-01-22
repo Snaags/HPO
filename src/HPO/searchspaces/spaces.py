@@ -3,58 +3,66 @@
 #Hierarchical
 #Graph
 
-    hp_list = []
-    for i in range(n_ops):  
-      hp_list.append(CSH.CategoricalHyperparameter('op_{}'.format(i), choices=conv_ops))
-      hp_list.append(CSH.UniformIntegerHyperparameter('op_{}_kernel'.format(i), lower = 2 , upper = 4))#kernel
-      hp_list.append(CSH.UniformIntegerHyperparameter('op_{}_stride'.format(i), lower = 1 , upper = 4))#stride
-      hp_list.append(CSH.UniformIntegerHyperparameter('op_{}_dil'.format(i), lower = 0 , upper = 4))#dilation
-      hp_list.append(CSH.UniformIntegerHyperparameter('op_{}_channels'.format(i), lower = 2 , upper = 5))#channels
-    cs.add_hyperparameters(hp_list)
-
-class Topology:
-  def __init__(self):
-
-class Operations:
-  def __init__(self,op_set): 
-      self.hp_list = []
-      self.op_set
-  def generate_config_space(self,names)
-      for i in names: 
-      hp_list.append(CSH.CategoricalHyperparameter('op_{}'.format(i), choices=conv_ops))
     
 
-def generate_ops(op_set, names,parameter_list = None):
-  if parameter_list == None:
-    parameter_list =[]
-  for i in names:
-      parameter_list.append(CSH.CategoricalHyperparameter('{}_{}'.format(i[0],i[1]), choices=op_set))
-  return parameter_list
 
-def generate_ops(op_set, names,parameter_list = None):
+def generate_ops(op_set, location , name ,parameter_list = None):
   if parameter_list == None:
     parameter_list =[]
-  for i in names:
-      parameter_list.append(CSH.CategoricalHyperparameter('{}_{}'.format(i[0],i[1]), choices=op_set))
+  if len(op_set) == 1:
+    for i in location:
+      parameter_list.append(CSH.Constant("{}_{}".format(i,name),value = op_set[0]))
+  else:
+    for i in location:
+      parameter_list.append(CSH.CategoricalHyperparameter('{}_{}'.format(i,name), choices=op_set))
   return parameter_list
 
 class SearchSpace:
-  def __init__(self,topology : str, operations : list):
+  def __init__(self,JSON):
+    #LOAD JSON DATA
+    GRAPH_SIZE = 
+    GRAPH_RATE = 
+    EDGE_OPERATIONS = 
+    
+    #GENERATE GRAPH
     self.edges_op = []
     self.nodes_op = []
     self.graph = []
-  
-  def generate_search_space(self):
+    self.hyperparameters = []
+
+    #GENERATE EDGE OPS
+    self.hyperparameters = generate_ops(EDGE_OPERATIONS, self.graph, "OP",self.hyperparameters)
+    
+    #GENERATE NODE OPS
+    self.hyperparameters = generate_ops(NODE_ACTIVATIONS, self.nodes, "activation",self.hyperparameters)
+    self.hyperparameters = generate_ops(NODE_NORMALISATION, self.nodes, "normalisation",self.hyperparameters)
+    
+    #Here the same node can be selected twice to allow for a larger downsampling 
+    self.hyperparameters = generate_ops(self.nodes, downsample_quantity, "downsample",self.hyperparameters)
+
+    #This channel variation should be for that op only allowing for bottlenecks and expansions.
+    self.hyperparameters = generate_ops([0.25,0.5,1,2,4], self.nodes, "channel_ratio",self.hyperparameters)
+    
 
 
 
 
+def build_bottleneck_graph():
+  bottleneck_graph = [(0,1),(1,2),(2,3),(0,3)]
+  bottleneck_ops = {
+    "0_1_OP": "skip_connect",
+    "1_2_OP": "conv_3",
+    "2_3_OP": "skip_connect",
+    "0_3_OP": "skip_connect",
+
+  }
+  node_ops = {
+    "1_activation" : "relu","1_normalisation": "batch_norm",
+    "2_activation" : "relu","2_normalisation": "batch_norm",
+    
+  }
 
 
-bottleneck_graph = [(0,1),(1,2),(2,3),(0,3)]
-bottleneck_ops = {"0_1": "skip", }
-bottleneck_node= {1: }
-      
 class Bottleneck(nn.Module):
     expansion = 4
     def __init__(self, in_channels, out_channels, i_downsample=None, stride=1):
