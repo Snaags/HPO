@@ -1,4 +1,4 @@
-import torch.nn as nn
+import torchf.nn as nn
 import torch
 import numpy as np
 import HPO.utils.graph_ops as OPS1D
@@ -8,7 +8,40 @@ import networkx as nx
 from HPO.utils.graph_utils import get_reduction, Order, get_sorted_edges
 
 
-def propagate_resolution(g,down_sample_nodes)
+def propagate_channels(edges,ops):
+  down_sample_nodes = []
+  g = nx.DiGraph()
+  g.add_edges_from(edges)
+  for i in ops:
+    if "channel" in i:
+      down_sample_nodes.append(i.split("_")[0])
+  res_dict = {}
+  for n in g.nodes():
+      res_dict[n] = 1
+  nodes = list(nx.topological_sort(g))
+  for i in nodes:
+      if i in down_sample_nodes:
+          update_list = list(nx.bfs_tree(g, source=i).nodes())
+          for _nodes in update_list:
+              res_dict[_nodes] *= ops["{}_channel_ratio"]
+  plt.figure(figsize = (19,12))
+  nx.draw(
+      g, edge_color='black', width=1, linewidths=1,
+      node_size=500, node_color='pink', alpha=0.9,
+      labels={node: "{}({})".format(node,res_dict[node]) for node in g.nodes()}
+      )
+  plt.axis('off')
+  plt.savefig("resolutions")
+  return res_dict
+
+
+def propagate_resolution(edges, ops):
+  down_sample_nodes = []
+  g = nx.DiGraph()
+  g.add_edges_from(edges)
+  for i in ops:
+    if "stride" in i:
+      down_sample_nodes.append(i.split("_")[0])
   res_dict = {}
   for n in g.nodes():
       res_dict[n] = 1
@@ -18,8 +51,6 @@ def propagate_resolution(g,down_sample_nodes)
           update_list = list(nx.bfs_tree(g, source=i).nodes())
           for _nodes in update_list:
               res_dict[_nodes] *=2
-  g = nx.DiGraph()
-  g.add_edges_from(edges)
   plt.figure(figsize = (19,12))
   nx.draw(
       g, edge_color='black', width=1, linewidths=1,
@@ -34,21 +65,26 @@ class Node(nn.Module):
   """
   Resolution should never increase here
   """
-  def __init__(self,name, join, stride, length,channels):
+  def __init__(self,ID,data,length,channels):
     super(Node,self).__init__()
     self.name = name
-    self.join_op = join
-    self.scale_length = length
-    self.out_channels = channels 
-    self.activation = None
-    self.normalisation = None
-    self.state = 0
+    self.combine = data["{}_combine"] 
+    self.length = length
+    self.channels = channels 
+    self.activation = data["{}_activation"]
+    self.normalisation = data["{}_normalisation"]
     
-  def forward(self,x):
-    """
-    if the node has a stride of 2 then everything gets halfed in resolution.
-    """
-     
+  def generate_edge(self,node_previous) -> list: 
+    ops = []
+    if self.channels != node_previous.channels:
+      ops.append(OPS["resample_channels"](self.node_previous.channels,self.channels))
+    self.stride = node_previous.length / self.length
+    if self.stride != 1:
+      assert(self.stride %2 == 0)
+      ops.append(OPS["downsample_resolution"](self.channels,self.stride))
+    ops.append(OPS[self.normalisation]) 
+    ops.append(OPS[self.activation]) 
+    return ops
     
 
 
@@ -63,7 +99,7 @@ def transform_idx(original_list,original_list_permuted,new_list):
   return list(np.asarray(new_list)[transform_idx])
 
 class ModelGraph(nn.Module):
-  def __init__(self,n_features, n_channels, n_classes,signal_length, graph : list, op_graph : list, op_node,device,binary = False,data_dim = 1,sigmoid = False):
+  def __init__(self,n_features, n_channels, n_classes,signal_length, graph : list, ops : list, device,binary = False,data_dim = 1,sigmoid = False):
     super(ModelGraph,self).__init__()
     #INITIALISING MODEL VARIABLES
     self.DEBUG = False
@@ -71,18 +107,10 @@ class ModelGraph(nn.Module):
     self.data_dim = data_dim
     self.n_features = n_features
     self.graph = copy.copy(graph)
-    self.edges = get_sorted_edges(graph)
+    self.sorted_graph = get_sorted_edges(graph)
     self.current_iteration = -1
-    self.op_graph = op_graph
     self.n_channels = n_channels
-    self.OP_NAMES = []
-    self.op_keys = []
-    self.op_node = op_node
-
-    #EXTRACT OPERATIONS ORDER BASED ON GRAPH
-    for i in range(len(self.graph)):
-      self.OP_NAMES.append(op_graph["op_{}".format(i)])
-      self.op_keys.append(i)
+    self.ops = ops
 
     #STRUCTURES FOR HOLDING DATA STATES AND OPERATIONS
     self.states = {}
@@ -109,6 +137,15 @@ class ModelGraph(nn.Module):
       self.OP_MODULE = OPS2D
     else:
       self.OP_MODULE = OPS1D
+  
+    #BUILD NODES
+    self.resolution_dict = propagate_resolution(self.sorted_graph, self.ops)
+    self.channel_dict = propagate_channels(self.sorted_graph, self.ops)
+    g = nx.Digraph()
+    g.add_edges(self.sorted_graph)
+    for i in g.nodes():
+      self.nodes[i] = Node(i,self.ops,self.resoltion_dict[i]*signal_length, self.channel_dict[i]*n_channels)
+
 
     #BUILDS THE OPERATIONS ALONG EDGES BASED ON N_CHANNELS OF PREVIOUS OP
     self._compile(signal_length)
@@ -143,27 +180,35 @@ class ModelGraph(nn.Module):
     x = self.stem(x)
 
     self.states["S"] = x
-    for iteration,(name , edge,keys) in enumerate(zip(OP_NAMES_ORDERED ,self.edges,OP_KEYS)):
+    
+    #ITERATE THROUGH EDGES
+    for iteration,edge in enumerate(self.sorted_graph):
+
       if self.DEBUG:
         print(edge,self.combine_index,self.states[edge[0]].shape,name)
-      
+ 
+      #INITIALISE CONTAINER FOR EDGE OPERATIONS 
+      edge_container = nn.Sequencial()
+
+      #GET OP AND NODE DATA
+      curr_op = self.ops["{}_{}_OP".format(edge[0],edge[1])]
+      curr_node = self.nodes[edge[1]]
+      node_ops = curr_node.generate_edge(self.nodes[edge[0]])
+
       #GET NUMBER OF CHANNELS FROM PREVIOUS DATA STATE
       if edge[0] == "S":#INIT CHANNELS
         C = self.n_channels
       else:
-        C = self.states[edge[0]].shape[1]
+        C = self.nodes[edge[0]].channels
       
-
       #BUILD THE OPERATION
-      if self.states[edge[0]].shape[2] > (stride*kernel):
-        op = self.OP_MODULE.OPS[name](C, kernel,stride,dil , True).cuda(self.device)
-      else:
-        op = self.OP_MODULE.OPS[name](C, kernel,1,1 , True).cuda(self.device)
-        
-      #ADD OP TO THE MODULE LIST AND PASS THROUGH DATA
-      self.ops.append(op)
-      self._forward_build(op,edge,iteration)
+      edge_container.append( self.OP_MODULE.OPS[name](C).cuda(self.device))
+      edge_container.append(node_ops) 
+       
 
+      #ADD OP TO THE MODULE LIST AND PASS THROUGH DATA
+      self.ops.append(edge_container)
+      
 
   def combine(self,x1,x2):
     """
@@ -212,28 +257,16 @@ class ModelGraph(nn.Module):
       self.states[edge[1]] = self.combine_ops[str(edge)](self.states[edge[1]],h)
       self.combine_index+=1
 
-  def _forward(self, op,edge,iteration):
+  def _forward(self, op,edge):
     h = op(self.states[edge[0]])
     #CASE 1 - 1 INPUT
     if not (edge[1] in self.states.keys()):
       self.states[edge[1]] = h
     #CASE 2 - 2 INPUTS OF SAME SIZE (ADD)
-    elif self.states[edge[1]].shape == h.shape:
+    elif self.nodes[edge[1]].combine == "ADD":
       self.states[edge[1]] = self.states[edge[1]] + h
-    #CASE 3 - 2 INPUTS, SAME LENGTH (CONCAT CHANNELS)
-    elif self.states[edge[1]].shape[2] == h.shape[2] and False:
+    elif self.nodes[edge[1]].combine == "CONCAT":
       self.states[edge[1]] = torch.cat((self.states[edge[1]], h),dim = 1)
-    #CASE 4 - 2 INPUTS SAME CHANNELS (MATMUL 2D CONV)
-    elif self.states[edge[1]].shape[1] == h.shape[1] and False:
-      h = self.combine(self.states[edge[1]], h)
-      self.states[edge[1]] = self.combine_ops[str(edge)](h).squeeze()
-    else:
-      #try:
-      self.states[edge[1]] = self.combine_ops[str(edge)](self.states[edge[1]],h)
-      #except:
-      #  print(h.shape,op)
-      #  exit()
-      self.combine_index+=1
 
   def forward(self,x):
     #print("Starting Training -- shape:{}".format(x.shape))
@@ -244,13 +277,7 @@ class ModelGraph(nn.Module):
     hold = 0
     #while self.current_iteration < len(self.edges)-1:
     for iteration, (op,edge) in enumerate(zip(self.ops,self.edges)):
-      hold = self.combine_index
-      """
-      for i in self.states:
-        if not i in self.required_states[iteration] and i != "T":
-          del self.states[i]
-      """  
-      self._forward(op,edge,iteration)
+      self._forward(op,edge)
     #FC LAYER
     x = self.global_pooling(self.states["T"])
     x = self.classifier(x.squeeze())

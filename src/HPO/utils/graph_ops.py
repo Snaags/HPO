@@ -16,7 +16,9 @@ OPS = {
   'skip_connect' : lambda C, kernel, stride,dil, affine: Identity(),
   'max_pool_3x3' : lambda C, stride, affine: nn.MaxPool1d(3, stride=stride, padding=1),
   'avg_pool_3x3' : lambda C, stride, affine: nn.AvgPool1d(3, stride=stride, padding=1, count_include_pad=False),
-
+  'resample_channel' : lambda c_in,c_out: ResampleChannels(c_in,c_out),
+  'downsample_resolution' : lambda c_in,c_out: ResampleChannels(c_in,c_out),
+  
   'max_pool_3x3' : lambda C, stride, affine: nn.MaxPool1d(3, stride=stride, padding=1),
   #'avg_pool_31x31' : lambda C, stride, affine: nn.AvgPool1d(31, stride=stride, padding=15, count_include_pad=False),
   #'max_pool_31x31' : lambda C, stride, affine: nn.MaxPool1d(31, stride=stride, padding=15),
@@ -54,21 +56,21 @@ class Zero(nn.Module):
       return x.mul(0.)
     return x[:,:,::self.stride].mul(0.)
 
-class DownSampleResolution(nn.Module):
+class DownsampleResolution(nn.Module):
   """
   This operation uses a depthwise convolution to reduce the signal resolution when needed.
   Given a stride of 2 its a kernel of 2 etc. 
   """
-  def __init__(self, stride, c_in):
-    self.conv1 = nn.Conv1d(c_in,c_in*stride, kernel_size =kernel_size, stride = stride, bias = False, groups = c)
+  def __init__(self, c_in,stride):
+    self.conv1 = nn.Conv1d(c_in,c_in*stride, kernel_size =stride, stride = stride, bias = False, groups = c)
   def forward(self,x):
     return self.conv1(x)
 
-class ReSampleChannels(nn.Module):
+class ResampleChannels(nn.Module):
   """
   This operation uses a pointwise convolution to change the number of channels when needed.
   """
-  def __init__(self, stride, c_in,c_out):
+  def __init__(self,c_in,c_out):
     self.conv1 = nn.Conv1d(c_in,c_out, kernel_size = 1, stride = 1, bias = False)
   def forward(self,x):
     return self.conv1(x)

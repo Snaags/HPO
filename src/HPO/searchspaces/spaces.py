@@ -37,30 +37,100 @@ class SearchSpace:
     self.hyperparameters = generate_ops(NODE_ACTIVATIONS, self.nodes, "activation",self.hyperparameters)
     self.hyperparameters = generate_ops(NODE_NORMALISATION, self.nodes, "normalisation",self.hyperparameters)
     
-    #Here the same node can be selected twice to allow for a larger downsampling 
+    #Here the same node can be selected twice to allow for a larger downsampling
+    #THIS NEEDS TO BE CHANGED!!!!
     self.hyperparameters = generate_ops(self.nodes, downsample_quantity, "downsample",self.hyperparameters)
 
     #This channel variation should be for that op only allowing for bottlenecks and expansions.
     self.hyperparameters = generate_ops([0.25,0.5,1,2,4], self.nodes, "channel_ratio",self.hyperparameters)
-    
+   
 
+def graph_joiner(old,new):
+  #FLATTEN THE GRAPH TO GET HIGHEST NODE (USING NETWORKX)
+  g = nx.DiGraph()
+  g.add_edges_from(old)
+  _max = 0
+  for e in g.nodes():
+    if e > _max:
+      _max = e
+  #ADD MAX TO ALL VALUES IN NEW SET
+  for i in new:
+    old.append((i[0]+_max , i[1] + _max))
+  return old
 
+def op_joiner(old,new):
+  _max = 0
+  for n in old:
+    for i in n.split("_"):
+      if i.isdigit():
+        if i > _max:
+          _max = i
 
+  for n in new:
+    split_key = n.split("_")
+    for e,i in enumerate(split_key):
+      if i.isdigit():
+        split_key[e] += _max
+    old["_".join(split_key)] = new[n]
+  return old 
 
-def build_bottleneck_graph():
-  bottleneck_graph = [(0,1),(1,2),(2,3),(0,3)]
+def build_bottleneck(stride = 1):
+  graph = [(0,1),(1,2),(2,3),(0,3),(3,4)]
   bottleneck_ops = {
     "0_1_OP": "skip_connect",
     "1_2_OP": "conv_3",
     "2_3_OP": "skip_connect",
     "0_3_OP": "skip_connect",
-
+    "3_4_OP": "skip_connect",
   }
   node_ops = {
-    "1_activation" : "relu","1_normalisation": "batch_norm",
-    "2_activation" : "relu","2_normalisation": "batch_norm",
+    "1_activation" : "relu","1_normalisation": "batch_norm","1_stride": 1,"1_channel_ratio":0.25 if stride == 1 else stride,
+    "2_activation" : "relu","2_normalisation": "batch_norm","2_stride": stride,"2_channel_ratio":1,
+    "3_activation" : "none","3_normalisation": "batch_norm","3_stride": 1,"3_channel_ratio":4,
+    "4_activation" : "relu","4_normalisation": "none","4_stride": 1,"4_channel_ratio":1,
     
   }
+  ops = bottlneck_ops | node_ops
+  return graph, ops
+
+
+def make_layer(blocks, stride=1):
+  g,op = build_bottleneck(stride = stride)
+  
+  for i in range(blocks-1):
+    g_i , op_i = build_bottleneck()
+    g = graph_joiner(g,g_i)
+    op = op_joiner(op,op_i)
+  return g , op    
+  
+
+def build_resnet(self,  layer_list):
+    ops = {"S_0_OP": "max_pool_3","0_activation" : "relu","0_normalisation": "batch_norm","0_stride": 2,"0_channel_ratio":1}
+    graph = [("S",0)]
+    
+  
+    g_new, ops_new = make_layer(layer_list[0])
+    graph = graph_joiner(graph,graph_new)
+    ops = op_joiner(ops,ops_new)
+
+    g_new, ops_new = make_layer(layer_list[1], stride=2)
+    graph = graph_joiner(graph,graph_new)
+    ops = op_joiner(ops,ops_new)
+
+    g_new, ops_new = make_layer(layer_list[2], stride=2)
+    graph = graph_joiner(graph,graph_new)
+    ops = op_joiner(ops,ops_new)
+
+    g_new, ops_new = make_layer(layer_list[3], stride=2)
+    graph = graph_joiner(graph,graph_new)
+    ops = op_joiner(ops,ops_new)
+    g = nx.Digraph()
+    g.add_edges(graph)
+    for i in g.nodes():
+      ops["{}_combine".format(i)] = "ADD"
+
+    return graph, ops
+
 
 
 class Bottleneck(nn.Module):
