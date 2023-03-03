@@ -83,8 +83,8 @@ class TEPS(Dataset):
               break
     
     data = []
-    self.x_index_address = {}
-    self.y_index_address = {}
+    self.x = {}
+    self.y = {}
     self.window = window_size
     for i in files:
       data.append(np.load(path+i))
@@ -107,13 +107,16 @@ class TEPS(Dataset):
       self.true_n_samples = self.n_samples
       self.n_samples *= samples_per_epoch
     self.labels = torch.Tensor(self.labels)
+    self.x = torch.stack(list(self.x.values()), dim=0)
+    self.y = torch.stack(list(self.y.values()), dim=0)
+    print(self.y.shape)
   def add_to_dataset(self,x,y):
     if self.one_hot == True:
-      self.x_index_address[self.current_index] = torch.from_numpy(np.swapaxes(x,0,1)).float().cuda(device = self.device )
-      self.y_index_address[self.current_index] = F.one_hot(torch.from_numpy(np.unique(y)).long(),num_classes = self.n_classes).cuda(device = self.device).long()
+      self.x[self.current_index] = torch.from_numpy(np.swapaxes(x,0,1)).float().cuda(device = self.device )
+      self.y[self.current_index] = F.one_hot(torch.from_numpy(np.unique(y)).long(),num_classes = self.n_classes).cuda(device = self.device).long()
     else:
-      self.x_index_address[self.current_index] = torch.from_numpy(np.swapaxes(x,0,1)).float().cuda(device = self.device )
-      self.y_index_address[self.current_index] = torch.from_numpy(np.unique(y)).cuda(device = self.device).long()
+      self.x[self.current_index] = torch.from_numpy(np.swapaxes(x,0,1)).float().cuda(device = self.device )
+      self.y[self.current_index] = torch.from_numpy(np.unique(y)).cuda(device = self.device).long()
     self.samples_per_class[int(y[0])] += x.shape[0]
     self.current_index += 1
     self.labels.append(y[0])
@@ -131,7 +134,7 @@ class TEPS(Dataset):
   def disable_augmentation(self):
     self.augmentations = False
 
-  def update_augmentation(self, augmentations):
+  def enable_augmentation(self, augmentations):
     self.augmentations = augmentations
   def __getitem__(self, index):
     #index_address keys are the first usable index in a batch for the window size
@@ -139,8 +142,8 @@ class TEPS(Dataset):
     if self.samples_per_epoch > 1:
       if index >= self.true_n_samples-2:
         index = index % (self.true_n_samples-2)
-    x = self.x_index_address[index]
-    y = self.y_index_address[index]
+    x = self.x[index]
+    y = self.y[index]
     if self.augmentations:
       for func in self.augmentations:
         x,y = func(x,y)
@@ -162,11 +165,11 @@ class TEPS(Dataset):
 
 class Train_TEPS(TEPS):
 
-  def __init__(self, window_size = 500, augmentations = False,samples_per_class = None,binary = False,one_hot = True,samples_per_epoch = 1,PATH= None,device = None,sub_set_classes = None): 
+  def __init__(self, window_size = 500, augmentations = False,samples_per_class = None,binary = False,one_hot = False,samples_per_epoch = 1,PATH= None,device = None,sub_set_classes = None): 
     super().__init__(window_size, True, augmentations,samples_per_class,binary = binary ,one_hot = one_hot,samples_per_epoch = samples_per_epoch,PATH = PATH,device = device,sub_set_classes = sub_set_classes)
 
 class Test_TEPS(TEPS):
 
   def __init__(self, window_size = 500, augmentations = False,samples_per_class = None,binary = False,one_hot = False,samples_per_epoch = 1,device = None,sub_set_classes = None): 
-    super().__init__(window_size,  False , augmentations,samples_per_class,binary = binary ,one_hot = one_hot,samples_per_epoch = samples_per_epoch,device = device,sub_set_classes = sub_set_classes)
+    super().__init__(window_size,  False , augmentations = augmentations,samples_per_class = samples_per_class,binary = binary ,one_hot = one_hot,samples_per_epoch = samples_per_epoch,device = device,sub_set_classes = sub_set_classes)
 

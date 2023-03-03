@@ -57,23 +57,33 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
     augs = aug.initialise_augmentations(SETTINGS["AUGMENTATIONS"])
   else: 
     augs = None
-  if SETTINGS["CROSS_VALIDATION_FOLDS"] == False: 
+  if SETTINGS["RESAMPLES"]:
+    dataset = UEA_Full(name, cuda_device,augmentation = augs)
+    kfold = KFold(n_splits = 2, shuffle = True)
+    splits = [(None,None)]*SETTINGS["RESAMPLES"]
+    train_dataset = dataset
+    test_dataset = dataset
+  elif SETTINGS["CROSS_VALIDATION_FOLDS"] == False: 
     train_dataset = UEA_Train(name,cuda_device,augmentation = augs )
     test_dataset = UEA_Test(name,cuda_device)
     splits = [(None,None)]
-  else:
+  elif SETTINGS["CROSS_VALIDATION_FOLDS"]:
     dataset = UEA_Full(name, cuda_device)
     kfold = KFold(n_splits = SETTINGS["CROSS_VALIDATION_FOLDS"], shuffle = True)
     splits = kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy())
     train_dataset = dataset
     test_dataset = dataset
+
   n_classes = train_dataset.get_n_classes()
   multibatch = False
   torch.cuda.empty_cache()
-
+  
+  
   for fold, (train_ids, test_ids) in enumerate(splits):    
     print('---Fold No.--{}--------------------'.format(fold))
     torch.cuda.empty_cache()
+    if SETTINGS["RESAMPLES"]:
+      train_ids, test_ids = next(kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy()))
     if SETTINGS["CROSS_VALIDATION_FOLDS"]: 
       # Sample elements randomly from a given list of ids, no replacement.
       train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
@@ -98,8 +108,9 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
     #g = GraphConfigSpace(50)
     #s = g.sample_configuration()
     #s = s[0]
-    model = ModelGraph(train_dataset.get_n_features(),32,train_dataset.get_n_classes(),train_dataset.x.shape[2],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device)
+    model = ModelGraph(train_dataset.get_n_features(),64,train_dataset.get_n_classes(),train_dataset.x.shape[2],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device)
     if SETTINGS["COMPILE"]:
+      torch.set_float32_matmul_precision('high')
       model = torch.compile(model)
     model = model.cuda(device = cuda_device)
     """
@@ -127,8 +138,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
 
 
 if __name__ == "__main__":
-  for i in range(500):
     with open(sys.argv[1]) as f:
       HP = json.load(f)["WORKER_CONFIG"]
-      HP["ID"] = i
+      HP["ID"] = "val"
     _compute(HP,3,sys.argv[1])

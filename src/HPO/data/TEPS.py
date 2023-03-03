@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 class TEPS(Dataset):
 
-  def __init__(self, train: bool, augmentation = None, cuda_device = 0):
+  def __init__(self, train: bool, augmentation = None, cuda_device = 0,**kwargs):
     PATH = "/home/cmackinnon/scripts/datasets/TEPS/"
     self.cuda_device = cuda_device
     if train:
@@ -22,6 +22,10 @@ class TEPS(Dataset):
     self.augmentation = augmentation
   def get_labels(self):
     return self.y
+  def disable_augmentation(self):
+    self.augmentation = False
+  def enable_augmentation(self,aug):
+    self.augmentation = aug
 
   def __getitem__(self, index):
     x, y = self.x[index], self.y[index]
@@ -44,10 +48,10 @@ class TEPS(Dataset):
 class Train_TEPS(TEPS):
 
   def __init__(self, window_size = 500, augmentations = False,samples_per_class = None,binary = False,one_hot = True,samples_per_epoch = 1,PATH= None,device = None,sub_set_classes = None): 
-    super().__init__(window_size, True, augmentations,samples_per_class,binary = binary ,one_hot = one_hot,samples_per_epoch = samples_per_epoch,PATH = PATH,device = device,sub_set_classes = sub_set_classes)
+    super(Train_TEPS,self).__init__(True, augmentations,samples_per_class = samples_per_class,binary = binary ,one_hot = one_hot,samples_per_epoch = samples_per_epoch,PATH = PATH,device = device,sub_set_classes = sub_set_classes)
 
 class Test_TEPS(TEPS):
 
   def __init__(self, window_size = 500, augmentations = False,samples_per_class = None,binary = False,one_hot = False,samples_per_epoch = 1,device = None,sub_set_classes = None): 
-    super().__init__(window_size,  False , augmentations,samples_per_class,binary = binary ,one_hot = one_hot,samples_per_epoch = samples_per_epoch,device = device,sub_set_classes = sub_set_classes)
+    super(Test_TEPS,self).__init__(False , augmentations,samples_per_class,binary = binary ,one_hot = one_hot,samples_per_epoch = samples_per_epoch,device = device,sub_set_classes = sub_set_classes)
 

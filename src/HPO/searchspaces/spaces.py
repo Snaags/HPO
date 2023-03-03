@@ -1,9 +1,86 @@
+from HPO.searchspaces.resnet import build_resnet, ResNet50
+import random
 #ResNet
 #Cell
 #Hierarchical
 #Graph
 
-    
+def random_ops_unweighted(ops, data):
+  for i in ops:
+    if "OP" in i:
+      ops[i] = random.choice(data["EDGE_OPERATIONS"])
+  return ops
+
+def random_activation_unweighted(ops,data):
+  for i in ops:
+    if "activation" in i:
+      ops[i] = random.choice(data["ACTIVATION_FUNCTIONS"])
+  return ops
+
+def random_normalisation_unweighted(ops,data):
+  for i in ops:
+    if "normalisation" in i:
+      ops[i] = random.choice(data["NORMALISATION_FUNCTIONS"])
+  return ops
+
+
+class FixedModel:
+  """
+  Fixed model can be used for testing or hyperparameter search etC
+  """
+  def __init__(self, model):
+    self.model = model
+  def sample_configuration(self, num):
+    return [self.model] * num
+
+
+class ResNetSearchSpace:
+  def __init__(self, JSON):
+    self.data = JSON["ARCHITECTURE_CONFIG"]
+    self.EDGE_OPERATIONS = self.data["EDGE_OPERATIONS"]
+
+
+  def generate_layers(self):
+    x = [1]
+    for i in range(random.randint(self.data["MIN_LAYERS"]-1,self.data["MAX_LAYERS"]-1)):
+      if random.random() < (1/len(x)):
+        x.append(1)
+      else:
+        x[random.randint(0,len(x)-1)] += 1
+    return x
+      
+
+
+  def sample_configuration(self, num):
+    configs = []
+    for i in range(num):
+      m = build_resnet(self.generate_layers())
+      m["ops"] = random_ops_unweighted(m["ops"],self.data)
+      m["ops"] = random_activation_unweighted(m["ops"],self.data)
+      m["ops"] = random_normalisation_unweighted(m["ops"],self.data)
+      configs.append(m)
+    print(configs)
+    return configs
+
+
+def resnet_search_space(JSON_CONFIG):
+  return ResNetSearchSpace(JSON_CONFIG)
+
+
+def init_config():
+  return FixedModel(ResNet50())
+     
+
+class FixedTopology:
+  def __init__(self, JSON):
+    with open(JSON) as conf:
+      data = json.load(conf)
+    self.model = model
+
+  def   generate_ops(self):
+    ops = self.model["ops"]
+    "OP"
+
 
 
 def generate_ops(op_set, location , name ,parameter_list = None):
@@ -20,9 +97,9 @@ def generate_ops(op_set, location , name ,parameter_list = None):
 class SearchSpace:
   def __init__(self,JSON):
     #LOAD JSON DATA
-    GRAPH_SIZE = 
-    GRAPH_RATE = 
-    EDGE_OPERATIONS = 
+    GRAPH_SIZE = None
+    GRAPH_RATE = None
+    EDGE_OPERATIONS = None 
     
     #GENERATE GRAPH
     self.edges_op = []
@@ -45,226 +122,3 @@ class SearchSpace:
     self.hyperparameters = generate_ops([0.25,0.5,1,2,4], self.nodes, "channel_ratio",self.hyperparameters)
    
 
-def graph_joiner(old,new):
-  #FLATTEN THE GRAPH TO GET HIGHEST NODE (USING NETWORKX)
-  g = nx.DiGraph()
-  g.add_edges_from(old)
-  _max = 0
-  for e in g.nodes():
-    if e > _max:
-      _max = e
-  #ADD MAX TO ALL VALUES IN NEW SET
-  for i in new:
-    old.append((i[0]+_max , i[1] + _max))
-  return old
-
-def op_joiner(old,new):
-  _max = 0
-  for n in old:
-    for i in n.split("_"):
-      if i.isdigit():
-        if i > _max:
-          _max = i
-
-  for n in new:
-    split_key = n.split("_")
-    for e,i in enumerate(split_key):
-      if i.isdigit():
-        split_key[e] += _max
-    old["_".join(split_key)] = new[n]
-  return old 
-
-def build_bottleneck(stride = 1):
-  graph = [(0,1),(1,2),(2,3),(0,3),(3,4)]
-  bottleneck_ops = {
-    "0_1_OP": "skip_connect",
-    "1_2_OP": "conv_3",
-    "2_3_OP": "skip_connect",
-    "0_3_OP": "skip_connect",
-    "3_4_OP": "skip_connect",
-  }
-  node_ops = {
-    "1_activation" : "relu","1_normalisation": "batch_norm","1_stride": 1,"1_channel_ratio":0.25 if stride == 1 else stride,
-    "2_activation" : "relu","2_normalisation": "batch_norm","2_stride": stride,"2_channel_ratio":1,
-    "3_activation" : "none","3_normalisation": "batch_norm","3_stride": 1,"3_channel_ratio":4,
-    "4_activation" : "relu","4_normalisation": "none","4_stride": 1,"4_channel_ratio":1,
-    
-  }
-  ops = bottlneck_ops | node_ops
-  return graph, ops
-
-
-def make_layer(blocks, stride=1):
-  g,op = build_bottleneck(stride = stride)
-  
-  for i in range(blocks-1):
-    g_i , op_i = build_bottleneck()
-    g = graph_joiner(g,g_i)
-    op = op_joiner(op,op_i)
-  return g , op    
-  
-
-def build_resnet(self,  layer_list):
-    ops = {"S_0_OP": "max_pool_3","0_activation" : "relu","0_normalisation": "batch_norm","0_stride": 2,"0_channel_ratio":1}
-    graph = [("S",0)]
-    
-  
-    g_new, ops_new = make_layer(layer_list[0])
-    graph = graph_joiner(graph,graph_new)
-    ops = op_joiner(ops,ops_new)
-
-    g_new, ops_new = make_layer(layer_list[1], stride=2)
-    graph = graph_joiner(graph,graph_new)
-    ops = op_joiner(ops,ops_new)
-
-    g_new, ops_new = make_layer(layer_list[2], stride=2)
-    graph = graph_joiner(graph,graph_new)
-    ops = op_joiner(ops,ops_new)
-
-    g_new, ops_new = make_layer(layer_list[3], stride=2)
-    graph = graph_joiner(graph,graph_new)
-    ops = op_joiner(ops,ops_new)
-    g = nx.Digraph()
-    g.add_edges(graph)
-    for i in g.nodes():
-      ops["{}_combine".format(i)] = "ADD"
-
-    return graph, ops
-
-
-
-class Bottleneck(nn.Module):
-    expansion = 4
-    def __init__(self, in_channels, out_channels, i_downsample=None, stride=1):
-        super(Bottleneck, self).__init__()
-        
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
-        self.batch_norm1 = nn.BatchNorm2d(out_channels)
-        
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=stride, padding=1)
-        self.batch_norm2 = nn.BatchNorm2d(out_channels)
-        
-        self.conv3 = nn.Conv2d(out_channels, out_channels*self.expansion, kernel_size=1, stride=1, padding=0)
-        self.batch_norm3 = nn.BatchNorm2d(out_channels*self.expansion)
-        
-        self.i_downsample = i_downsample
-        self.stride = stride
-        self.relu = nn.ReLU()
-        
-    def forward(self, x):
-        identity = x.clone()
-        x = self.relu(self.batch_norm1(self.conv1(x)))
-        
-        x = self.relu(self.batch_norm2(self.conv2(x)))
-        
-        x = self.conv3(x)
-        x = self.batch_norm3(x)
-        
-        #downsample if needed
-        if self.i_downsample is not None:
-            identity = self.i_downsample(identity)
-        #add identity
-        x+=identity
-        x=self.relu(x)
-        
-        return x
-
-class Block(nn.Module):
-    expansion = 1
-    def __init__(self, in_channels, out_channels, i_downsample=None, stride=1):
-        super(Block, self).__init__()
-       
-
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, stride=stride, bias=False)
-        self.batch_norm1 = nn.BatchNorm2d(out_channels)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, stride=stride, bias=False)
-        self.batch_norm2 = nn.BatchNorm2d(out_channels)
-
-        self.i_downsample = i_downsample
-        self.stride = stride
-        self.relu = nn.ReLU()
-
-    def forward(self, x):
-      identity = x.clone()
-
-      x = self.relu(self.batch_norm2(self.conv1(x)))
-      x = self.batch_norm2(self.conv2(x))
-
-      if self.i_downsample is not None:
-          identity = self.i_downsample(identity)
-      print(x.shape)
-      print(identity.shape)
-      x += identity
-      x = self.relu(x)
-      return x
-
-
-        
-        
-class ResNet(nn.Module):
-    def __init__(self, ResBlock, layer_list, num_classes, num_channels=3):
-        super(ResNet, self).__init__()
-        self.ops = {}
-        self.graph = []
-        self.nodes = {}
-
-        self.in_channels = 64
-        
-        self.conv1 = nn.Conv2d(num_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        self.batch_norm1 = nn.BatchNorm2d(64)
-        self.relu = nn.ReLU()
-        self.max_pool = nn.MaxPool2d(kernel_size = 3, stride=2, padding=1)
-        
-        self.layer1 = self._make_layer(ResBlock, layer_list[0], planes=64)
-        self.layer2 = self._make_layer(ResBlock, layer_list[1], planes=128, stride=2)
-        self.layer3 = self._make_layer(ResBlock, layer_list[2], planes=256, stride=2)
-        self.layer4 = self._make_layer(ResBlock, layer_list[3], planes=512, stride=2)
-        
-        self.avgpool = nn.AdaptiveAvgPool2d((1,1))
-        self.fc = nn.Linear(512*ResBlock.expansion, num_classes)
-        
-    def forward(self, x):
-        x = self.relu(self.batch_norm1(self.conv1(x)))
-        x = self.max_pool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-        
-        x = self.avgpool(x)
-        x = x.reshape(x.shape[0], -1)
-        x = self.fc(x)
-        
-        return x
-        
-    def _make_layer(self, ResBlock, blocks, planes, stride=1):
-        ii_downsample = None
-        layers = []
-        
-        if stride != 1 or self.in_channels != planes*ResBlock.expansion:
-            ii_downsample = nn.Sequential(
-                nn.Conv2d(self.in_channels, planes*ResBlock.expansion, kernel_size=1, stride=stride),
-                nn.BatchNorm2d(planes*ResBlock.expansion)
-            )
-            
-        layers.append(ResBlock(self.in_channels, planes, i_downsample=ii_downsample, stride=stride))
-        self.in_channels = planes*ResBlock.expansion
-        
-        for i in range(blocks-1):
-            layers.append(ResBlock(self.in_channels, planes))
-            
-        return nn.Sequential(*layers)
-
-def ResNetGraph():
-  graph = []
-  ops = {}
-  nodes = {}
-
-
-
-def ResNet50(num_classes, channels=3):
-    """
-    should return graph, nodes and ops
-    """
-    return ResNet(Bottleneck, [3,4,6,3], num_classes, channels)      

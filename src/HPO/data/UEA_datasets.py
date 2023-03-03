@@ -24,7 +24,6 @@ class UEA(Dataset):
         """
         for c in classes:
             np.where(self.y == c)
-
         """
     self.n_classes = len(torch.unique(self.y))
     self.n_features = self.x.shape[1]

@@ -35,7 +35,7 @@ def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tens
     peak_acc = acc
   # Save the canvas
   print("Epoch (",str(epoch),"/",str(epochs), ") Accuracy: ","%.2f" % acc, "Iteration(s) (", str(iteration),"/",str(n_iter), ") Loss: "
-    ,"%.2f" % loss," Correct / Total : {} / {} ".format(correct , total),  end = '\r')
+    ,"%.6f" % loss," Correct / Total : {} / {} ".format(correct , total),  end = '\r')
   return correct ,total ,peak_acc
 
 def train_model_triplet(model : Model , hyperparameter : dict, dataloader : DataLoader , epochs : int, 

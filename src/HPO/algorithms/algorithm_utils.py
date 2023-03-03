@@ -28,6 +28,10 @@ class train_eval:
       SETTINGS = json.load(f)["SEARCH_CONFIG"]
     self.num_worker = SETTINGS["CORES"]
     self.filename = "{}/{}".format(SETTINGS["PATH"],SETTINGS["FILE_NAME"])
+    if SETTINGS["RESUME"] == True:
+      self.ID_INIT = len(os.listdir(SETTINGS["PATH"]+"/metrics/"))
+    else:
+      self.ID_INIT = 0
     self.JSON_CONFIG = json_config
     self.config_queue = Queue()
     self.gpu_slots = Queue()
@@ -59,13 +63,13 @@ class train_eval:
     self.processes = []
     gpu = assign_gpu()
     self.gpu =gpu
-    print(population)
     for ID,i in enumerate(population):
       if type(i) != dict:
         c = i.get_dictionary()
       else:
-        c = i 
-      c["ID"] = len(self.config_list_full) + ID
+        c = i
+      if not "ID" in c:
+        c["ID"] = len(self.config_list_full) + ID + self.ID_INIT
       self.config_queue.put(c)
     
     #Initialise GPU slots

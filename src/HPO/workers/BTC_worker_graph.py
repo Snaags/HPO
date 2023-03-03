@@ -63,8 +63,8 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
       augs = aug.initialise_augmentations(SETTINGS["AUGMENTATIONS"])
     else: 
       augs = None 
-    train_dataset = Train(SETTINGS["WINDOW_SIZE"],0.6,device = cuda_device,augmentation = augs )
-    test_dataset = Test(SETTINGS["WINDOW_SIZE"],0.1,device = cuda_device)
+    train_dataset = Train(SETTINGS["WINDOW_SIZE"],0.94,device = cuda_device,augmentation = augs )
+    test_dataset = Test(SETTINGS["WINDOW_SIZE"],0.05,device = cuda_device)
     #test_dataset = datasets.load_all(name,train_args,test_args)
 
     
@@ -85,10 +85,12 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
     #g = GraphConfigSpace(50)
     #s = g.sample_configuration()
     #s = s[0]
-    model = ModelGraph(train_dataset.get_n_features(),32,train_dataset.get_n_classes(),SETTINGS["WINDOW_SIZE"],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device,sigmoid = False)
+    model = ModelGraph(train_dataset.get_n_features(),64,train_dataset.get_n_classes(),SETTINGS["WINDOW_SIZE"],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device,sigmoid = False)
     if SETTINGS["COMPILE"]:
       model = torch.compile(model)
-    model = model.cuda(device = cuda_device)
+    model = nn.DataParallel(model,device_ids = [0,1,2,3])
+  
+    model = model.cuda()
     """
     ### Train the model
     """

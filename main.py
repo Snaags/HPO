@@ -10,20 +10,23 @@ import json
 from datetime import datetime
 
 def main(JSON_CONFIG):
-  #CREATE EXPERIMENT DIRECTORY AND LOAD JSON DATA
-  date = "".join(str(datetime.now()).split(" "))
-  os.system("mkdir experiments/{}".format(date))
-  os.system("mkdir experiments/{}/weights".format(date))
   with open(JSON_CONFIG) as conf:
     data = json.load(conf)
+  if not data["SEARCH_CONFIG"]["RESUME"]:
+    #CREATE EXPERIMENT DIRECTORY AND LOAD JSON DATA
+    date = "".join(str(datetime.now()).split(" "))
+    os.system("mkdir experiments/{}".format(date))
+    os.system("mkdir experiments/{}/weights".format(date))
+  else: 
+    date = data["SEARCH_CONFIG"]["PATH"]
   #IMPORT MODULES
   _worker = importlib.import_module("HPO.workers.{}".format(data["WORKER_MODULE_NAME"])) 
-  _config =importlib.import_module("HPO.searchspaces.{}".format(data["CONFIG_MODULE_NAME"])) 
+  _config =importlib.import_module("HPO.searchspaces.spaces") 
   _algorithm = importlib.import_module("HPO.algorithms.{}".format(data["SEARCH_MODULE_NAME"])) 
   #DEFINE FUNCTIONS FROM MODULES
   algorithm = _algorithm.main
   worker = _worker.compute
-  config = _config.init_config()  
+  config = eval("_config.{}({})".format(data["CONFIG_MODULE_NAME"],data))
   #STORE DATA IN EXPERIMENT JSON FILE 
   data["DATE"] = date
   data["START_TIME"] = time.time()

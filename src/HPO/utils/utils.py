@@ -135,3 +135,23 @@ def create_exp_dir(path, scripts_to_save=None):
 
 
 
+import pandas as pd
+
+class MetricLogger:
+  def __init__(self,PATH):
+    self.performance_data = {"ID": [],"accuracy": [], "recall":[]}
+    self.PATH = PATH
+    if not os.path.exists("{}/{}".format(PATH,"metrics")):
+      os.mkdir("{}/metrics".format(self.PATH))
+  def update(self, new_data : dict):
+    for i in new_data:
+      self.performance_data[i].append(new_data[i])
+
+    df = pd.DataFrame.from_dict(self.performance_data)
+    df.to_csv("{}/{}/{}".format(self.PATH,"metrics",new_data["ID"]))
+
+
+
+
+
+

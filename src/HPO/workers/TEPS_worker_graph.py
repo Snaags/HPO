@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 import random
 import HPO.utils.augmentation as aug
 from HPO.utils.train_utils import collate_fn_padd
-from HPO.utils.train import train_model, auto_train_model
+from HPO.utils.train import train_model
 from HPO.utils.weight_freezing import freeze_FCN, freeze_resnet
 from HPO.utils.ResNet1d import resnet18
 from HPO.utils.files import save_obj
@@ -82,7 +82,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
     #g = GraphConfigSpace(50)
     #s = g.sample_configuration()
     #s = s[0]
-    model = ModelGraph(train_dataset.get_n_features(),16,train_dataset.get_n_classes(),train_dataset.x.shape[2],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device)
+    model = ModelGraph(train_dataset.get_n_features(),32,train_dataset.get_n_classes(),train_dataset.x.shape[2],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device)
     if SETTINGS["COMPILE"]:
       model = torch.compile(model)
     model = model.cuda(device = cuda_device)
