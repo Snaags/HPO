@@ -1,5 +1,6 @@
-from HPO.searchspaces.utils import graph_joiner, op_joiner
+from HPO.searchspaces.utils import *
 import networkx as nx
+import random
 
 def build_cell_graph(n_nodes = 4):
     graph = []
@@ -12,7 +13,55 @@ def build_cell_graph(n_nodes = 4):
         source_list.append(end_node)
         graph.append((end_node,n_nodes +3))
     ops["{}_combine".format(n_nodes +3 )] = "CONCAT" 
+    graph = prune_cell(graph,n_nodes)
     return graph, ops
+
+def generate_cell_ops(graph,ops,data,n_nodes = 4):
+    nodes = [i for i in range(3,n_nodes+3)]
+    op_edges = []
+    skip_edges = []
+    for edge in graph:
+        if edge[1] in nodes:
+            op_edges.append(edge)
+        else:
+            skip_edges.append(edge)
+
+    g = nx.DiGraph()
+    g.add_edges_from(op_edges)
+    ops_temp = generate_op_names(g)
+    ops_temp = random_ops_unweighted(ops_temp, data)
+    ops_temp = random_activation_unweighted(ops_temp,data)
+    ops_temp = random_normalisation_unweighted(ops_temp,data)
+    for i in ops_temp:
+        if not i in ops:
+            ops[i] = ops_temp[i]
+    g = nx.DiGraph()
+    g.add_edges_from(skip_edges)
+    ops_temp = generate_skip(g)
+    for i in ops_temp:
+        if not i in ops:
+            ops[i] = ops_temp[i]
+
+    return ops
+
+
+def prune_cell(graph, n_nodes = 4):
+    nodes = [i for i in range(3,n_nodes+3)]
+    count_list = {}
+    for i in nodes:
+        count_list[i] = 0
+    for edge in graph:
+        if edge[1] in nodes:
+            count_list[edge[1]] += 1
+    while max(count_list.values()) > 2:
+        edge = random.choice(graph)
+        if edge[1] in nodes and count_list[edge[1]] > 1:
+            graph.remove(edge)
+            count_list[edge[1]] -= 1
+    return graph
+
+
+
 
 def replace_cell_inputs(graph,ops,outputs):
     g = nx.DiGraph()
@@ -43,19 +92,80 @@ def build_macro( n_nodes = 8, n_cells = 5, reduction_freq = 3):
         #graph , ops = replace_cell_inputs(graph,ops,cell_outputs) #REPLACE "K-1","K-2" PLACEHOLDERS
         cell_outputs.append((n_nodes+3) + (n_nodes+3)*layer)
         graph.extend([(cell_outputs[-3],cell_outputs[-1]-((n_nodes+2))),((cell_outputs[-2],cell_outputs[-1]-(n_nodes+1)))])
-        if layer % reduction_freq == 0 and layer != 0:
+        if layer % reduction_freq == 0 and layer != 0 and layer != n_cells -1 :
             ops["{}_channel_ratio".format(cell_outputs[-1]-(n_nodes+2))] = 2
             ops["{}_channel_ratio".format(cell_outputs[-1]-(n_nodes+1))] = 2
             ops["{}_stride".format(cell_outputs[-1]-(n_nodes+2))] = 2
             ops["{}_channel_ratio".format(cell_outputs[-1]-(n_nodes+1))] = 2
 
-        print(graph)
 
-        
+    g = nx.DiGraph()
+    g.add_edges_from(graph)
+    nodes = list(nx.topological_sort(g))
+    for idx ,(e_0,e_1) in enumerate(graph):
+        if e_1 == nodes[-1]:
+            hold = (list(graph[idx])[0], "T")
+            graph[idx] = tuple(hold)
 
+    hold_dict = {}
+    rm_list = []
+    for idx ,op in enumerate(ops):
+        if op.split("_")[0] == nodes[0]:
+            ops[("{}_{}".format("S",op.split("_")[1]))] = ops[op]
+        if int(op.split("_")[0]) == nodes[-1]:
+            hold_dict[("{}_{}".format("T",op.split("_")[1]))] = ops[op]
+            rm_list.append(op)
+    for i in rm_list:
+        del ops[i]
+    ops.update(hold_dict)
     return graph, ops
 
+def build_macro_repeat(data, n_nodes = 8, n_cells = 5, reduction_freq = 3):
+    """
+    Builds the graph of a cell style search space
+    """
+    graph = []
+    ops = {}
+    cell_outputs = ["S","S"]
+    graph_new , ops_new = build_cell_graph(n_nodes)
+    ops_new = generate_cell_ops(graph_new,ops_new,data,n_nodes = n_nodes)
+    for layer in range(n_cells):
 
+
+
+        
+        graph  = graph_joiner(graph,graph_new)
+        ops  = op_joiner(ops,ops_new)
+        #graph , ops = replace_cell_inputs(graph,ops,cell_outputs) #REPLACE "K-1","K-2" PLACEHOLDERS
+        cell_outputs.append((n_nodes+3) + (n_nodes+3)*layer)
+        graph.extend([(cell_outputs[-3],cell_outputs[-1]-((n_nodes+2))),((cell_outputs[-2],cell_outputs[-1]-(n_nodes+1)))])
+        if layer % reduction_freq == 0 and layer != 0 and layer != n_cells -1 :
+            ops["{}_channel_ratio".format(cell_outputs[-1]-(n_nodes+2))] = 2
+            ops["{}_channel_ratio".format(cell_outputs[-1]-(n_nodes+1))] = 2
+            ops["{}_stride".format(cell_outputs[-1]-(n_nodes+2))] = 2
+            ops["{}_channel_ratio".format(cell_outputs[-1]-(n_nodes+1))] = 2
+
+
+    g = nx.DiGraph()
+    g.add_edges_from(graph)
+    nodes = list(nx.topological_sort(g))
+    for idx ,(e_0,e_1) in enumerate(graph):
+        if e_1 == nodes[-1]:
+            hold = (list(graph[idx])[0], "T")
+            graph[idx] = tuple(hold)
+
+    hold_dict = {}
+    rm_list = []
+    for idx ,op in enumerate(ops):
+        if op.split("_")[0] == nodes[0]:
+            ops[("{}_{}".format("S",op.split("_")[1]))] = ops[op]
+        if int(op.split("_")[0]) == nodes[-1]:
+            hold_dict[("{}_{}".format("T",op.split("_")[1]))] = ops[op]
+            rm_list.append(op)
+    for i in rm_list:
+        del ops[i]
+    ops.update(hold_dict)
+    return graph, ops
             
 
         
@@ -86,3 +196,4 @@ if __name__ == "__main__":
         plt.axis('off')
         plt.savefig("test") 
     plot_graph(c[0])
+    print(c)

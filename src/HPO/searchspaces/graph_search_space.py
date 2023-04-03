@@ -1,4 +1,5 @@
 from HPO.utils.graph_utils import gen_iter
+from HPO.searchspaces.utils import *
 import copy
 import ConfigSpace.hyperparameters as CSH
 import ConfigSpace as CS
@@ -33,6 +34,7 @@ def get_ops(n_ops = 30):
     #'attention_channel']
   
 
+
   ###DARTS###
   hp_list = []
   for i in range(n_ops):  
@@ -46,12 +48,14 @@ def get_ops(n_ops = 30):
 
 
 
+
+
 class GraphConfigSpace:
-  def __init__(self,n_operations = 30):
+  def __init__(self,JSON):
+    self.data = JSON["ARCHITECTURE_CONFIG"]
     self.g = nx.DiGraph
-    self.n_operations = n_operations
+    self.n_operations = 50
     self.init_state = [("S",1),(1,"T")]
-    self.ops_cs = get_ops(n_operations)
   def sample_configuration(self,n_samples=1):
     samples = []
     while len(samples) < n_samples:
@@ -62,12 +66,21 @@ class GraphConfigSpace:
         self.g = nx.DiGraph()
         self.g.add_edges_from(graph)
         graph = gen_iter(graph,self.g,rate)
-      ops = self.ops_cs.sample_configuration()
-      samples.append({"graph":graph,"ops":ops.get_dictionary()})
+      self.g.add_edges_from(graph)
+      ops = generate_op_names(self.g)
+      ops = random_ops_unweighted(ops, self.data)
+      ops = random_activation_unweighted(ops,self.data)
+      ops = random_normalisation_unweighted(ops,self.data)
+      ops = random_combine_unweighted(ops,self.data)
+      del ops["T_stride"]
+      del ops["T_channel_ratio"]
+      del ops["S_stride"]
+      del ops["S_channel_ratio"]
+      ops = random_strides(ops,self.data["STRIDE_COUNT"])
+      ops["stem"] = random.choice(self.data["STEM_SIZE"])
+
+      samples.append({"graph":graph,"ops":copy.copy(ops)})
     return samples
   
   
 
-def init_config(n = 30):
-  graph = GraphConfigSpace(n)
-  return graph

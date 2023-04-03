@@ -1,0 +1,68 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class MultiResAtt(nn.Module):
+    def __init__(self, num_IMUs, num_classes):
+        super(MultiResAtt, self).__init__()
+
+        self.num_IMUs = num_IMUs
+
+        # Initial blocks
+        self.init_blocks = nn.ModuleList([nn.Sequential(
+            nn.Conv1d(9, 64, kernel_size=3, padding=1),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.MaxPool1d(kernel_size=2, stride=2)
+        ) for _ in range(num_IMUs)])
+
+        # Residual modules
+        self.res_modules = nn.ModuleList([nn.Sequential(
+            nn.Conv1d(64, 64, kernel_size=3, padding=1),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.Conv1d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.Conv1d(128, 256, kernel_size=3, padding=1),
+            nn.BatchNorm1d(256),
+            nn.ReLU()
+        ) for _ in range(num_IMUs)])
+
+        # Adaptive average pooling
+        self.adaptive_pool = nn.AdaptiveAvgPool1d(1)
+
+        # BiGRU with attention
+        self.bigru = nn.GRU(256 * num_IMUs, 128, bidirectional=True, batch_first=True)
+        self.attention = nn.Linear(256, 1)
+
+        # Dense layers for classification
+        self.fc1 = nn.Linear(256, 128)
+        self.fc2 = nn.Linear(128, num_classes)
+
+    def forward(self, x):
+        # x: (batch_size, num_IMUs, 9, seq_len)
+
+        # Process each IMU through initial blocks and residual modules
+        imu_outputs = []
+        for i in range(self.num_IMUs):
+            out = self.init_blocks[i](x[:, i])
+            out = self.res_modules[i](out)
+            imu_outputs.append(out)
+
+        # Concatenate outputs from all IMUs
+        out = torch.cat(imu_outputs, dim=1)
+
+        # Adaptive average pooling
+        out = self.adaptive_pool(out).squeeze(-1)
+
+        # BiGRU with attention
+        out, _ = self.bigru(out)
+        att_weights = F.softmax(self.attention(out), dim=1)
+        out = torch.bmm(att_weights.transpose(1, 2), out).squeeze(1)
+
+        # Dense layers for classification
+        out = F.relu(self.fc1(out))
+        out = self.fc2(out)
+
+        return out

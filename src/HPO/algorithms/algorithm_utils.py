@@ -6,7 +6,7 @@ from pynvml import *
 
 def assign_gpu():
   nvmlInit()
-  max_memory = 2000000000
+  max_memory = 6000000000
   count = nvmlDeviceGetCount()  
   gpu_list = []
   for i in range(count):
@@ -26,6 +26,8 @@ class train_eval:
   def __init__(self, worker ,json_config):
     with open(json_config) as f:
       SETTINGS = json.load(f)["SEARCH_CONFIG"]
+    if not os.path.exists("{}/metrics".format(SETTINGS["PATH"])):
+        os.mkdir("{}/metrics".format(SETTINGS["PATH"]))
     self.num_worker = SETTINGS["CORES"]
     self.filename = "{}/{}".format(SETTINGS["PATH"],SETTINGS["FILE_NAME"])
     if SETTINGS["RESUME"] == True:
@@ -92,7 +94,7 @@ class train_eval:
       self.write2file()  
      
     for i in self.processes:
-      i.join()    
+      i     
       i.close() 
     self.write2file()
     return self.acc_list, self.recall_list, self.config_list#self.match_output_order_to_input(population)

@@ -1,4 +1,5 @@
 import torch.nn as nn
+import math
 import torch
 import numpy as np
 from HPO.utils.graph_ops import OPS, ACTIVATION , NORMALISATION
@@ -14,6 +15,7 @@ def propagate_channels(edges,ops):
   for i in ops:
     if "channel" in i:
         if ops[i] != 1:
+          print(i,ops[i])
           down_sample_nodes.append((int(i.split("_")[0])))
   res_dict = {}
   for n in g.nodes():
@@ -34,14 +36,88 @@ def propagate_channels(edges,ops):
   #plt.savefig("channels")
   return res_dict
 
+def propagate_channels_combine(edges,ops):
+  down_sample_nodes = []
+  combine_nodes = []
+  g = nx.DiGraph()
+  g.add_edges_from(edges)
+  for i in ops:
+    if "channel" in i and i.split("_")[0].isdigit():
+          down_sample_nodes.append((int(i.split("_")[0])))
+    if "combine" in i:
+          if i.split("_")[0].isdigit(): 
+            combine_nodes.append((int(i.split("_")[0])))
+          else:
+            combine_nodes.append((i.split("_")[0]))
+  res_dict = {}
+  for n in g.nodes():
+      res_dict[n] = 1
+  nodes = list(nx.topological_sort(g))
+  for i in nodes:
+    if i in combine_nodes:
+      if ops["{}_combine".format(i)] == "CONCAT":
+          predecessor_nodes = list(g.predecessors(i))
+          print("Combine values: {}".format(predecessor_nodes))
+          if len(predecessor_nodes) > 1:
+            res_dict[i] *= len([res_dict[x] for x in predecessor_nodes])
+      else:
+        predecessor_nodes = list(g.predecessors(i))
+        if len(predecessor_nodes ) == 0:
+          res_dict[i] = 1 
+        else:
+          res_dict[i]  = max([res_dict[x] for x in predecessor_nodes])
+    if i in down_sample_nodes:
+      res_dict[i] *= ops["{}_channel_ratio".format(i)]
+      #    update_list = list(nx.bfs_tree(g, source=i).nodes())
+      #    update_list.remove(i)
+      #    print("Down Stream Nodes: {}".format(update_list))
+      #    for _nodes in update_list:
+
+      print(res_dict)
+  print("combines: {}".format(res_dict))
+  print(ops)
+  return res_dict
+
+
+def propagate_cat_num(edges,ops):
+  down_sample_nodes = []
+  combine_nodes = []
+  g = nx.DiGraph()
+  g.add_edges_from(edges)
+  for i in ops:
+    if "channel" in i and i.split("_")[0].isdigit():
+          down_sample_nodes.append((int(i.split("_")[0])))
+    if "combine" in i:
+          if i.split("_")[0].isdigit(): 
+            combine_nodes.append((int(i.split("_")[0])))
+          else:
+            combine_nodes.append((i.split("_")[0]))
+  res_dict = {}
+  for n in g.nodes():
+      res_dict[n] = 1
+      print(n)
+  nodes = list(nx.topological_sort(g))
+  for i in nodes:
+    if i in combine_nodes:
+      print("Node: {}".format(i))
+      if ops["{}_combine".format(i)] == "CONCAT":
+          predecessor_nodes = list(g.predecessors(i))
+          print("Combine values: {}".format(predecessor_nodes))
+          if len(predecessor_nodes) > 1:
+            res_dict[i] = len([res_dict[x] for x in predecessor_nodes])
+    
+  return res_dict
+
 
 def propagate_resolution(edges, ops):
+  print(edges)
   down_sample_nodes = []
   g = nx.DiGraph()
   g.add_edges_from(edges)
   for i in ops:
     if "stride" in i:
       if ops[i] > 1:
+        print(i,ops[i])
         down_sample_nodes.append(int(i.split("_")[0]))
   res_dict = {}
   for n in g.nodes():
@@ -51,7 +127,7 @@ def propagate_resolution(edges, ops):
       if i in down_sample_nodes:
           update_list = list(nx.bfs_tree(g, source=i).nodes())
           for _nodes in update_list:
-              res_dict[_nodes] *=2
+              res_dict[_nodes] *= ops["{}_stride".format(i)]
   """
   plt.figure(figsize = (19,12))
   nx.draw(
@@ -68,26 +144,28 @@ class Node:
   """
   Resolution should never increase here
   """
-  def __init__(self,name,data,length,channels):
+  def __init__(self,name,data,length,channels,cat_num):
     self.name = name
     self.combine = data["{}_combine".format(name)]
     self.length = length
+    self.cat_num = cat_num
     self.channels = int(channels)
     self.activation = data["{}_activation".format(name)]
     self.normalisation = data["{}_normalisation".format(name)]
-    
+
   def generate_edge(self,node_previous) -> list: 
     ops = []#nn.ModuleList()
-    if self.channels != node_previous.channels:
-      ops.append(OPS["resample_channels"](node_previous.channels,self.channels))
-    self.stride = node_previous.length // self.length
-    #print(node_previous.length,self.length)
+    print("output channel sizes : {} {} {}".format(self.channels, self.cat_num,self.channels/self.cat_num))
+    if self.channels/self.cat_num != node_previous.channels:
+      ops.append(OPS["resample_channels"](node_previous.channels,int(self.channels/self.cat_num)))
+    self.stride = 2**round(math.log(node_previous.length // self.length,2))
+    print("lengths:",node_previous.length,self.length,self.stride)
     if self.stride != 1:
-      ops.append(OPS["downsample_resolution"](self.channels,self.stride))
+      ops.append(OPS["downsample_resolution"](int(self.channels/self.cat_num),self.stride))
     if self.normalisation != "none":
-      ops.append(NORMALISATION[self.normalisation](self.channels,self.length)) 
+      ops.append(NORMALISATION[self.normalisation](int(self.channels/self.cat_num),self.length)) 
     if self.activation != "none":
-      ops.append(ACTIVATION[self.activation](self.channels,self.length)) 
+      ops.append(ACTIVATION[self.activation](int(self.channels/self.cat_num),self.length)) 
     return ops
     
 
@@ -102,10 +180,10 @@ def transform_idx(original_list,original_list_permuted,new_list):
   return list(np.asarray(new_list)[transform_idx])
 
 class ModelGraph(nn.Module):
-  def __init__(self,n_features, n_channels, n_classes,signal_length, graph : list, ops : list, device,binary = False,data_dim = 1,sigmoid = False):
+  def __init__(self,n_features, n_channels, n_classes,signal_length, graph : list, ops : list, device,binary = False,data_dim = 1,sigmoid = False,dropout = 0.3):
     super(ModelGraph,self).__init__()
     #INITIALISING MODEL VARIABLES
-    self.DEBUG = False
+    self.DEBUG = True
     self.device = device
     self.data_dim = data_dim
     self.n_features = n_features
@@ -118,6 +196,10 @@ class ModelGraph(nn.Module):
     #STRUCTURES FOR HOLDING DATA STATES AND OPERATIONS
     self.states = {}
     self.nodes  = {}
+    if dropout:
+      self.dropout = nn.Dropout(dropout)
+    else:
+      self.dropout = nn.Identity()
     self.ops = nn.ModuleList()
     self.combine_ops = nn.ModuleDict() 
     
@@ -132,7 +214,7 @@ class ModelGraph(nn.Module):
       STEM_STRIDE = 2 
       self.stem = nn.Conv2d(n_features,n_channels,2,stride = STEM_STRIDE ,padding = STEM_PADDING)
     else:
-      self.stem = nn.Conv1d(n_features,n_channels,1,stride = 1) #Will just leave this at defaults for now
+      self.stem = nn.Conv1d(n_features,n_channels,2,stride = 2) #Will just leave this at defaults for now
     self.stem = self.stem.cuda(device)
 
     #DEFINE OP_MODULE BASED ON DATA_DIM
@@ -144,10 +226,14 @@ class ModelGraph(nn.Module):
     #BUILD NODES
     self.resolution_dict = propagate_resolution(self.sorted_graph, self.ops_list)
     self.channel_dict = propagate_channels(self.sorted_graph, self.ops_list)
+    self.cat_num_dict = propagate_cat_num(self.sorted_graph, self.ops_list)
+    print(self.channel_dict)
+    print(self.resolution_dict)
+
     g = nx.DiGraph()
     g.add_edges_from(self.sorted_graph)
     for i in g.nodes():
-      self.nodes[i] = Node(i,self.ops_list,signal_length // self.resolution_dict[i], self.channel_dict[i]*n_channels)
+      self.nodes[i] = Node(i,self.ops_list,signal_length // self.resolution_dict[i], self.channel_dict[i]*n_channels,self.cat_num_dict[i])
 
     #BUILDS THE OPERATIONS ALONG EDGES BASED ON N_CHANNELS OF PREVIOUS OP
     self._compile(signal_length)
@@ -165,7 +251,7 @@ class ModelGraph(nn.Module):
     else:
       self.classifier = nn.Linear(C, n_classes)
     if sigmoid:
-      self.actfc = nn.Tanh()
+      self.actfc = nn.Sigmoid()#nn.Softmax(dim =1)
     self.sigmoid = sigmoid
   
   def _compile(self,size):
@@ -186,8 +272,9 @@ class ModelGraph(nn.Module):
     #ITERATE THROUGH EDGES
     for iteration,edge in enumerate(self.sorted_graph):
       if self.DEBUG:
-        print(edge,self.combine_index,self.states[edge[0]].shape,name)
- 
+        print(edge, self.ops_list["{}_{}_OP".format(edge[0],edge[1])])
+        print(self.channel_dict[edge[0]]*self.n_channels,self.channel_dict[edge[1]]*self.n_channels)
+      
       #INITIALISE CONTAINER FOR EDGE OPERATIONS 
       edge_container = nn.Sequential()
 
@@ -260,16 +347,29 @@ class ModelGraph(nn.Module):
       self.combine_index+=1
 
   def _forward(self, op,edge):
+    if self.states[edge[0]].shape[1] > 1:
+      self.states[edge[0]] = self.dropout(self.states[edge[0]])
+    #print(edge,self.states[edge[0]].shape, op)
+    #print("Predicted channels: {} {}".format(self.channel_dict[edge[0]],self.channel_dict[edge[1]]))
     h = op(self.states[edge[0]])
     #CASE 1 - 1 INPUT
     if not (edge[1] in self.states.keys()):
       self.states[edge[1]] = h
     #CASE 2 - 2 INPUTS OF SAME SIZE (ADD)
     elif self.nodes[edge[1]].combine == "ADD":
+      if self.states[edge[1]].shape != h.shape:
+        print("PREADD SHAPE: {} - {}".format(self.states[edge[1]].shape, h.shape))
+        print("OP: {}".format(op))
+        print("PREVIOUS SHAPE: {}".format(self.states[edge[0]].shape))
       self.states[edge[1]] = self.states[edge[1]] + h
     elif self.nodes[edge[1]].combine == "CONCAT":
+      #print("PRECONCAT: {} - {}".format(self.states[edge[1]].shape, h.shape))
       self.states[edge[1]] = torch.cat((self.states[edge[1]], h),dim = 1)
-
+    elif self.nodes[edge[1]].combine == "MULT":
+      self.states[edge[1]] = self.states[edge[1]] * h
+    #print(edge,self.states[edge[1]].shape)
+    else:
+      self.states[edge[1]] = self.states[edge[1]] + h
   def forward(self,x):
     self.combine_index = 0
     self.states = {}

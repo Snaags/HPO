@@ -9,14 +9,17 @@ from HPO.utils.utils import MetricLogger
 import os 
 import matplotlib.pyplot as plt
 from HPO.utils.model import NetworkMain
+from HPO.utils.MultResAttn import MultiResAtt
 from HPO.utils.DARTS_utils import config_space_2_DARTS
 from HPO.utils.FCN import FCN 
 import pandas as pd
 import torch
+from sklearn.model_selection import GroupKFold
 from HPO.data.teps_datasets import Train_TEPS , Test_TEPS
 import torch.nn as nn
 from torch import Tensor
 from torch.utils.data import DataLoader, SubsetRandomSampler
+from torchsummary import summary
 import random
 import HPO.utils.augmentation as aug
 from HPO.utils.train_utils import collate_fn_padd
@@ -30,6 +33,7 @@ from collections import namedtuple
 from HPO.utils.worker_score import Evaluator 
 from HPO.utils.worker_utils import LivePlot
 from HPO.workers.worker_wrapper import __compute
+from HPO.data.dataset import get_dataset
 Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
 
 
@@ -40,7 +44,7 @@ def compute(*args, **kwargs):
   return None
 
 
-def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
+def _compute(hyperparameter,cuda_device, JSON_CONFIG):
   ### Configuration 
   with open(JSON_CONFIG) as f:
     data = json.load(f)
@@ -56,25 +60,29 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
   torch.cuda.set_device(cuda_device)
   #torch.autograd.set_detect_anomaly(True)
   #with torch.autograd.profiler.profile() as prof:
+
   ##Dataset Initialisation
   name = SETTINGS["DATASET_CONFIG"]["NAME"]
   if "AUGMENTATIONS" in SETTINGS:
     augs = aug.initialise_augmentations(SETTINGS["AUGMENTATIONS"])
   else: 
     augs = None
+
+  train_args = {"cuda_device":cuda_device,"augmentation" : augs, "binary" :SETTINGS["BINARY"]}
+  test_args = None #{"device":cuda_device,"augmentation" :None, "binary" :SETTINGS["BINARY"]}
+
   if SETTINGS["RESAMPLES"]:
-    dataset = UEA_Full(name, cuda_device,augmentation = augs)
-    kfold = KFold(n_splits = 2, shuffle = True)
+    dataset, test_dataset = get_dataset(name,train_args, test_args )
+    kfold = KFold(n_splits = 5, shuffle = True)
     splits = [(None,None)]*SETTINGS["RESAMPLES"]
     train_dataset = dataset
     test_dataset = dataset
   elif SETTINGS["CROSS_VALIDATION_FOLDS"] == False: 
-    train_dataset = Train_TEPS(name,device = cuda_device, binary =SETTINGS["BINARY"],augmentations = augs, samples_per_class = 100 )
-    test_dataset = Test_TEPS(name,device = cuda_device ,augmentations = False,binary =SETTINGS["BINARY"], samples_per_class = 100)
+    train_dataset, test_dataset = get_dataset(name,train_args, test_args)
     splits = [(None,None)]
   elif SETTINGS["CROSS_VALIDATION_FOLDS"]:
-    dataset = Train_TEPS(name, device = cuda_device,augmentations = augs,  binary =SETTINGS["BINARY"],samples_per_class = 100)
-    kfold = KFold(n_splits = SETTINGS["CROSS_VALIDATION_FOLDS"], shuffle = True)
+    dataset, test_dataset = get_dataset(name,train_args, test_args)
+    kfold = KFold(n_splits = SETTINGS["CROSS_VALIDATION_FOLDS"], shuffle = False)
     splits = kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy())
     train_dataset = dataset
     test_dataset = dataset
@@ -85,8 +93,15 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
    
   for _ in range(SETTINGS["REPEAT"]):
     
-    if SETTINGS["RESAMPLES"]:
-      kfold = KFold(n_splits = 2, shuffle = True)
+    if SETTINGS["GROUPED_RESAMPLES"]:
+      # Initialize GroupKFold cross-validator with desired number of splits
+      kfold = GroupKFold(n_splits=30)
+      splits = [(None,None)]*SETTINGS["RESAMPLES"]
+      train_dataset = dataset
+      test_dataset = dataset
+
+    elif SETTINGS["RESAMPLES"]:
+      kfold = KFold(n_splits = 5, shuffle = True)
       splits = [(None,None)]*SETTINGS["RESAMPLES"]
       train_dataset = dataset
       test_dataset = dataset
@@ -97,13 +112,17 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
       splits = kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy())
       train_dataset = dataset
       test_dataset = dataset
-
+    print("train",train_dataset.y.shape,train_dataset.y )
+    print("test",test_dataset.y.shape,test_dataset.y )
     for fold, (train_ids, test_ids) in enumerate(splits):    
       print('---Fold No.--{}--------------------'.format(fold))
       torch.cuda.empty_cache()
-      if SETTINGS["RESAMPLES"]:
+      if SETTINGS["GROUPED_RESAMPLES"]:
+         train_ids, test_ids = next(kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy(),groups =dataset.groups))
+         dataset.get_groups(train_ids,test_ids)
+      elif SETTINGS["RESAMPLES"]:
         train_ids, test_ids = next(kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy()))
-      if SETTINGS["CROSS_VALIDATION_FOLDS"]: 
+      if SETTINGS["CROSS_VALIDATION_FOLDS"] or SETTINGS["GROUPED_RESAMPLES"]: 
         # Sample elements randomly from a given list of ids, no replacement.
         train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
         test_subsampler = torch.utils.data.SubsetRandomSampler(test_ids)
@@ -128,11 +147,13 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG ):
       #g = GraphConfigSpace(50)
       #s = g.sample_configuration()
       #s = s[0]
-      model = ModelGraph(train_dataset.get_n_features(),32,train_dataset.get_n_classes(),train_dataset.x.shape[2],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device,binary = SETTINGS["BINARY"])
+      model = MultiResAtt(train_dataset.get_n_features(),train_dataset.get_n_classes())
       if SETTINGS["COMPILE"]:
         torch.set_float32_matmul_precision('high')
         model = torch.compile(model)
+
       model = model.cuda(device = cuda_device)
+      summary(model, (3,151))
       """
       ### Train the model
       """

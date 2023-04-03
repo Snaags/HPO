@@ -1,27 +1,13 @@
 from HPO.searchspaces.resnet import build_resnet, ResNet50
+from HPO.searchspaces.graph_search_space import GraphConfigSpace
+from HPO.searchspaces.utils import *
+from HPO.searchspaces.cell import build_macro, build_macro_repeat
 import random
 #ResNet
 #Cell
 #Hierarchical
 #Graph
 
-def random_ops_unweighted(ops, data):
-  for i in ops:
-    if "OP" in i:
-      ops[i] = random.choice(data["EDGE_OPERATIONS"])
-  return ops
-
-def random_activation_unweighted(ops,data):
-  for i in ops:
-    if "activation" in i:
-      ops[i] = random.choice(data["ACTIVATION_FUNCTIONS"])
-  return ops
-
-def random_normalisation_unweighted(ops,data):
-  for i in ops:
-    if "normalisation" in i:
-      ops[i] = random.choice(data["NORMALISATION_FUNCTIONS"])
-  return ops
 
 
 class FixedModel:
@@ -66,9 +52,8 @@ class ResNetSearchSpace:
 def resnet_search_space(JSON_CONFIG):
   return ResNetSearchSpace(JSON_CONFIG)
 
-
-def init_config():
-  return FixedModel(ResNet50())
+def resnet50(JSON_CONFIG):
+    return FixedModel(ResNet50())
      
 
 class FixedTopology:
@@ -121,4 +106,81 @@ class SearchSpace:
     #This channel variation should be for that op only allowing for bottlenecks and expansions.
     self.hyperparameters = generate_ops([0.25,0.5,1,2,4], self.nodes, "channel_ratio",self.hyperparameters)
    
+
+def graph_config(JSON):
+  graph = GraphConfigSpace(JSON)
+  return graph
+
+class CellSpace:
+  def __init__(self,JSON):
+    self.data = JSON["ARCHITECTURE_CONFIG"]
+    self.n_nodes = 4
+    self.cells = 5
+    self.reduce = 1
+
+  def sample_configuration(self,n):
+    configs = []
+    for i in range(n):
+      self.g = nx.DiGraph()
+      model = build_macro( n_nodes = self.n_nodes, n_cells = self.cells, reduction_freq = self.reduce)
+      self.g.add_edges_from(model[0])
+      ops = generate_op_names(self.g)
+      ops = random_ops_unweighted(ops, self.data)
+      ops = random_activation_unweighted(ops,self.data)
+      ops = random_normalisation_unweighted(ops,self.data)
+      #ops = random_combine_unweighted(ops,self.data)
+      #ops = random_strides(ops,self.data["STRIDE_COUNT"])
+      ops.update(model[1])
+      del ops["T_stride"]
+      del ops["T_channel_ratio"]
+      del ops["S_stride"]
+      del ops["S_channel_ratio"]
+      configs.append({"graph": model[0], "ops": ops})
+    return configs
+
+class CellSpaceRepeat:
+  def __init__(self,JSON):
+    self.data = JSON["ARCHITECTURE_CONFIG"]
+    self.n_nodes = 4
+    self.cells = 7
+    self.reduce = 1
+
+  def sample_configuration(self,n):
+    configs = []
+    for i in range(n):
+      self.g = nx.DiGraph()
+      model = build_macro_repeat( data = self.data, n_nodes = self.n_nodes, n_cells = self.cells, reduction_freq = self.reduce)
+      self.g.add_edges_from(model[0])
+      #ops = generate_op_names(self.g)
+      #ops = random_ops_unweighted(ops, self.data)
+      #ops = random_activation_unweighted(ops,self.data)
+      #ops = random_normalisation_unweighted(ops,self.data)
+      #ops = random_combine_unweighted(ops,self.data)
+      #ops = random_strides(ops,self.data["STRIDE_COUNT"])
+
+      
+      ops_temp = generate_skip(self.g)
+      for i in ops_temp:
+          if not i in model[1]:
+              model[1][i] = ops_temp[i]
+      #ops.update(model[1])
+      del model[1]["T_stride"]
+      del model[1]["T_channel_ratio"]
+      del model[1]["T_channel"]
+      del model[1]["S_stride"]
+      del model[1]["S_channel_ratio"]
+
+      for i in model[1]:
+        if "combine" in i:
+          if model[1][i] == 1:
+            model[1][i] = "ADD"
+      
+      configs.append({"graph": model[0], "ops": model[1]})
+    return configs
+
+def cell_config(JSON):
+  return CellSpace(JSON)
+
+def cell_repeat_config(JSON):
+  return CellSpaceRepeat(JSON)
 

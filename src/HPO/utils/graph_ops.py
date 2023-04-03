@@ -17,13 +17,21 @@ NORMALISATION = {
 
 }
 
-
+COMBINE = {
+  "CONCAT" : lambda : CONCAT(),
+  "ADD" : lambda : ADD()
+}
 
 OPS = {
+  "none" : lambda C : Zero(),
   "gelu" : lambda C,kernel, stride,dil, affine: nn.GELU(),
   "relu" : lambda : nn.ReLU(),
   "batch_norm" : lambda C : nn.BatchNorm1d(C),
   "skip_connect" : lambda C : Identity(),
+  "MHA_4" : lambda C : MHA(C, 4),
+  "MHA_16" : lambda C : MHA(C, 16),
+  "SE_4" : lambda C : SE(C, 4),
+  "SE_16" : lambda C : SE(C, 16),
   "resample_channels" : lambda c_in,c_out: ResampleChannels(c_in,c_out),
   "downsample_resolution" : lambda c_in,stride: DownsampleResolution(c_in,stride),
   "point_conv_1" :  lambda C: PointConv(C, stride = 1,dilation = 1,padding = 1*(3 - 1)//2, affine = True),
@@ -31,6 +39,7 @@ OPS = {
   "depth_conv_3_1" :  lambda C: DepthConv(C,3, stride = 1,dilation = 1,padding = 1*(3 - 1)//2, affine = True),
   "depth_conv_5_1" :  lambda C: DepthConv(C,5, stride = 1,dilation = 1,padding = 1*(5 - 1)//2, affine = True),
   "depth_conv_7_1" :  lambda C: DepthConv(C,7, stride = 1,dilation = 1,padding = 1*(7 - 1)//2, affine = True),
+
   "depth_conv_3_2" :  lambda C: DepthConv(C,3, stride = 1,dilation = 2,padding = 2*(3 - 1)//2, affine = True),
   "depth_conv_5_2" :  lambda C: DepthConv(C,5, stride = 1,dilation = 2,padding = 2*(5 - 1)//2, affine = True),
   "depth_conv_7_2" :  lambda C: DepthConv(C,7, stride = 1,dilation = 2,padding = 2*(7 - 1)//2, affine = True),
@@ -104,9 +113,27 @@ OPS = {
   "max_pool_15_32" :  lambda C: nn.MaxPool1d(15,stride = 1 , dilation = 32,padding =32*(15 - 1)//2),
   "max_pool_31_32" :  lambda C: nn.MaxPool1d(31,stride = 1 , dilation = 32,padding =32*(31 - 1)//2),
   "max_pool_63_32" :  lambda C: nn.MaxPool1d(63,stride = 1 , dilation = 32,padding =32*(63 - 1)//2),
-  
+
+  'sep_conv_3_BR' : lambda C : SepConv(C, C, 3, 1, 1, affine=1),
+  'sep_conv_5_BR' : lambda C : SepConv(C, C, 5, 1, 2, affine=1),
+  'sep_conv_7_BR' : lambda C : SepConv(C, C, 7, 1, 3, affine=1),
+  'sep_conv_15_BR' : lambda C, : SepConv(C, C, 15, 1, 7, affine=1),
+  'sep_conv_30_BR' : lambda C: SepConv(C, C, 27, 1, 13, affine=1),
+  'dil_conv_3_BR' : lambda C: DilConv(C, C, 3, 1, 2, 2, affine=1),
+  'dil_conv_5_BR' : lambda C: DilConv(C, C, 5, 1, 4, 2, affine=1),
+  'dil_conv_7_BR' : lambda C: DilConv(C, C, 3, 1, 2, 2, affine=1),
+
+  "depth_conv_3_1_BR" :  lambda C: DepthConvBR(C,3, stride = 1,dilation = 1,padding = 1*(3 - 1)//2, affine = True),
+  "depth_conv_5_1_BR" :  lambda C: DepthConvBR(C,5, stride = 1,dilation = 1,padding = 1*(5 - 1)//2, affine = True),
+  "depth_conv_7_1_BR" :  lambda C: DepthConvBR(C,7, stride = 1,dilation = 1,padding = 1*(7 - 1)//2, affine = True),
+  "depth_conv_3_2_BR" :  lambda C: DepthConvBR(C,3, stride = 1,dilation = 2,padding = 2*(3 - 1)//2, affine = True),
+  "depth_conv_5_2_BR" :  lambda C: DepthConvBR(C,5, stride = 1,dilation = 2,padding = 2*(5 - 1)//2, affine = True),
+  "depth_conv_7_2_BR" :  lambda C: DepthConvBR(C,7, stride = 1,dilation = 2,padding = 2*(7 - 1)//2, affine = True),
+  "point_conv_1_BR" :  lambda C: PointConvBR(C, stride = 1,dilation = 1,padding = 1*(3 - 1)//2, affine = True),
   
   }
+
+"""
 class MHA(nn.Module):
   def __init__(self,C):
     super(MHA,self).__init__()
@@ -114,7 +141,7 @@ class MHA(nn.Module):
   def forward(self,x):
     x = x.swapaxes(1,2)
     return self.act(x,x,x,need_weights=False)[0].swapaxes(1,2)
-  
+"""
 
 class Identity(nn.Module):
 
@@ -124,17 +151,30 @@ class Identity(nn.Module):
   def forward(self, x):
     return x
 
+class CONCAT(nn.Module):
+
+  def __init__(self):
+    super(CONCAT, self).__init__()
+
+  def forward(self, x):
+    return torch.cat(x,dim = 1)
+
+class ADD(nn.Module):
+
+  def __init__(self):
+    super(ADD, self).__init__()
+
+  def forward(self, x):
+    x = torch.stack(x, dim=0)
+    return torch.sum(x,dim = 0)
 
 class Zero(nn.Module):
 
-  def __init__(self, stride):
+  def __init__(self):
     super(Zero, self).__init__()
-    self.stride = stride
 
   def forward(self, x):
-    if self.stride == 1:
-      return x.mul(0.)
-    return x[:,:,::self.stride].mul(0.)
+    return x.mul(0.)
 
 class DownsampleResolution(nn.Module):
   """
@@ -143,7 +183,9 @@ class DownsampleResolution(nn.Module):
   """
   def __init__(self, c_in,stride):
     super(DownsampleResolution,self).__init__()
-    self.conv1 = nn.Conv1d(c_in,c_in, kernel_size =stride, stride = stride, bias = False, groups = c_in)
+    if stride > 2:
+      print("Stride: {}".format(stride))
+    self.conv1 = nn.Conv1d(c_in,c_in, kernel_size = stride, stride = stride, bias = False, groups = c_in)
   def forward(self,x):
     return self.conv1(x)
 
@@ -202,10 +244,24 @@ class DepthConv(nn.Module):
   def __init__(self, c, kernel_size, padding,stride,dilation= 1, affine=True):
     super(DepthConv, self).__init__()
     #padding = (kernel_size*stride*dilation)//2
-    self.conv = nn.Conv1d(c,c, kernel_size=kernel_size, stride=stride, padding="same", groups=c, bias=False)
+    self.conv = nn.Conv1d(c,c, kernel_size=kernel_size, stride=stride, padding=padding, groups=c, bias=False)
 
   def forward(self, x):
     x =self.conv(x)
+    return x
+
+class DepthConvBR(nn.Module):
+  def __init__(self, c, kernel_size, padding,stride,dilation= 1, affine=True):
+    super(DepthConvBR, self).__init__()
+    #padding = (kernel_size*stride*dilation)//2
+    self.act =  nn.ReLU()
+    self.bn = nn.BatchNorm1d(c, affine=affine)
+    self.conv = nn.Conv1d(c,c, kernel_size=kernel_size, stride=stride, padding="same", groups=c, bias=False)
+
+  def forward(self, x):
+    x = self.act(x)
+    x =self.conv(x)
+    x = self.bn(x)
     return x
 
 class PointConv(nn.Module):
@@ -219,3 +275,113 @@ class PointConv(nn.Module):
   def forward(self, x):
     x =self.conv(x)
     return x
+
+class PointConvBR(nn.Module):
+  def __init__(self, C, stride,affine=True,dilation = 1,padding = 0 ):
+    super(PointConvBR, self).__init__()
+    if stride == 2:
+      self.conv = nn.Conv1d(C,C*2, kernel_size=1, dilation = 1,stride=stride, bias=False)
+    else:
+      self.conv = nn.Conv1d(C,C, kernel_size=1, stride=stride,dilation = 1 , bias=False)
+    self.act =  nn.ReLU()
+    self.bn = nn.BatchNorm1d(C, affine=affine)
+
+  def forward(self, x):
+    x = self.act(x)
+    x =self.conv(x)
+    x = self.bn(x)
+    return x
+
+
+class SepConv(nn.Module):
+    
+  def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
+    super(SepConv, self).__init__()
+    self.op = nn.Sequential(
+      nn.ReLU(inplace=False),
+      nn.Conv1d(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding, groups=C_in, bias=False),
+      nn.Conv1d(C_in, C_in, kernel_size=1, padding=0, bias=False),
+      nn.BatchNorm1d(C_in, affine=affine),
+      nn.ReLU(inplace=False),
+      nn.Conv1d(C_in, C_in, kernel_size=kernel_size, stride=1, padding=padding, groups=C_in, bias=False),
+      nn.Conv1d(C_in, C_out, kernel_size=1, padding=0, bias=False),
+      nn.BatchNorm1d(C_out, affine=affine),
+      )
+
+  def forward(self, x):
+    return self.op(x)
+
+class DilConv(nn.Module):
+    
+  def __init__(self, C_in, C_out, kernel_size, stride, padding, dilation, affine=True):
+    super(DilConv, self).__init__()
+    self.op = nn.Sequential(
+      nn.ReLU(inplace=False),
+      nn.Conv1d(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=C_in, bias=False),
+      nn.Conv1d(C_in, C_out, kernel_size=1, padding=0, bias=False),
+      nn.BatchNorm1d(C_out, affine=affine),
+      )
+
+  def forward(self, x):
+    return self.op(x)
+
+
+class SE(nn.Module):
+    def __init__(self, channels, reduction=16):
+        super(SE, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool1d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channels, channels // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channels // reduction, channels, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        batch_size, channels, length = x.size()
+        y = self.avg_pool(x).view(batch_size, channels)
+        y = self.fc(y).view(batch_size, channels, 1)
+        return x * y.expand_as(x)
+
+
+class MHA(nn.Module):
+    def __init__(self, d_model, num_heads):
+        super(MHA, self).__init__()
+
+        assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
+        
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.head_dim = d_model // num_heads
+
+        self.q_linear = nn.Linear(d_model, d_model)
+        self.k_linear = nn.Linear(d_model, d_model)
+        self.v_linear = nn.Linear(d_model, d_model)
+        self.out_linear = nn.Linear(d_model, d_model)
+
+    def forward(self, x):
+        batch_size = x.size(0)
+
+        # Calculate q, k, and v
+        x = x.permute(0, 2, 1)
+        q = self.q_linear(x)
+        k = self.k_linear(x)
+        v = self.v_linear(x)
+
+        # Split the last dimension into (heads, depth)
+        q = q.view(batch_size, -1, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
+        k = k.view(batch_size, -1, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
+        v = v.view(batch_size, -1, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
+
+        # Scaled Dot-Product Attention
+        attn_weights = torch.matmul(q, k.transpose(-1, -2)) / torch.sqrt(torch.tensor(self.head_dim, dtype=torch.float))
+        attn_weights = torch.softmax(attn_weights, dim=-1)
+        attn_output = torch.matmul(attn_weights, v)
+
+        # Concatenate heads and put through final linear layer
+        attn_output = attn_output.permute(0, 2, 1, 3).contiguous()
+        attn_output = attn_output.view(batch_size, -1, self.d_model)
+
+        output = self.out_linear(attn_output)
+        output = output.permute(0, 2, 1)
+        return output

@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 
 class UEA(Dataset):
-  def __init__(self, name,device,augmentation = False,classes=None):
+  def __init__(self, name,device,augmentation = False,classes=None, **kwargs):
     self.PATH = "/home/cmackinnon/scripts/datasets/UEA_NPY/"
     self.augmentation = augmentation
     ##LOAD SAMPLES AND LABELS FROM .npy FILE
@@ -19,7 +19,12 @@ class UEA(Dataset):
       x.append(np.load("{}{}_samples.npy".format(self.PATH,n)))
       y.append(np.load("{}{}_labels.npy".format(self.PATH,n)))
     self.x = torch.from_numpy(np.concatenate(x,axis = 0)).cuda(device = device).float()
-    self.y = torch.from_numpy(np.concatenate(y,axis = 0)).cuda(device = device)
+    self.y = np.concatenate(y,axis = 0)
+    if kwargs["binary"]:
+      self.y = np.where(self.y != 0, 1,0)
+    self.y = torch.from_numpy(self.y).cuda(device).long()
+    print("Length of {}: {}".format(name, self.x.shape[0]))
+    exit()
     if classes != None:
         """
         for c in classes:
@@ -32,9 +37,13 @@ class UEA(Dataset):
     if self.augmentation:
       for f in self.augmentation:
         x,y = f(x,y)
-    return x,y.long()
+    return x,y
   def __len__(self):
     return len(self.y)
+  def enable_augmentation(self,augs):
+    self.augmentation = augs
+  def disable_augmentation(self):
+    self.augmentation = False 
 
   def get_n_classes(self):
     return self.n_classes

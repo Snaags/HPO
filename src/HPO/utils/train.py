@@ -8,6 +8,7 @@ from HPO.utils.train_log import Logger
 from HPO.utils.model_constructor import Model
 from torch.utils.data import DataLoader
 from HPO.utils.train_utils import stdio_print_training_data
+from sklearn.metrics import confusion_matrix
 
 def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tensor , epoch : int, epochs : int, correct :int , total : int , peak_acc : float , loss : Tensor, n_iter, loss_list = None, binary = True):
   def cal_acc(y,t):
@@ -57,6 +58,7 @@ def train_model_triplet(model : Model , hyperparameter : dict, dataloader : Data
   if logger == None:
     logger = Logger()
   while epoch < epochs:
+
     loss_values = 0
     if epoch % 3 == 0:
       total = 0
@@ -128,11 +130,15 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   if logger != False or logger == None:
     logger = Logger()
 
+
   #MAIN TRAINING LOOP
   while epoch < EPOCHS:
     if epoch % 3 == 0:
       total = 0
+      pred_tensor = torch.Tensor()
+      gt_tensor = torch.Tensor()
       correct = 0
+
     for i, (samples, labels) in enumerate( dataloader ):
       optimizer.zero_grad()
       #samples, labels = samples.cuda(cuda_device).float(), labels.cuda(cuda_device).long()
@@ -143,12 +149,24 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
         loss = criterion(outputs, labels)
       loss.backward()
       optimizer.step()
+      if PRINT_RATE_TRAIN:
+        pred_tensor = torch.cat((pred_tensor, outputs.detach().cpu().flatten(end_dim = 0)))
+        gt_tensor = torch.cat((gt_tensor, labels.detach().cpu().flatten()))
 
       if PRINT_RATE_TRAIN and i % PRINT_RATE_TRAIN == 0:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,EPOCHS , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = BINARY)
+
+
+      
+        #print(outputs,labels)
       if logger != False:
         logger.update({"loss": loss.item(), "training_accuracy": (correct/total),"index" : i,
               "epoch": epoch, "validation_accuracy": acc, "lr":optimizer.param_groups[0]['lr'],"validation recall": recall })
+    if PRINT_RATE_TRAIN:
+      pred_labels = torch.argmax(pred_tensor, dim=1).numpy()
+      gt_labels = gt_tensor.numpy()
+      with np.printoptions(linewidth = (10*len(np.unique(gt_labels))+20),precision=4, suppress=True):
+        print(confusion_matrix(gt_labels,pred_labels))
     if hyperparameter["WEIGHT_AVERAGING_RATE"] and epoch % hyperparameter["WEIGHT_AVERAGING_RATE"] == 0:
         torch.save(model.state_dict() ,"SWA/run-{}-checkpoint-{}".format(run, epoch))
     if hyperparameter["MODEL_VALIDATION_RATE"] and epoch % hyperparameter["MODEL_VALIDATION_RATE"] == 0 and epoch != 0:

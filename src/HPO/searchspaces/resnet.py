@@ -7,16 +7,16 @@ def build_bottleneck(stride = 1, step = False):
   graph = [(0,1),(1,2),(2,3),(0,3),(3,4)]
   bottleneck_ops = {
     "0_1_OP": "skip_connect",
-    "1_2_OP": "conv_3",
+    "1_2_OP": "depth_conv_3_1",
     "2_3_OP": "skip_connect",
     "0_3_OP": "skip_connect",
     "3_4_OP": "skip_connect",
   }
   node_ops = {
-    "1_activation" : "relu","1_normalisation": "batch_norm","1_stride": 1,"1_channel_ratio":0.25 if step == 0 else step,
-    "2_activation" : "relu","2_normalisation": "batch_norm","2_stride": stride,"2_channel_ratio":1,
+    "1_activation" : "gelu","1_normalisation": "batch_norm","1_stride": 1,"1_channel_ratio":0.25 if step == 0 else step,
+    "2_activation" : "gelu","2_normalisation": "batch_norm","2_stride": stride,"2_channel_ratio":1,
     "3_activation" : "none","3_normalisation": "batch_norm","3_stride": 1,"3_channel_ratio":4,
-    "4_activation" : "relu","4_normalisation": "none","4_stride": 1,"4_channel_ratio":1,
+    "4_activation" : "gelu","4_normalisation": "none","4_stride": 1,"4_channel_ratio":1,
     
   }
   ops = {**bottleneck_ops , **node_ops}
@@ -34,7 +34,7 @@ def make_layer(blocks, step,stride = 1 ):
   
 
 def build_resnet( layer_list):
-    ops = {"S_0_OP": "max_pool_3","0_activation" : "relu","0_normalisation": "batch_norm","0_stride": 2,"0_channel_ratio":1,"S_activation": None, "S_normalisation": None, "S_channel_ratio": 1, "S_stride": 1, "S_combine" : None}
+    ops = {"S_0_OP": "max_pool_3_1","0_activation" : "gelu","0_normalisation": "batch_norm","0_stride": 2,"0_channel_ratio":1,"S_activation": None, "S_normalisation": None, "S_channel_ratio": 1, "S_stride": 1, "S_combine" : None}
     graph = [("S",0)]
     
   

@@ -36,6 +36,7 @@ OPS = {
   'sep_conv_30x30' : lambda C, stride, affine: SepConv(C, C, 27, stride, 13, affine=affine),
   'dil_conv_3x3' : lambda C, stride, affine: DilConv(C, C, 3, stride, 2, 2, affine=affine),
   'dil_conv_5x5' : lambda C, stride, affine: DilConv(C, C, 5, stride, 4, 2, affine=affine),
+  'dil_conv_7x7' : lambda C, stride, affine: DilConv(C, C, 3, stride, 2, 2, affine=affine),
 }
 class ReLUConvBN(nn.Module):
 
@@ -140,6 +141,7 @@ class AttentionChannel(nn.Module):
     attn = nn.functional.softmax(score, dim = -1)
     out = torch.bmm(attn,value)
     return out
+    
 class SE(nn.Module):
   def __init__(self, C,r,stride,affine = True ):
     super(SE,self).__init__()
