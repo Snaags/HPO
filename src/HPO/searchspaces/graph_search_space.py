@@ -54,7 +54,7 @@ class GraphConfigSpace:
   def __init__(self,JSON):
     self.data = JSON["ARCHITECTURE_CONFIG"]
     self.g = nx.DiGraph
-    self.n_operations = 50
+    self.n_operations = 30
     self.init_state = [("S",1),(1,"T")]
   def sample_configuration(self,n_samples=1):
     samples = []

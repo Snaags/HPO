@@ -13,7 +13,6 @@ def random_strides(ops,count):
   s = [ x for x in ops if "stride" in x]
   while count > 0:
     o = random.choice(s)
-    print(o)
     ops[o] *= 2
     ops["{}_channel_ratio".format(o.split("_")[0])] *= 1.5 # FIX THIS ALSO 
     count -= 1

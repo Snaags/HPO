@@ -1,11 +1,13 @@
 from HPO.data.HAR import *
 from HPO.data.SHAR import *
 from HPO.data.TEPS import *
+from HPO.data.EEG import *
 from HPO.data.UEA_datasets import *
 DATASETS = {
     "teps" : (Train_TEPS,Test_TEPS),
     "HAR" : (Train_HAR,Test_HAR),
-    "SHAR" : (SHAR, None)
+    "SHAR" : (SHAR, None),
+    "EEG" : (Train_EEG,Test_EEG)
 }
 
 
