@@ -12,3 +12,8 @@ example/*
 *.ts
 *.arff
 *.pyc
+*.orig
+*.db
+*.npy
+*.db-journal
+

@@ -8,17 +8,25 @@ import sys
 import os
 import json
 from datetime import datetime
+import sqlite3
+
 
 def main(JSON_CONFIG):
   with open(JSON_CONFIG) as conf:
     data = json.load(conf)
   if not data["SEARCH_CONFIG"]["RESUME"]:
-    #CREATE EXPERIMENT DIRECTORY AND LOAD JSON DATA
-    date = "".join(str(datetime.now()).split(" "))
-    os.system("mkdir experiments/{}".format(date))
-    os.system("mkdir experiments/{}/weights".format(date))
-  else: 
-    date = data["SEARCH_CONFIG"]["PATH"]
+    if not data["EXPERIMENT_NAME"]:
+      #CREATE EXPERIMENT DIRECTORY AND LOAD JSON DATA
+      name = "".join(str(datetime.now()).split(" "))
+    else: 
+      name = data["EXPERIMENT_NAME"]
+    if os.path.exists("experiments/{}".format(name)):
+      raise Exception("Experiment name exists, rename current experiment")
+
+    os.system("mkdir experiments/{}".format(name))
+    os.system("mkdir experiments/{}/weights".format(name))
+  else:
+    name = data["EXPERIMENT_NAME"]
   #IMPORT MODULES
   _worker = importlib.import_module("HPO.workers.{}".format(data["WORKER_MODULE_NAME"])) 
   _config =importlib.import_module("HPO.searchspaces.spaces") 
@@ -28,17 +36,49 @@ def main(JSON_CONFIG):
   worker = _worker.compute
   config = eval("_config.{}({})".format(data["CONFIG_MODULE_NAME"],data))
   #STORE DATA IN EXPERIMENT JSON FILE 
-  data["DATE"] = date
+  data["DATE"] = "".join(str(datetime.now()).split(" "))
   data["START_TIME"] = time.time()
-  data["SEARCH_CONFIG"]["PATH"] = "experiments/{}".format(date)
+  data["SEARCH_CONFIG"]["PATH"] = "experiments/{}".format(name)
   data["SEARCH_SPACE"] = str(config)
-  experiment_json = "experiments/{}/configuration.json".format(date)
+  experiment_json = "experiments/{}/configuration.json".format(name)
   with open(experiment_json,"w") as f:
     json.dump(data,f, indent=4)
-  logging.basicConfig(filename='experiments/{}/experiment.log'.format(date),  level=logging.DEBUG)
+  logging.basicConfig(filename='experiments/{}/experiment.log'.format(name),  level=logging.DEBUG)
   time.sleep(1) 
   set_seed(experiment_json)
   #START SEARCH
+
+  # Connect to the SQLite database (this will create a new file called 'training_info.db')
+  database = data["DATABASE_NAME"]
+  conn = sqlite3.connect(database)
+  c = conn.cursor()
+
+  # Create a table to store training information
+
+  # Create the training_info table
+  c.execute("""
+  CREATE TABLE IF NOT EXISTS training_info (
+      experiment TEXT,
+      dataset TEXT,
+      model_id INTEGER,
+      epoch INTEGER,
+      training_loss REAL,
+      validation_loss REAL,
+      training_accuracy REAL,
+      validation_accuracy REAL,
+      learning_rate REAL,
+      confusion_matrix_train TEXT,
+      confusion_matrix_test TEXT,
+      fold INTEGER,
+      repeat INTEGER,
+      parameters INTEGER,
+      PRIMARY KEY (model_id, epoch)
+  )
+  """)
+  conn.commit()
+
+
+
   algorithm(worker, config,experiment_json)
   with open(JSON_CONFIG) as conf:
     data = json.load(conf)

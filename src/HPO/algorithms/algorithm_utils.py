@@ -4,9 +4,35 @@ import csv
 import json
 from pynvml import *
 
+
+
+def load(FILENAME):
+    scores = []
+    recall = []
+    config = []
+    params = []
+    ID = []
+    with open( "{}".format(FILENAME) , newline = "") as csvfile:
+        reader = csv.reader(csvfile, delimiter = ",")
+        for row in reader:
+            scores.append(float(row[0]))
+            recall.append(float(row[1]))
+            config.append(eval("".join(row[2])))
+            ID.append(config[-1]["ID"])
+            if len(row) == 4:
+               params.append(int(row[3])) 
+    error = [1-x for x in scores]
+    e_min = 1
+    best_list = []
+    for i in error:
+      if i < e_min:
+        e_min = i
+      best_list.append(e_min)
+    return {"accuracy":scores,"recall":recall,"config":config ,"params": params, "ID": ID}
+
 def assign_gpu():
   nvmlInit()
-  max_memory = 6000000000
+  max_memory = 1000000000
   count = nvmlDeviceGetCount()  
   gpu_list = []
   for i in range(count):
@@ -30,10 +56,6 @@ class train_eval:
         os.mkdir("{}/metrics".format(SETTINGS["PATH"]))
     self.num_worker = SETTINGS["CORES"]
     self.filename = "{}/{}".format(SETTINGS["PATH"],SETTINGS["FILE_NAME"])
-    if SETTINGS["RESUME"] == True:
-      self.ID_INIT = len(os.listdir(SETTINGS["PATH"]+"/metrics/"))
-    else:
-      self.ID_INIT = 0
     self.JSON_CONFIG = json_config
     self.config_queue = Queue()
     self.gpu_slots = Queue()
@@ -43,11 +65,20 @@ class train_eval:
     self.param_list_full= []
     self.config_list_full = []
     self.worker = worker
+    if SETTINGS["RESUME"] == True and os.path.exists(self.filename):
+      self.resume()
+    else:
+      self.ID_INIT = 0
 
-  def resume(self, acc, recall, config):
-    self.acc_list_full = acc
-    self.recall_list_full = recall
-    self.config_list_full = config
+  def resume(self):
+    data_dict = load(self.filename)
+    self.acc_list_full = data_dict["accuracy"]
+    self.recall_list_full = data_dict["recall"]
+    self.config_list_full = data_dict["config"]
+    self.param_list_full=data_dict["params"]
+    self.ID_INIT = max(data_dict["ID"])
+    print("LOADING PREVIOUS DATA: ",self.acc_list_full)
+
   def allocate_gpu(self):
     if max(self.gpu) == 0:
       return None
@@ -61,7 +92,6 @@ class train_eval:
     self.recall_list = []
     self.param_list = []
     self.config_list = []
-       
     self.processes = []
     gpu = assign_gpu()
     self.gpu =gpu
@@ -94,8 +124,8 @@ class train_eval:
       self.write2file()  
      
     for i in self.processes:
-      i     
-      i.close() 
+      self.write2file()
+      i.join() 
     self.write2file()
     return self.acc_list, self.recall_list, self.config_list#self.match_output_order_to_input(population)
  

@@ -412,6 +412,12 @@ class Evaluator:
           with np.printoptions(linewidth = (10*self.n_classes+20),precision=4, suppress=True):
             print(self.confusion_matrix)
 
+  def calculate_loss(self,criterion,model_is_binary = False):
+    if model_is_binary:
+      return criterion(torch.Tensor(self.model_prob).squeeze(), torch.Tensor(self.labels).squeeze().float())
+    else:
+      return criterion(torch.Tensor(self.model_prob), torch.Tensor(self.labels).squeeze().long())
+
   def TP(self, value):
     TP = self.confusion_matrix[value,value]
     return TP

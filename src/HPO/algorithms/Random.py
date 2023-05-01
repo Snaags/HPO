@@ -8,7 +8,7 @@ def main(worker, configspace : ConfigurationSpace, json_config):
     SETTINGS = json.load(f)["SEARCH_CONFIG"]
     
   train = train_eval( worker , json_config)
-  configs = configspace.sample_configuration(SETTINGS["TOTAL_EVALUATIONS"])
+  configs = configspace.sample_configuration(SETTINGS["TOTAL_EVALUATIONS"] - train.ID_INIT)
   scores ,recall , pop= train.eval(configs)
   #print("Best Score: ", max(scores))      
   #plot_scores(scores)

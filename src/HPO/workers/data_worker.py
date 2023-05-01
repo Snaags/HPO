@@ -47,7 +47,12 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
   ### Configuration 
   with open(JSON_CONFIG) as f:
     data = json.load(f)
+    
     SETTINGS = data["WORKER_CONFIG"]
+    SETTINGS["ID"] = hyperparameter["ID"]
+    SETTINGS["database"] = data["DATABASE_NAME"]
+    SETTINGS["experiment"] = data["EXPERIMENT_NAME"]
+    ARCH_SETTINGS = data["ARCHITECTURE_CONFIG"]
     SAVE_PATH = data["SEARCH_CONFIG"]["PATH"]
   acc = []
   metric_logger = MetricLogger(SAVE_PATH) 
@@ -71,7 +76,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
   test_args = {"cuda_device":cuda_device,"augmentation" :None, "binary" :SETTINGS["BINARY"]}
 
   if SETTINGS["RESAMPLES"]:
-    dataset, test_dataset = get_dataset(name,train_args, test_args )
+    dataset = get_dataset(name,train_args,None )
     kfold = KFold(n_splits = 5, shuffle = True)
     splits = [(None,None)]*SETTINGS["RESAMPLES"]
     train_dataset = dataset
@@ -95,7 +100,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
     
     if SETTINGS["GROUPED_RESAMPLES"]:
       # Initialize GroupKFold cross-validator with desired number of splits
-      kfold = GroupKFold(n_splits=SETTINGS["RESAMPLES"])
+      kfold = GroupKFold(n_splits=5)
       splits = [(None,None)]*SETTINGS["RESAMPLES"]
       train_dataset = dataset
       test_dataset = dataset
@@ -150,8 +155,8 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       if "stem" in hyperparameter["ops"]:
         stem_size = hyperparameter["ops"]["stem"]
       else:
-        stem_size = 64
-      model = ModelGraph(train_dataset.get_n_features(),stem_size,train_dataset.get_n_classes(),train_dataset.x.shape[2],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device,binary = SETTINGS["BINARY"])
+        stem_size = ARCH_SETTINGS["STEM_SIZE"][0]
+      model = ModelGraph(train_dataset.get_n_features(),stem_size,train_dataset.get_n_classes(),train_dataset.x.shape[2],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device,binary = SETTINGS["BINARY"],dropout = SETTINGS["DROPOUT"],droppath = SETTINGS["DROPPATH"])
       model = model.cuda(device = cuda_device)
       summary(model, (train_dataset.get_n_features(),test_dataset.get_length()))
       if SETTINGS["COMPILE"]:
@@ -164,7 +169,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       """
       params = sum(p.numel() for p in model.parameters() if p.requires_grad)
       print("Size: {}".format(params))
-      train_model(model , SETTINGS, trainloader , cuda_device,logger = False, evaluator = evaluator if SETTINGS["LIVE_EVAL"] else None) 
+      train_model(model , SETTINGS, trainloader , cuda_device, evaluator = evaluator if SETTINGS["LIVE_EVAL"] else None, fold = fold, repeat = _) 
     #print(prof.key_averages().table(sort_by="self_cpu_time_total"))
       torch.cuda.empty_cache()
       model.eval()

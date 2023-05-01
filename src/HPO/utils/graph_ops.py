@@ -28,10 +28,16 @@ OPS = {
   "relu" : lambda : nn.ReLU(),
   "batch_norm" : lambda C : nn.BatchNorm1d(C),
   "skip_connect" : lambda C : Identity(),
+  "MHA_2" : lambda C : MHA(C, 2),
   "MHA_4" : lambda C : MHA(C, 4),
-  "MHA_16" : lambda C : MHA(C, 16),
+  "MHA_8" : lambda C : MHA(C, 8),
+  "SE_1" : lambda C : SE(C, 1),
+  "SE_2" : lambda C : SE(C, 2),
   "SE_4" : lambda C : SE(C, 4),
-  "SE_16" : lambda C : SE(C, 16),
+  "lstm" :lambda C : LSTM(C, False),
+  "lstm_bi" :lambda C : LSTM(C, True),
+  "depth_lstm" :lambda C : DepthLSTM(C, False),
+  "depth_lstm_bi" :lambda C : DepthLSTM(C, True),
   "resample_channels" : lambda c_in,c_out: ResampleChannels(c_in,c_out),
   "downsample_resolution" : lambda c_in,stride: DownsampleResolution(c_in,stride),
   "point_conv_1" :  lambda C: PointConv(C, stride = 1,dilation = 1,padding = 1*(3 - 1)//2, affine = True),
@@ -68,6 +74,10 @@ OPS = {
   "depth_conv_31_8" :  lambda C: DepthConv(C,31, stride = 1,dilation = 8,padding = 8*(31 - 1)//2, affine = True),
   "depth_conv_63_8" :  lambda C: DepthConv(C,63, stride = 1,dilation = 8,padding = 8*(63 - 1)//2, affine = True),
   "depth_conv_15_16" :  lambda C: DepthConv(C,15, stride = 1,dilation = 16,padding =16*(15 - 1)//2, affine = True),
+  "depth_conv_31_16" :  lambda C: DepthConv(C,31, stride = 1,dilation = 16,padding = 8*(31 - 1)//2, affine = True),
+  "depth_conv_63_16" :  lambda C: DepthConv(C,63, stride = 1,dilation = 16,padding = 8*(31 - 1)//2, affine = True),
+  "depth_conv_15_32" :  lambda C: DepthConv(C,15, stride = 1,dilation = 32,padding =16*(15 - 1)//2, affine = True),
+  "depth_conv_31_32" :  lambda C: DepthConv(C,31, stride = 1,dilation = 32,padding =16*(15 - 1)//2, affine = True),
   "depth_conv_63_32" :  lambda C: DepthConv(C,63, stride = 1,dilation = 32,padding =32*(63 - 1)//2, affine = True),
   #AVERAGE POOLING OPERATIONS
   "avg_pool_3_1" :  lambda C: nn.AvgPool1d(3,stride = 1, padding = 1*(3 - 1)//2,count_include_pad=False),
@@ -176,6 +186,51 @@ class Zero(nn.Module):
   def forward(self, x):
     return x.mul(0.)
 
+
+class GRU(nn.Module):
+  def __init__(self, c):
+    super(GRU, self).__init__()
+    self.gru = nn.GRU(
+        input_size=c,
+        hidden_size=c,
+        num_layers=1,
+        batch_first=True,
+        bias = False
+        )
+
+class LSTM(nn.Module):
+  def __init__(self, c,bidirectional = False):
+    super(LSTM, self).__init__()
+    self.lstm = nn.LSTM(
+        input_size=c,
+        hidden_size=c,
+        num_layers=1,
+        batch_first=True,
+        bias = False
+        )
+  def forward(self,x):
+    x = x.permute(0,2,1)
+    x, (_1,_2) = self.lstm(x)
+    x = x.permute(0,2,1)
+    return x
+
+class DepthLSTM(nn.Module):
+  def __init__(self, c,bidirectional = False):
+    super(DepthLSTM, self).__init__()
+    self.lstms = nn.ModuleList(
+      [
+            nn.LSTM(input_size=1, hidden_size=1, num_layers=1, batch_first=True,bias = False,bidirectional = bidirectional)
+            for _ in range(c)
+        ])
+
+  def forward(self,x):
+    outputs = []
+    for i, lstm in enumerate(self.lstms):
+        input_channel = x[:, i, :].unsqueeze(-1)  # Select the ith feature and add feature dimension
+        output, (_1,_2) = lstm(input_channel)
+        outputs.append(output)
+    outputs = torch.cat(outputs, dim=-1)  # Concatenate outputs along the feature dimension
+    return outputs.permute(0,2,1)
 class DownsampleResolution(nn.Module):
   """
   This operation uses a depthwise convolution to reduce the signal resolution when needed.
@@ -244,7 +299,7 @@ class DepthConv(nn.Module):
   def __init__(self, c, kernel_size, padding,stride,dilation= 1, affine=True):
     super(DepthConv, self).__init__()
     #padding = (kernel_size*stride*dilation)//2
-    self.conv = nn.Conv1d(c,c, kernel_size=kernel_size, stride=stride, padding=padding, groups=c, bias=False)
+    self.conv = nn.Conv1d(c,c, kernel_size=kernel_size, stride=stride, padding="same", groups=c, bias=False)
 
   def forward(self, x):
     x =self.conv(x)
@@ -358,10 +413,20 @@ class MHA(nn.Module):
         self.k_linear = nn.Linear(d_model, d_model)
         self.v_linear = nn.Linear(d_model, d_model)
         self.out_linear = nn.Linear(d_model, d_model)
+        self.pe = None
+
+
 
     def forward(self, x):
         batch_size = x.size(0)
-
+        if self.pe == None or self.pe.shape[0] != 16:
+          pe = torch.zeros(x.shape)
+          pos = torch.arange(x.shape[2]).unsqueeze(1).view(1,-1)
+          denominator = torch.exp(torch.arange(0,self.d_model,2)*(-math.log(10000.0)/self.d_model)).unsqueeze(1)
+          pe[:,0::2,:] = torch.sin(pos *denominator)
+          pe[:,1::2,:] = torch.cos(pos *denominator)
+          self.pe = pe.cuda(x.device)
+        x += self.pe
         # Calculate q, k, and v
         x = x.permute(0, 2, 1)
         q = self.q_linear(x)

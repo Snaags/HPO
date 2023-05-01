@@ -54,19 +54,26 @@ class GraphConfigSpace:
   def __init__(self,JSON):
     self.data = JSON["ARCHITECTURE_CONFIG"]
     self.g = nx.DiGraph
-    self.n_operations = 30
+    self.n_operations = 32
+    self.edge_options = self.data["N_EDGES"]
     self.init_state = [("S",1),(1,"T")]
   def sample_configuration(self,n_samples=1):
     samples = []
     while len(samples) < n_samples:
       graph = copy.copy(self.init_state)
-      rate = 1
+      self.n_operations = random.choice(self.edge_options)
       while len(graph) < self.n_operations:
         rate = 0.5 
         self.g = nx.DiGraph()
         self.g.add_edges_from(graph)
         graph = gen_iter(graph,self.g,rate)
       self.g.add_edges_from(graph)
+      model_stride = random.choice(self.data["STRIDE_RATE"])
+      model_stride_channel_ratio = random.choice(self.data["CHANNEL_DEPTH_RATE"])
+      if model_stride == 4:
+        stride = self.data["STRIDE_COUNT"]/2
+      else:
+        stride = self.data["STRIDE_COUNT"]
       ops = generate_op_names(self.g)
       ops = random_ops_unweighted(ops, self.data)
       ops = random_activation_unweighted(ops,self.data)
@@ -76,7 +83,9 @@ class GraphConfigSpace:
       del ops["T_channel_ratio"]
       del ops["S_stride"]
       del ops["S_channel_ratio"]
-      ops = random_strides(ops,self.data["STRIDE_COUNT"])
+      ops = random_strides(ops,stride,self.data,model_stride,model_stride_channel_ratio)
+      ops["s_rate"] = model_stride
+      ops["s_c_ratio"] = model_stride_channel_ratio
       ops["stem"] = random.choice(self.data["STEM_SIZE"])
 
       samples.append({"graph":graph,"ops":copy.copy(ops)})

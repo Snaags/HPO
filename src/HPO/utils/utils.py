@@ -3,6 +3,8 @@ import numpy as np
 import torch
 import shutil
 from torch.autograd import Variable
+import json
+from sklearn.metrics import confusion_matrix
 
 
 class AvgrageMeter(object):
@@ -152,6 +154,25 @@ class MetricLogger:
 
 
 
+
+def calculate_train_vals(pred_tensor,gt_tensor):
+    # Convert the tensors to NumPy arrays
+  predictions = torch.argmax(pred_tensor, dim=1).numpy()
+  labels = gt_tensor.numpy()
+  # Calculate accuracy
+  correct = np.sum(predictions == labels)
+  total = len(labels)
+  accuracy = correct / total
+
+  # Determine the number of classes
+  num_classes = int(max(labels.max(), predictions.max()) + 1)
+
+  # Generate confusion matrix
+  cm = confusion_matrix(labels, predictions)
+
+  # Serialize the confusion matrix as a JSON string
+  confusion_matrix_str = json.dumps(cm.tolist())
+  return confusion_matrix_str, accuracy
 
 
 

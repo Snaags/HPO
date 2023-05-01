@@ -1,0 +1,3 @@
+Fix Cells concatenating all internal nodes regardless of whether they are used as an output or not. [DONE]
+Add Stride Channel ratio as an setting. [DONE]
+FIX CONCAT PROPAGATION AND RERUN CELL CHANNEL SEARCH [] 

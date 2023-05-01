@@ -9,13 +9,14 @@ NODE_TEMPLATES = [
   "{}_channel_ratio",
   "{}_combine"]
 
-def random_strides(ops,count):
+def random_strides(ops,count,data,stride, channel_ratio):
   s = [ x for x in ops if "stride" in x]
   while count > 0:
     o = random.choice(s)
-    ops[o] *= 2
-    ops["{}_channel_ratio".format(o.split("_")[0])] *= 1.5 # FIX THIS ALSO 
+    ops[o] *= stride
+    ops["{}_channel_ratio".format(o.split("_")[0])] *=channel_ratio # FIX THIS ALSO 
     count -= 1
+
   """
   for i in s:
     ops[i] = 2 ** (ops[i] - 1 )

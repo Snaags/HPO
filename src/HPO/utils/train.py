@@ -2,9 +2,11 @@ import random
 import torch
 import torch.nn as nn
 import numpy as np
+import json
 from HPO.utils.triplet import Batch_All_Triplet_Loss as Triplet_Loss
 from torch import Tensor
 from HPO.utils.train_log import Logger
+from HPO.utils.utils import calculate_train_vals
 from HPO.utils.model_constructor import Model
 from torch.utils.data import DataLoader
 from HPO.utils.train_utils import stdio_print_training_data
@@ -100,8 +102,9 @@ def train_model_triplet(model : Model , hyperparameter : dict, dataloader : Data
   return logger
 
 def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
-     cuda_device = None, evaluator= None,logger = None,run = None):
+     cuda_device = None, evaluator= None,logger = None,run = None,fold = None, repeat = None):
 
+  params = sum(p.numel() for p in model.parameters() if p.requires_grad)
   #INITIALISATION
   EPOCHS = hyperparameter["EPOCHS"]
   BATCH_SIZE = hyperparameter["BATCH_SIZE"] 
@@ -125,10 +128,15 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   loss_list = []
   total = 0
   correct = 0
+  cm_test = ""
   acc = 0
+  val_loss = torch.Tensor([0])
   recall = 0
-  if logger != False or logger == None:
-    logger = Logger()
+  val_acc = 0
+  if hyperparameter["LOGGING"]:
+    logger = Logger(hyperparameter["database"],hyperparameter["experiment"],hyperparameter["DATASET_CONFIG"]["NAME"],fold,repeat,params)
+  else:
+    logger = None
 
 
   #MAIN TRAINING LOOP
@@ -149,44 +157,60 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
         loss = criterion(outputs, labels)
       loss.backward()
       optimizer.step()
-      if PRINT_RATE_TRAIN:
+      if hyperparameter["LOGGING"]:
         pred_tensor = torch.cat((pred_tensor, outputs.detach().cpu().flatten(end_dim = 0)))
         gt_tensor = torch.cat((gt_tensor, labels.detach().cpu().flatten()))
 
       if PRINT_RATE_TRAIN and i % PRINT_RATE_TRAIN == 0:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,EPOCHS , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = BINARY)
 
-
-      
-        #print(outputs,labels)
-      if logger != False:
-        logger.update({"loss": loss.item(), "training_accuracy": (correct/total),"index" : i,
-              "epoch": epoch, "validation_accuracy": acc, "lr":optimizer.param_groups[0]['lr'],"validation recall": recall })
-    if PRINT_RATE_TRAIN:
-      pred_labels = torch.argmax(pred_tensor, dim=1).numpy()
-      gt_labels = gt_tensor.numpy()
-      with np.printoptions(linewidth = (10*len(np.unique(gt_labels))+20),precision=4, suppress=True):
-        print(confusion_matrix(gt_labels,pred_labels))
+    if hyperparameter["LOGGING"]:
+      cm_train, train_acc = calculate_train_vals(pred_tensor,gt_tensor)
+      if PRINT_RATE_TRAIN:
+        pred_labels = torch.argmax(pred_tensor, dim=1).numpy()
+        gt_labels = gt_tensor.numpy()
+        with np.printoptions(linewidth = (10*len(np.unique(gt_labels))+20),precision=4, suppress=True):
+          print(confusion_matrix(gt_labels,pred_labels))
     if hyperparameter["WEIGHT_AVERAGING_RATE"] and epoch % hyperparameter["WEIGHT_AVERAGING_RATE"] == 0:
         torch.save(model.state_dict() ,"SWA/run-{}-checkpoint-{}".format(run, epoch))
-    if hyperparameter["MODEL_VALIDATION_RATE"] and epoch % hyperparameter["MODEL_VALIDATION_RATE"] == 0 and epoch != 0:
+    if hyperparameter["MODEL_VALIDATION_RATE"] and epoch % hyperparameter["MODEL_VALIDATION_RATE"] == 0:
         if evaluator != None:
           model.eval()
           evaluator.forward_pass(model,binary = BINARY)
           evaluator.predictions(model_is_binary = BINARY,THRESHOLD = hyperparameter["THRESHOLD"])
-          #if binary:
-          #  evaluator.ROC("train")
-          acc = evaluator.T_ACC()
+          val_loss = evaluator.calculate_loss(criterion,BINARY)
+          val_acc = evaluator.T_ACC()
           recall = evaluator.TPR(1)
+          cm_test = evaluator.confusion_matrix.copy()
+          
           evaluator.reset_cm()
           model.train()
           print("")
-          print("Validation set Accuracy: {} -- Recall: {}".format(acc,recall))
+          print("Validation set Accuracy: {} -- Recall: {} -- loss: {}".format(val_acc,recall,val_loss))
           print("")
+
+    if hyperparameter["LOGGING"]:
+      cm_test = json.dumps(cm_test.tolist())
+      logger.update({
+        "loss": loss.item(), 
+        "training_accuracy": train_acc,
+        "ID":hyperparameter["ID"],
+        "epoch": epoch, 
+        "validation_accuracy": val_acc, 
+        "lr":optimizer.param_groups[0]['lr'],
+        "validation_loss": val_loss.item(),
+        "confusion_matrix_train": cm_train,
+        "confusion_matrix_test": cm_test
+        })
+
+
+
     scheduler.step()
     epoch += 1
   print()
   print("Num epochs: {}".format(epoch))
+  if hyperparameter["LOGGING"]:
+    logger.close()
   return logger
 
 def train_model_regression(model : Model , hyperparameter : dict, dataloader : DataLoader ,

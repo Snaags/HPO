@@ -142,14 +142,16 @@ class CellSpaceRepeat:
   def __init__(self,JSON):
     self.data = JSON["ARCHITECTURE_CONFIG"]
     self.n_nodes = 4
-    self.cells = 7
+    self.cells = self.data["N_CELLS"]
     self.reduce = 1
 
   def sample_configuration(self,n):
     configs = []
     for i in range(n):
       self.g = nx.DiGraph()
-      model = build_macro_repeat( data = self.data, n_nodes = self.n_nodes, n_cells = self.cells, reduction_freq = self.reduce)
+      model_stride = random.choice(self.data["STRIDE_RATE"])
+      model_stride_channel_ratio = random.choice(self.data["CHANNEL_DEPTH_RATE"])
+      model = build_macro_repeat( data = self.data, n_nodes = self.n_nodes, n_cells = self.cells, reduction_freq = self.reduce,stride = model_stride,channel_ratio = model_stride_channel_ratio)
       self.g.add_edges_from(model[0])
       #ops = generate_op_names(self.g)
       #ops = random_ops_unweighted(ops, self.data)
@@ -158,7 +160,9 @@ class CellSpaceRepeat:
       #ops = random_combine_unweighted(ops,self.data)
       #ops = random_strides(ops,self.data["STRIDE_COUNT"])
 
-      
+
+
+       
       ops_temp = generate_skip(self.g)
       for i in ops_temp:
           if not i in model[1]:
@@ -174,7 +178,8 @@ class CellSpaceRepeat:
         if "combine" in i:
           if model[1][i] == 1:
             model[1][i] = "ADD"
-      
+      model[1]["s_rate"] = model_stride
+      model[1]["s_c_ratio"] = model_stride_channel_ratio
       configs.append({"graph": model[0], "ops": model[1]})
     return configs
 

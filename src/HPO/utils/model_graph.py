@@ -180,7 +180,8 @@ def transform_idx(original_list,original_list_permuted,new_list):
   return list(np.asarray(new_list)[transform_idx])
 
 class ModelGraph(nn.Module):
-  def __init__(self,n_features, n_channels, n_classes,signal_length, graph : list, ops : list, device,binary = False,data_dim = 1,sigmoid = False,dropout = 0.3):
+  def __init__(self,n_features, n_channels, n_classes,signal_length, 
+    graph : list, ops : list, device,binary = False,data_dim = 1,sigmoid = False,dropout = 0.3,droppath = True):
     super(ModelGraph,self).__init__()
     #INITIALISING MODEL VARIABLES
     self.DEBUG = True
@@ -196,7 +197,9 @@ class ModelGraph(nn.Module):
     #STRUCTURES FOR HOLDING DATA STATES AND OPERATIONS
     self.states = {}
     self.nodes  = {}
-    if dropout:
+    if dropout and droppath:
+      self.dropout = DropPath(dropout,self.device)
+    elif dropout:
       self.dropout = nn.Dropout(dropout)
     else:
       self.dropout = nn.Identity()
@@ -347,8 +350,7 @@ class ModelGraph(nn.Module):
       self.combine_index+=1
 
   def _forward(self, op,edge):
-    if self.states[edge[0]].shape[1] > 1:
-      self.states[edge[0]] = self.dropout(self.states[edge[0]])
+    self.states[edge[0]] = self.dropout(self.states[edge[0]])
     #print(edge,self.states[edge[0]].shape, op)
     #print("Predicted channels: {} {}".format(self.channel_dict[edge[0]],self.channel_dict[edge[1]]))
     h = op(self.states[edge[0]])
@@ -357,10 +359,12 @@ class ModelGraph(nn.Module):
       self.states[edge[1]] = h
     #CASE 2 - 2 INPUTS OF SAME SIZE (ADD)
     elif self.nodes[edge[1]].combine == "ADD":
+      """
       if self.states[edge[1]].shape != h.shape:
         print("PREADD SHAPE: {} - {}".format(self.states[edge[1]].shape, h.shape))
         print("OP: {}".format(op))
         print("PREVIOUS SHAPE: {}".format(self.states[edge[0]].shape))
+      """
       self.states[edge[1]] = self.states[edge[1]] + h
     elif self.nodes[edge[1]].combine == "CONCAT":
       #print("PRECONCAT: {} - {}".format(self.states[edge[1]].shape, h.shape))
@@ -385,6 +389,20 @@ class ModelGraph(nn.Module):
     if self.sigmoid:
       x = self.actfc(x)
     return x
+
+class DropPath(nn.Module):
+  def __init__(self, drop_prob,device):
+    super(DropPath, self).__init__()
+    self.drop_prob = drop_prob
+    self.device = device
+  def forward(self,x):
+    if self.drop_prob > 0.:
+      keep_prob = 1.-self.drop_prob
+      mask = torch.FloatTensor(x.size(0), 1, 1).bernoulli_(keep_prob).cuda(self.device)
+      #x.div(keep_prob)
+      x.mul(mask)
+    return x
+
 
       
     

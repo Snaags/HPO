@@ -14,7 +14,20 @@ def build_cell_graph(n_nodes = 4):
         graph.append((end_node,n_nodes +3))
     ops["{}_combine".format(n_nodes +3 )] = "CONCAT" 
     graph = prune_cell(graph,n_nodes)
+    graph = fix_concat_inputs(graph,n_nodes)
     return graph, ops
+
+def fix_concat_inputs(graph,n_nodes):
+    nodes = [i for i in range(3,n_nodes+3)]
+    output = max(nodes) + 1 
+    for edge in graph:
+        if edge[0] in nodes and edge[1] in nodes and (edge[0],output) in graph:
+
+            graph.remove((edge[0],output))
+
+    print(graph)
+    return graph
+
 
 def generate_cell_ops(graph,ops,data,n_nodes = 4):
     nodes = [i for i in range(3,n_nodes+3)]
@@ -46,7 +59,7 @@ def generate_cell_ops(graph,ops,data,n_nodes = 4):
 
 
 def prune_cell(graph, n_nodes = 4):
-    nodes = [i for i in range(3,n_nodes+3)]
+    nodes = [i for i in range(3,n_nodes+2)]
     count_list = {}
     for i in nodes:
         count_list[i] = 0
@@ -55,7 +68,7 @@ def prune_cell(graph, n_nodes = 4):
             count_list[edge[1]] += 1
     while max(count_list.values()) > 2:
         edge = random.choice(graph)
-        if edge[1] in nodes and count_list[edge[1]] > 1:
+        if edge[1] in nodes and count_list[edge[1]] > 2:
             graph.remove(edge)
             count_list[edge[1]] -= 1
     return graph
@@ -120,7 +133,7 @@ def build_macro( n_nodes = 8, n_cells = 5, reduction_freq = 3):
     ops.update(hold_dict)
     return graph, ops
 
-def build_macro_repeat(data, n_nodes = 8, n_cells = 5, reduction_freq = 3):
+def build_macro_repeat(data, n_nodes = 8, n_cells = 5, reduction_freq = 3,stride= 2, channel_ratio =2 ):
     """
     Builds the graph of a cell style search space
     """
@@ -140,10 +153,10 @@ def build_macro_repeat(data, n_nodes = 8, n_cells = 5, reduction_freq = 3):
         cell_outputs.append((n_nodes+3) + (n_nodes+3)*layer)
         graph.extend([(cell_outputs[-3],cell_outputs[-1]-((n_nodes+2))),((cell_outputs[-2],cell_outputs[-1]-(n_nodes+1)))])
         if layer % reduction_freq == 0 and layer != 0 and layer != n_cells -1 :
-            ops["{}_channel_ratio".format(cell_outputs[-1]-(n_nodes+2))] = 2
-            ops["{}_channel_ratio".format(cell_outputs[-1]-(n_nodes+1))] = 2
-            ops["{}_stride".format(cell_outputs[-1]-(n_nodes+2))] = 2
-            ops["{}_channel_ratio".format(cell_outputs[-1]-(n_nodes+1))] = 2
+            ops["{}_channel_ratio".format(cell_outputs[-1]-(n_nodes+2))] = channel_ratio
+            ops["{}_channel_ratio".format(cell_outputs[-1]-(n_nodes+1))] = channel_ratio
+            ops["{}_stride".format(cell_outputs[-1]-(n_nodes+2))] = stride
+            ops["{}_channel_ratio".format(cell_outputs[-1]-(n_nodes+1))] = channel_ratio
 
 
     g = nx.DiGraph()
