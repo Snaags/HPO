@@ -9,7 +9,7 @@ import os
 import json
 from datetime import datetime
 import sqlite3
-
+import cProfile
 
 def main(JSON_CONFIG):
   with open(JSON_CONFIG) as conf:
@@ -34,6 +34,9 @@ def main(JSON_CONFIG):
   #DEFINE FUNCTIONS FROM MODULES
   algorithm = _algorithm.main
   worker = _worker.compute
+
+
+
   config = eval("_config.{}({})".format(data["CONFIG_MODULE_NAME"],data))
   #STORE DATA IN EXPERIMENT JSON FILE 
   data["DATE"] = "".join(str(datetime.now()).split(" "))
@@ -49,37 +52,49 @@ def main(JSON_CONFIG):
   #START SEARCH
 
   # Connect to the SQLite database (this will create a new file called 'training_info.db')
-  database = data["DATABASE_NAME"]
-  conn = sqlite3.connect(database)
-  c = conn.cursor()
+  if data["WORKER_CONFIG"]["LOGGING"]:
+    database = data["DATABASE_NAME"]
+    conn = sqlite3.connect(database)
+    c = conn.cursor()
 
-  # Create a table to store training information
+    # Create a table to store training information
 
-  # Create the training_info table
-  c.execute("""
-  CREATE TABLE IF NOT EXISTS training_info (
-      experiment TEXT,
-      dataset TEXT,
-      model_id INTEGER,
-      epoch INTEGER,
-      training_loss REAL,
-      validation_loss REAL,
-      training_accuracy REAL,
-      validation_accuracy REAL,
-      learning_rate REAL,
-      confusion_matrix_train TEXT,
-      confusion_matrix_test TEXT,
-      fold INTEGER,
-      repeat INTEGER,
-      parameters INTEGER,
-      PRIMARY KEY (model_id, epoch)
-  )
-  """)
-  conn.commit()
+    # Create the training_info table
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS training_info (
+        experiment TEXT,
+        dataset TEXT,
+        model_id INTEGER,
+        epoch INTEGER,
+        training_loss REAL,
+        validation_loss REAL,
+        training_accuracy REAL,
+        validation_accuracy REAL,
+        learning_rate REAL,
+        confusion_matrix_train TEXT,
+        confusion_matrix_test TEXT,
+        fold INTEGER,
+        repeat INTEGER,
+        parameters INTEGER,
+        PRIMARY KEY (model_id, epoch)
+    )
+    """)
+    conn.commit()
 
-
-
-  algorithm(worker, config,experiment_json)
+  if False:
+    def profiled_worker(*args, **kwargs):
+        profiler = cProfile.Profile()
+        profiler.enable()
+        
+        result = worker(*args, **kwargs)
+        
+        profiler.disable()
+        profiler.dump_stats(f'profile_output_{os.getpid()}.txt')
+        
+        return result
+    algorithm(profiled_worker, config,experiment_json)
+  else:
+    algorithm(worker, config,experiment_json)
   with open(JSON_CONFIG) as conf:
     data = json.load(conf)
   data["END_TIME"] = time.time()

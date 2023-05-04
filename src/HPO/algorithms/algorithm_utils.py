@@ -3,8 +3,18 @@ import time
 import csv
 import json
 from pynvml import *
+import cProfile
 
-
+def profiled_function(worker,*args, **kwargs):
+    profiler = cProfile.Profile()
+    profiler.enable()
+    
+    result = worker(*args, **kwargs)
+    
+    profiler.disable()
+    profiler.dump_stats(f'profile_output_{os.getpid()}.txt')
+    
+    return result
 
 def load(FILENAME):
     scores = []
@@ -86,6 +96,58 @@ class train_eval:
     self.gpu[idx] -= 1
     return idx
     
+
+  def init_async(self, population):
+    self.acc_list = []
+    self.recall_list = []
+    self.param_list = []
+    self.config_list = []
+    self.processes = []
+    gpu = assign_gpu()
+    self.gpu =gpu
+    for ID,i in enumerate(population):
+      if type(i) != dict:
+        c = i.get_dictionary()
+      else:
+        c = i
+      if not "ID" in c:
+        c["ID"] = len(self.config_list_full) + ID + self.ID_INIT
+      self.config_queue.put(c)
+    
+    #Initialise GPU slots
+    while True:
+      slot = self.allocate_gpu()
+      if slot == None:
+        break
+      else:
+        self.gpu_slots.put(slot)
+    #Initialise Processes
+    while len(self.processes) < self.num_worker:
+      print("Number of workers: {}".format(self.num_worker))
+      self.processes.append(Process(target = self.worker , args = (i, self.config_queue , self.gpu_slots, self.results,self.JSON_CONFIG)))
+
+    ###Main Evaluation Loop###
+    for i in self.processes:
+      i.start()
+    print("returning to main loop!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    return [],[],[]
+
+  def update_async(self,config):
+    if type(config) != dict:
+      c = config.get_dictionary()
+    else:
+      c = config
+    if not "ID" in c:
+      c["ID"] = len(self.config_list_full) + 1 + self.ID_INIT
+    self.config_queue.put(c)
+
+  def get_async(self):
+    self.acc_list = []
+    self.recall_list = []
+    self.config_list = []
+    self.write2file()
+    return self.acc_list, self.recall_list, self.config_list
+
 
   def eval(self, population, datasets = None):
     self.acc_list = []

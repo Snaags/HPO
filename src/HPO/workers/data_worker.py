@@ -39,7 +39,6 @@ Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
 
 def compute(*args, **kwargs):
   __compute(*args, **kwargs, _compute = _compute)
-  print("got out of __compute")
   return None
 
 
@@ -84,7 +83,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
   elif SETTINGS["CROSS_VALIDATION_FOLDS"] == False: 
     train_dataset, test_dataset = get_dataset(name,train_args, test_args)
     splits = [(None,None)]
-    print(train_dataset, test_dataset)
+    #print(train_dataset, test_dataset)
   elif SETTINGS["CROSS_VALIDATION_FOLDS"]:
     dataset, test_dataset = get_dataset(name,train_args, test_args)
     kfold = KFold(n_splits = SETTINGS["CROSS_VALIDATION_FOLDS"], shuffle = False)
@@ -117,10 +116,10 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       splits = kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy())
       train_dataset = dataset
       test_dataset = dataset
-    print("train",train_dataset.y.shape,train_dataset.y )
-    print("test",test_dataset.y.shape,test_dataset.y )
+    #print("train",train_dataset.y.shape,train_dataset.y )
+    #print("test",test_dataset.y.shape,test_dataset.y )
     for fold, (train_ids, test_ids) in enumerate(splits):    
-      print('---Fold No.--{}--------------------'.format(fold))
+      #print('---Fold No.--{}--------------------'.format(fold))
       torch.cuda.empty_cache()
       if SETTINGS["GROUPED_RESAMPLES"]:
          train_ids, test_ids = next(kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy(),groups =dataset.groups))
@@ -148,7 +147,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
         dataset.enable_augmentation(augs)
       n_classes = test_dataset.get_n_classes()
       evaluator = Evaluator(SETTINGS["BATCH_SIZE"], test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
-      print("classes: {} - name: {}".format(train_dataset.get_n_classes(),name))
+      #print("classes: {} - name: {}".format(train_dataset.get_n_classes(),name))
       #g = GraphConfigSpace(50)
       #s = g.sample_configuration()
       #s = s[0]
@@ -158,7 +157,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
         stem_size = ARCH_SETTINGS["STEM_SIZE"][0]
       model = ModelGraph(train_dataset.get_n_features(),stem_size,train_dataset.get_n_classes(),train_dataset.x.shape[2],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device,binary = SETTINGS["BINARY"],dropout = SETTINGS["DROPOUT"],droppath = SETTINGS["DROPPATH"])
       model = model.cuda(device = cuda_device)
-      summary(model, (train_dataset.get_n_features(),test_dataset.get_length()))
+      #summary(model, (train_dataset.get_n_features(),test_dataset.get_length()))
       if SETTINGS["COMPILE"]:
         torch.set_float32_matmul_precision('high')
         model = torch.compile(model)
@@ -168,7 +167,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       ### Train the model
       """
       params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-      print("Size: {}".format(params))
+      #print("Size: {}".format(params))
       train_model(model , SETTINGS, trainloader , cuda_device, evaluator = evaluator if SETTINGS["LIVE_EVAL"] else None, fold = fold, repeat = _) 
     #print(prof.key_averages().table(sort_by="self_cpu_time_total"))
       torch.cuda.empty_cache()
@@ -182,13 +181,13 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       recall.append(evaluator.TPR(1))
       recall_total = evaluator.P(1)
       print("Accuracy: ", "%.4f" % ((acc[-1])*100), "%")
-      print("Recall: ", "%.4f" % ((recall[-1])*100), "%")
+      #print("Recall: ", "%.4f" % ((recall[-1])*100), "%")
       if SETTINGS["SAVE_WEIGHTS"]:
         torch.save(model.state_dict(),"{}/weights/{:.02f}-{}".format(SAVE_PATH,acc[-1],hyperparameter["ID"]))
       metric_logger.update({"ID" : hyperparameter["ID"], "accuracy" : acc[-1], "recall": recall[-1]})
     acc_ = np.mean(acc)
     recall_ = np.mean(recall)
-    print("Average Accuracy: ", "%.4f" % ((acc_)*100), "%")
+    #print("Average Accuracy: ", "%.4f" % ((acc_)*100), "%")
   return acc_, recall_,params
 
 

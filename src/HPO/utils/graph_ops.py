@@ -238,11 +238,16 @@ class DownsampleResolution(nn.Module):
   """
   def __init__(self, c_in,stride):
     super(DownsampleResolution,self).__init__()
-    if stride > 2:
-      print("Stride: {}".format(stride))
+    self.stride = stride
     self.conv1 = nn.Conv1d(c_in,c_in, kernel_size = stride, stride = stride, bias = False, groups = c_in)
   def forward(self,x):
-    return self.conv1(x)
+    try:
+      return self.conv1(x)
+    except RuntimeError:
+      print("Kernel Size Error")
+      print("Convolution Size: {}".format(self.conv1))
+      print("Input Size: {}".format(x.shape))
+      print("Stride Value : {}".format(self.stride))
 
 class ResampleChannels(nn.Module):
   """
@@ -414,8 +419,6 @@ class MHA(nn.Module):
         self.v_linear = nn.Linear(d_model, d_model)
         self.out_linear = nn.Linear(d_model, d_model)
         self.pe = None
-
-
 
     def forward(self, x):
         batch_size = x.size(0)

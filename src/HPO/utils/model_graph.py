@@ -15,7 +15,7 @@ def propagate_channels(edges,ops):
   for i in ops:
     if "channel" in i:
         if ops[i] != 1:
-          print(i,ops[i])
+          #print(i,ops[i])
           down_sample_nodes.append((int(i.split("_")[0])))
   res_dict = {}
   for n in g.nodes():
@@ -73,9 +73,9 @@ def propagate_channels_combine(edges,ops):
       #    print("Down Stream Nodes: {}".format(update_list))
       #    for _nodes in update_list:
 
-      print(res_dict)
-  print("combines: {}".format(res_dict))
-  print(ops)
+      #print(res_dict)
+  #print("combines: {}".format(res_dict))
+  #print(ops)
   return res_dict
 
 
@@ -95,11 +95,11 @@ def propagate_cat_num(edges,ops):
   res_dict = {}
   for n in g.nodes():
       res_dict[n] = 1
-      print(n)
+      #print(n)
   nodes = list(nx.topological_sort(g))
   for i in nodes:
     if i in combine_nodes:
-      print("Node: {}".format(i))
+      #print("Node: {}".format(i))
       if ops["{}_combine".format(i)] == "CONCAT":
           predecessor_nodes = list(g.predecessors(i))
           print("Combine values: {}".format(predecessor_nodes))
@@ -110,14 +110,14 @@ def propagate_cat_num(edges,ops):
 
 
 def propagate_resolution(edges, ops):
-  print(edges)
+  #print(edges)
   down_sample_nodes = []
   g = nx.DiGraph()
   g.add_edges_from(edges)
   for i in ops:
     if "stride" in i:
       if ops[i] > 1:
-        print(i,ops[i])
+        #print(i,ops[i])
         down_sample_nodes.append(int(i.split("_")[0]))
   res_dict = {}
   for n in g.nodes():
@@ -155,11 +155,12 @@ class Node:
 
   def generate_edge(self,node_previous) -> list: 
     ops = []#nn.ModuleList()
-    print("output channel sizes : {} {} {}".format(self.channels, self.cat_num,self.channels/self.cat_num))
+    #print("output channel sizes : {} {} {}".format(self.channels, self.cat_num,self.channels/self.cat_num))
     if self.channels/self.cat_num != node_previous.channels:
       ops.append(OPS["resample_channels"](node_previous.channels,int(self.channels/self.cat_num)))
     self.stride = 2**round(math.log(node_previous.length // self.length,2))
-    print("lengths:",node_previous.length,self.length,self.stride)
+    if self.stride > 513:
+      print("lengths:",node_previous.length,self.length,self.stride)
     if self.stride != 1:
       ops.append(OPS["downsample_resolution"](int(self.channels/self.cat_num),self.stride))
     if self.normalisation != "none":
@@ -184,7 +185,7 @@ class ModelGraph(nn.Module):
     graph : list, ops : list, device,binary = False,data_dim = 1,sigmoid = False,dropout = 0.3,droppath = True):
     super(ModelGraph,self).__init__()
     #INITIALISING MODEL VARIABLES
-    self.DEBUG = True
+    self.DEBUG = False
     self.device = device
     self.data_dim = data_dim
     self.n_features = n_features
@@ -230,9 +231,9 @@ class ModelGraph(nn.Module):
     self.resolution_dict = propagate_resolution(self.sorted_graph, self.ops_list)
     self.channel_dict = propagate_channels(self.sorted_graph, self.ops_list)
     self.cat_num_dict = propagate_cat_num(self.sorted_graph, self.ops_list)
-    print(self.channel_dict)
-    print(self.resolution_dict)
-
+    #print(self.channel_dict)
+    #print(self.resolution_dict)
+    signal_length = signal_length//2
     g = nx.DiGraph()
     g.add_edges_from(self.sorted_graph)
     for i in g.nodes():
