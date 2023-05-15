@@ -117,7 +117,7 @@ def propagate_resolution(edges, ops):
   for i in ops:
     if "stride" in i:
       if ops[i] > 1:
-        #print(i,ops[i])
+        print(i,ops[i])
         down_sample_nodes.append(int(i.split("_")[0]))
   res_dict = {}
   for n in g.nodes():
@@ -128,7 +128,7 @@ def propagate_resolution(edges, ops):
           update_list = list(nx.bfs_tree(g, source=i).nodes())
           for _nodes in update_list:
               res_dict[_nodes] *= ops["{}_stride".format(i)]
-  """
+
   plt.figure(figsize = (19,12))
   nx.draw(
       g, edge_color='black', width=1, linewidths=1,
@@ -137,7 +137,7 @@ def propagate_resolution(edges, ops):
       )
   plt.axis('off')
   plt.savefig("resolutions")
-  """
+
   return res_dict
 
 class Node:
@@ -182,7 +182,8 @@ def transform_idx(original_list,original_list_permuted,new_list):
 
 class ModelGraph(nn.Module):
   def __init__(self,n_features, n_channels, n_classes,signal_length, 
-    graph : list, ops : list, device,binary = False,data_dim = 1,sigmoid = False,dropout = 0.3,droppath = True):
+    graph : list, ops : list, device,binary = False,data_dim = 1,sigmoid = False,
+    dropout = 0.3,droppath = False,raw_stem = False):
     super(ModelGraph,self).__init__()
     #INITIALISING MODEL VARIABLES
     self.DEBUG = False
@@ -218,7 +219,10 @@ class ModelGraph(nn.Module):
       STEM_STRIDE = 2 
       self.stem = nn.Conv2d(n_features,n_channels,2,stride = STEM_STRIDE ,padding = STEM_PADDING)
     else:
-      self.stem = nn.Conv1d(n_features,n_channels,2,stride = 2) #Will just leave this at defaults for now
+      if raw_stem == True:
+        self.stem = nn.Conv1d(n_features,n_channels,1,stride = 1)
+      else:
+        self.stem = nn.Conv1d(n_features,n_channels,2,stride = 2) #Will just leave this at defaults for now
     self.stem = self.stem.cuda(device)
 
     #DEFINE OP_MODULE BASED ON DATA_DIM

@@ -1,4 +1,4 @@
-from sklearn.metrics import confusion_matrix, roc_curve, auc
+from sklearn.metrics import confusion_matrix, roc_curve, auc, balanced_accuracy_score
 import matplotlib.pyplot as plt 
 import numpy as np
 import torch
@@ -385,6 +385,10 @@ class Evaluator:
     self.confusion_matrix = confusion_matrix(labels,prediction,labels = list(range(self.n_classes)))
   def update_CM(self):
     self.confusion_matrix += confusion_matrix(self.labels, self.prediction,labels = list(range(self.n_classes))) 
+
+  def balanced_acc(self):
+    return balanced_accuracy_score(self.labels, self.prediction) 
+
   def reset_cm(self):
     self.confusion_matrix = np.zeros(shape = (self.n_classes,self.n_classes)) #Matrix of prediction vs true values
 

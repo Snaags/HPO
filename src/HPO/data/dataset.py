@@ -7,9 +7,20 @@ from HPO.data.UEA_datasets import *
 DATASETS = {
     "teps" : (Train_TEPS,Test_TEPS),
     "HAR" : (Train_HAR,Test_HAR),
-    "SHAR" : (SHAR, None),
+    "SHAR" : (SHAR, SHAR_TEST),
     "EEG" : (Train_EEG,Test_EEG),
-    "FORDB" : (Train_FORDB,Test_FORDB)
+    "LSST" : (Train_LSST,Test_LSST),
+    "PhonemeSpectra" : (Train_PhonemeSpectra,Test_PhonemeSpectra),
+    "FaceDetection" : (Train_FaceDetection,Test_FaceDetection),
+    "PenDigits" : (Train_PenDigits,Test_PenDigits),
+    "FORDB" : (Train_FORDB,Test_FORDB),
+    "FaceDetection" : (Train_FaceDetection,Test_FaceDetection),
+    "Full_FaceDetection" : (Full_FaceDetection,Full_FaceDetection),
+    "Full_LSST" : (Full_LSST,Full_LSST),
+    "Full_PhonemeSpectra" : (Full_PhonemeSpectra,Full_PhonemeSpectra),
+    "UWaveGestureLibrary" : (Train_UWaveGestureLibrary,Test_UWaveGestureLibrary),
+    "Full_UWaveGestureLibrary" : (Full_UWaveGestureLibrary,Full_UWaveGestureLibrary)
+    
 }
 
 

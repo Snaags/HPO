@@ -76,7 +76,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
 
   if SETTINGS["RESAMPLES"]:
     dataset = get_dataset(name,train_args,None )
-    kfold = KFold(n_splits = 5, shuffle = True)
+    kfold = KFold(n_splits = 2, shuffle = True)
     splits = [(None,None)]*SETTINGS["RESAMPLES"]
     train_dataset = dataset
     test_dataset = dataset
@@ -99,13 +99,13 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
     
     if SETTINGS["GROUPED_RESAMPLES"]:
       # Initialize GroupKFold cross-validator with desired number of splits
-      kfold = GroupKFold(n_splits=5)
+      kfold = GroupKFold(n_splits=2)
       splits = [(None,None)]*SETTINGS["RESAMPLES"]
       train_dataset = dataset
       test_dataset = dataset
 
     elif SETTINGS["RESAMPLES"]:
-      kfold = KFold(n_splits = 5, shuffle = True)
+      kfold = KFold(n_splits = 2, shuffle = True)
       splits = [(None,None)]*SETTINGS["RESAMPLES"]
       train_dataset = dataset
       test_dataset = dataset
@@ -155,7 +155,10 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
         stem_size = hyperparameter["ops"]["stem"]
       else:
         stem_size = ARCH_SETTINGS["STEM_SIZE"][0]
-      model = ModelGraph(train_dataset.get_n_features(),stem_size,train_dataset.get_n_classes(),train_dataset.x.shape[2],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device,binary = SETTINGS["BINARY"],dropout = SETTINGS["DROPOUT"],droppath = SETTINGS["DROPPATH"])
+      model = ModelGraph(train_dataset.get_n_features(),stem_size,train_dataset.get_n_classes(),
+          train_dataset.x.shape[2],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device,
+          binary = SETTINGS["BINARY"],dropout = SETTINGS["DROPOUT"],droppath = SETTINGS["DROPPATH"],
+          raw_stem = SETTINGS["RAW_STEM"])
       model = model.cuda(device = cuda_device)
       #summary(model, (train_dataset.get_n_features(),test_dataset.get_length()))
       if SETTINGS["COMPILE"]:
@@ -201,4 +204,4 @@ if __name__ == "__main__":
       HP["ID"] = "val"
       HP["graph"] = search["config"][search["best"].index(min(search["best"]))]["graph"]
       HP["ops"] = search["config"][search["best"].index(min(search["best"]))]["ops"]
-    _compute(HP,2,sys.argv[1])
+    _compute(HP,1,sys.argv[1])

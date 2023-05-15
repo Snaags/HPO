@@ -128,14 +128,14 @@ class GraphConfigSpace:
       del ops["T_channel_ratio"]
       del ops["S_stride"]
       del ops["S_channel_ratio"]
-      ops = random_strides(ops,8,self.data,2,model_stride_channel_ratio)
+      ops = random_strides(ops,stride,self.data,2,model_stride_channel_ratio)
       #ops["s_rate"] = model_stride
       #ops["s_c_ratio"] = model_stride_channel_ratio
       #ops["stem"] = random.choice(self.data["STEM_SIZE"])
       samples.append(Graph(graph, self.g.nodes,copy.copy(ops),self.data))
     return samples
   
-  def mutate_graph(self,m):
+  def mutate_graph(self,m,steps = 1):
     edges = m["graph"]
     ops = m["ops"]
     g = nx.DiGraph()
@@ -145,6 +145,8 @@ class GraphConfigSpace:
     while result == False:
       result = self.check_valid(copy.deepcopy(model))
     #print("Time to find valid model: ",time.time()- s)
+    if steps>0:
+      return self.mutate_graph(result(),steps-1)
     return result
 
   def check_valid(self,model):
@@ -194,9 +196,10 @@ def log_graph_change(func):
     return wrapper
 
 
+
+
 class Edge:
   def __init__(self,source,end,operation = None):
-    self.id = [source,end]
     self.source = source
     self.end = end
     self.operation = operation
@@ -207,7 +210,13 @@ class Edge:
     return out_dict
 
   def get_edge(self):
-    return [(self.source,self.end)]
+    return (self.source,self.end)
+
+  def update(self,value):
+    if type(self.source) == int:
+      self.source += value
+    if type(self.end) == int:   
+      self.end += value
 
 class Vertex:
   def __init__(self,ID,attributes : dict):
@@ -221,6 +230,10 @@ class Vertex:
     for key, value in self.attributes.items():
       out_dict["{}_{}".format(self.id,key)] = value
     return out_dict
+
+  def update(self,value):
+    if type(self.id) == int:
+      self.id += value
 
 
 class Graph:
@@ -241,8 +254,16 @@ class Graph:
     def __call__(self):
       ops = {k: v for d in self.vertices for k, v in self.vertices[d]().items()}
       ops.update({k: v for d in self.edges for k, v in self.edges[d]().items()})
-      graph = [ e for e in self.edges]
+      graph = [ self.edges[e].get_edge() for e in self.edges]
       return { "graph":graph,"ops":ops}
+
+
+    def rename_vertices(self,value):
+      for e in self.edges:
+        self.edges[e].update(value)
+      for v in self.vertices:
+        self.vertices[v].update(value)
+
 
     def to_networkx(self):
         # Create a new directed graph using networkx

@@ -116,7 +116,8 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
 
   #CONFIGURATION OF OPTIMISER AND LOSS FUNCTION
   optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["LR"])
-  scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,EPOCHS)
+  if hyperparameter["SCHEDULE"] == True:
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,EPOCHS,eta_min = hyperparameter["LR_MIN"])
   if hyperparameter["BINARY"] == True:
     criterion = nn.BCEWithLogitsLoss().cuda(device = cuda_device)
   else:
@@ -182,11 +183,11 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
           val_acc = evaluator.T_ACC()
           recall = evaluator.TPR(1)
           cm_test = evaluator.confusion_matrix.copy()
-          
+          bal_acc = evaluator.balanced_acc()
           evaluator.reset_cm()
           model.train()
           print("")
-          print("Validation set Accuracy: {} -- Recall: {} -- loss: {}".format(val_acc,recall,val_loss))
+          print("Validation set Accuracy: {} -- Balanced Accuracy: {} -- loss: {}".format(val_acc, bal_acc ,val_loss))
           print("")
 
     if hyperparameter["LOGGING"]:
@@ -204,8 +205,8 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
         })
 
 
-
-    scheduler.step()
+    if hyperparameter["SCHEDULE"] == True:
+      scheduler.step()
     epoch += 1
   print()
   print("Num epochs: {}".format(epoch))

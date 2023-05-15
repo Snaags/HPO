@@ -24,7 +24,6 @@ class UEA(Dataset):
       self.y = np.where(self.y != 0, 1,0)
     self.y = torch.from_numpy(self.y).cuda(device).long()
     print("Length of {}: {}".format(name, self.x.shape[0]))
-    exit()
     if classes != None:
         """
         for c in classes:
@@ -50,6 +49,8 @@ class UEA(Dataset):
     
   def get_n_features(self):
     return self.n_features
+  def get_length(self):
+    return self.x.shape[2]
 class UEA_Train(UEA):
   def __init__(self, name,device,**kwargs):
     name = "{}_{}".format(name,"train")
@@ -65,3 +66,92 @@ class UEA_Full(UEA):
     name = ["{}_{}".format(name,"train") , "{}_{}".format(name,"test")]
     super(UEA_Full,self).__init__(name = name, device = device,**kwargs)
 
+
+
+class Train_LSST(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("LSST","train")
+    super(Train_LSST,self).__init__(name = [name], device = cuda_device,**kwargs)
+    
+class Test_LSST(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("LSST","test")
+    super(Test_LSST,self).__init__(name = [name], device = cuda_device,**kwargs)
+
+class Full_LSST(UEA):
+  def __init__(self, cuda_device,**kwargs):
+    name = ["{}_{}".format("LSST","train") , "{}_{}".format("LSST","test")]
+    super(Full_LSST,self).__init__(name = name, device = cuda_device,**kwargs)
+
+
+
+class Train_PhonemeSpectra(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("PhonemeSpectra","train")
+    super(Train_PhonemeSpectra,self).__init__(name = [name], device = cuda_device,**kwargs)
+    
+class Test_PhonemeSpectra(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("PhonemeSpectra","test")
+    super(Test_PhonemeSpectra,self).__init__(name = [name], device = cuda_device,**kwargs)
+
+class Full_PhonemeSpectra(UEA):
+  def __init__(self, cuda_device,**kwargs):
+    name = ["{}_{}".format("PhonemeSpectra","train") , "{}_{}".format("PhonemeSpectra","test")]
+    super(Full_PhonemeSpectra,self).__init__(name = name, device = cuda_device,**kwargs)
+ 
+
+
+
+class Train_FaceDetection(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("FaceDetection","train")
+    super(Train_FaceDetection,self).__init__(name = [name], device = cuda_device,**kwargs)
+    
+class Test_FaceDetection(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("FaceDetection","test")
+    super(Test_FaceDetection,self).__init__(name = [name], device = cuda_device,**kwargs)
+    
+
+class Train_PenDigits(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("PenDigits","train")
+    super(Train_PenDigits,self).__init__(name = [name], device = cuda_device,**kwargs)
+    
+class Test_PenDigits(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("PenDigits","test")
+    super(Test_PenDigits,self).__init__(name = [name], device = cuda_device,**kwargs)
+
+class Train_FaceDetection(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("FaceDetection","train")
+    super(Train_FaceDetection,self).__init__(name = [name], device = cuda_device,**kwargs)
+    
+class Test_FaceDetection(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("FaceDetection","test")
+    super(Test_FaceDetection,self).__init__(name = [name], device = cuda_device,**kwargs)
+
+class Full_FaceDetection(UEA):
+  def __init__(self, cuda_device,**kwargs):
+    name = ["{}_{}".format("FaceDetection","train") , "{}_{}".format("FaceDetection","test")]
+    super(Full_FaceDetection,self).__init__(name = name, device = cuda_device,**kwargs)
+ 
+
+class Train_UWaveGestureLibrary(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("UWaveGestureLibrary","train")
+    super(Train_UWaveGestureLibrary,self).__init__(name = [name], device = cuda_device,**kwargs)
+    
+class Test_UWaveGestureLibrary(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("UWaveGestureLibrary","test")
+    super(Test_UWaveGestureLibrary,self).__init__(name = [name], device = cuda_device,**kwargs)
+
+class Full_UWaveGestureLibrary(UEA):
+  def __init__(self, cuda_device,**kwargs):
+    name = ["{}_{}".format("UWaveGestureLibrary","train") , "{}_{}".format("UWaveGestureLibrary","test")]
+    super(Full_UWaveGestureLibrary,self).__init__(name = name, device = cuda_device,**kwargs)
+ 

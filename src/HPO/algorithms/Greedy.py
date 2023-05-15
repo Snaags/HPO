@@ -1,7 +1,7 @@
 from HPO.utils.visualisation import plot_scores
 import csv
 from ConfigSpace import ConfigurationSpace
-from HPO.algorithms.algorithm_utils import train_eval
+from HPO.algorithms.algorithm_utils import train_eval,load
 import json
 import copy
 import random
@@ -10,16 +10,20 @@ def main(worker, configspace : ConfigurationSpace, json_config):
   with open(json_config) as f:
     SETTINGS = json.load(f)["SEARCH_CONFIG"]
   
-  GENERATIONS = int(SETTINGS["TOTAL_EVALUATIONS"] / SETTINGS["CORES"])
   TIME_SINCE_IMPROVE = 0
-  EARLY_STOP = 150
+  EARLY_STOP = SETTINGS["EARLY_STOP"]
   train = train_eval( worker , json_config)
-  configs = configspace.sample_configuration(SETTINGS["CORES"]*2)
-  scores , recall , pop= train.init_async(configs)
-  history_scores = scores
-  history_conf = pop
-  last_max_indexs = None
-  iteration = 0
+  if SETTINGS["RESUME"]:
+    data = load(SETTINGS["EXPERIMENT_NAME"])
+    history_scores = data["scores"]
+    history_conf = data["config"]
+  else:
+    configs = configspace.sample_configuration(SETTINGS["INITIAL_POPULATION_SIZE"])
+    scores , recall , pop= train.init_async(configs)
+    history_scores = scores
+    history_conf = pop
+    last_max_indexs = None
+    iteration = 0
   while True:
     scores ,recall , pop = [], [], []
     while len(scores) == 0:
@@ -35,12 +39,7 @@ def main(worker, configspace : ConfigurationSpace, json_config):
     best_configs = [history_conf[i] for i in max_indices ]
     configs = []
     while train.config_queue.qsize() < SETTINGS["CORES"]/2:
-      train.update_async(configspace.mutate_graph(random.choice(best_configs)))
-
-    #scores ,recall , pop= train.get_async()
-
-
-
+      train.update_async(configspace.mutate_graph(random.choice(best_configs),0))
     if max_indices == last_max_indexs:
       TIME_SINCE_IMPROVE+=len(scores)
     else:
