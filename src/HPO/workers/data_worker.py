@@ -200,7 +200,7 @@ if __name__ == "__main__":
     with open(sys.argv[1]) as f:
       DATA = json.load(f)
       HP = DATA["WORKER_CONFIG"]
-      search = load( DATA["SEARCH_CONFIG"]["RETRAIN_PATH"])
+      search = load( "{}/{}".format(DATA["SEARCH_CONFIG"]["PATH"],"evaluations.csv"))
       HP["ID"] = "val"
       HP["graph"] = search["config"][search["best"].index(min(search["best"]))]["graph"]
       HP["ops"] = search["config"][search["best"].index(min(search["best"]))]["ops"]

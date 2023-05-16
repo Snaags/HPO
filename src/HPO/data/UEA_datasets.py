@@ -101,7 +101,7 @@ class Full_PhonemeSpectra(UEA):
     super(Full_PhonemeSpectra,self).__init__(name = name, device = cuda_device,**kwargs)
  
 
-
+"""
 
 class Train_FaceDetection(UEA):
   def __init__(self,cuda_device,**kwargs):
@@ -112,7 +112,7 @@ class Test_FaceDetection(UEA):
   def __init__(self,cuda_device,**kwargs):
     name = "{}_{}".format("FaceDetection","test")
     super(Test_FaceDetection,self).__init__(name = [name], device = cuda_device,**kwargs)
-    
+"""    
 
 class Train_PenDigits(UEA):
   def __init__(self,cuda_device,**kwargs):
@@ -123,6 +123,7 @@ class Test_PenDigits(UEA):
   def __init__(self,cuda_device,**kwargs):
     name = "{}_{}".format("PenDigits","test")
     super(Test_PenDigits,self).__init__(name = [name], device = cuda_device,**kwargs)
+
 
 class Train_FaceDetection(UEA):
   def __init__(self,cuda_device,**kwargs):
@@ -138,7 +139,19 @@ class Full_FaceDetection(UEA):
   def __init__(self, cuda_device,**kwargs):
     name = ["{}_{}".format("FaceDetection","train") , "{}_{}".format("FaceDetection","test")]
     super(Full_FaceDetection,self).__init__(name = name, device = cuda_device,**kwargs)
- 
+
+class Validation_FaceDetection(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("FaceDetection","validation")
+    super(Validation_FaceDetection,self).__init__(name = [name], device = cuda_device,**kwargs)
+    
+class True_Test_FaceDetection(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("FaceDetection","true_test")
+    super(True_Test_FaceDetection,self).__init__(name = [name], device = cuda_device,**kwargs)
+
+
+
 
 class Train_UWaveGestureLibrary(UEA):
   def __init__(self,cuda_device,**kwargs):

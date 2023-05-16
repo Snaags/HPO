@@ -15,6 +15,8 @@ DATASETS = {
     "PenDigits" : (Train_PenDigits,Test_PenDigits),
     "FORDB" : (Train_FORDB,Test_FORDB),
     "FaceDetection" : (Train_FaceDetection,Test_FaceDetection),
+    "FaceDetectionVal" : (Train_FaceDetection,Validation_FaceDetection),
+    "FaceDetectionTest" : (Train_FaceDetection,True_Test_FaceDetection),
     "Full_FaceDetection" : (Full_FaceDetection,Full_FaceDetection),
     "Full_LSST" : (Full_LSST,Full_LSST),
     "Full_PhonemeSpectra" : (Full_PhonemeSpectra,Full_PhonemeSpectra),
