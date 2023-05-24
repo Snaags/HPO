@@ -12,6 +12,19 @@ import sqlite3
 import cProfile
 
 
+from sklearn.model_selection import StratifiedKFold 
+def partition_dataset(JSON_CONFIG):
+  #load the dataset
+  #dataset =
+  PATH = "experiments/{}/weights".format(JSON_CONFIG["EXPERIMENT_NAME"])
+  names = ["train", "val", "test"]
+  #generate random split
+
+
+  #save datasets
+
+
+
 def main(JSON_CONFIG):
   with open(JSON_CONFIG) as conf:
     data = json.load(conf)

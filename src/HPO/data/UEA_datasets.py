@@ -15,8 +15,11 @@ class UEA(Dataset):
     ##LOAD SAMPLES AND LABELS FROM .npy FILE
     x = []
     y = []
+    self.sizes = []
+
     for n in name:
       x.append(np.load("{}{}_samples.npy".format(self.PATH,n)))
+      self.sizes.append(x.shape[0])
       y.append(np.load("{}{}_labels.npy".format(self.PATH,n)))
     self.x = torch.from_numpy(np.concatenate(x,axis = 0)).cuda(device = device).float()
     self.y = np.concatenate(y,axis = 0)
@@ -51,6 +54,10 @@ class UEA(Dataset):
     return self.n_features
   def get_length(self):
     return self.x.shape[2]
+
+  def get_proportions(self):
+    return self.sizes[1]/self.sizes[0]
+
 class UEA_Train(UEA):
   def __init__(self, name,device,**kwargs):
     name = "{}_{}".format(name,"train")
