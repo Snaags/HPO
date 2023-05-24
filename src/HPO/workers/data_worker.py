@@ -21,7 +21,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchsummary import summary
 import random
 import HPO.utils.augmentation as aug
-from HPO.utils.train_utils import collate_fn_padd
+from HPO.utils.train_utils import collate_fn_padd,BalancedBatchSampler
 from HPO.utils.train import train_model
 from HPO.utils.weight_freezing import freeze_FCN, freeze_resnet
 from HPO.utils.ResNet1d import resnet18
@@ -34,6 +34,7 @@ from HPO.utils.worker_utils import LivePlot
 from HPO.workers.worker_wrapper import __compute
 from HPO.data.dataset import get_dataset
 Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
+
 
 
 
@@ -128,14 +129,19 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
         train_ids, test_ids = next(kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy()))
       if SETTINGS["CROSS_VALIDATION_FOLDS"] or SETTINGS["RESAMPLES"]: 
         # Sample elements randomly from a given list of ids, no replacement.
-        train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
+        if SETTINGS["BALANCED_BATCH"]:
+          train_batch_sampler = BalancedBatchSampler(dataset,SETTINGS["BATCH_SIZE"],train_ids)
+          trainloader = torch.utils.data.DataLoader(dataset,collate_fn = collate_fn_padd,batch_sampler =train_batch_sampler)
+        else: 
+          train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
+          
+          trainloader = torch.utils.data.DataLoader(
+                                  dataset,collate_fn = collate_fn_padd,sampler = train_subsampler,
+                                  batch_size=SETTINGS["BATCH_SIZE"], drop_last = True)
         test_subsampler = torch.utils.data.SubsetRandomSampler(test_ids)
-        trainloader = torch.utils.data.DataLoader(
-                                dataset,collate_fn = collate_fn_padd,sampler = train_subsampler,
-                                batch_size=SETTINGS["BATCH_SIZE"], drop_last = True)
         testloader = torch.utils.data.DataLoader(
-                            dataset,collate_fn = collate_fn_padd,sampler = test_subsampler,
-                            batch_size= SETTINGS["BATCH_SIZE"] ,drop_last = True)
+                              dataset,collate_fn = collate_fn_padd,sampler = test_subsampler,
+                              batch_size= SETTINGS["BATCH_SIZE"] ,drop_last = True)
       else:
         trainloader = torch.utils.data.DataLoader(
                                 train_dataset,collate_fn = collate_fn_padd,shuffle = True,
@@ -156,11 +162,11 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       else:
         stem_size = ARCH_SETTINGS["STEM_SIZE"][0]
       model = ModelGraph(train_dataset.get_n_features(),stem_size,train_dataset.get_n_classes(),
-          train_dataset.x.shape[2],hyperparameter["graph"],hyperparameter["ops"],device = cuda_device,
+          train_dataset.get_length(),hyperparameter["graph"],hyperparameter["ops"],device = cuda_device,
           binary = SETTINGS["BINARY"],dropout = SETTINGS["DROPOUT"],droppath = SETTINGS["DROPPATH"],
-          raw_stem = SETTINGS["RAW_STEM"])
+          raw_stem = SETTINGS["RAW_STEM"],embedding = SETTINGS["EMBEDDING"])
       model = model.cuda(device = cuda_device)
-      #summary(model, (train_dataset.get_n_features(),test_dataset.get_length()))
+      summary(model, (train_dataset.get_n_features(),test_dataset.get_length()))
       if SETTINGS["COMPILE"]:
         torch.set_float32_matmul_precision('high')
         model = torch.compile(model)

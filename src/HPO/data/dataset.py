@@ -4,6 +4,8 @@ from HPO.data.TEPS import *
 from HPO.data.EEG import *
 from HPO.data.FORDB import *
 from HPO.data.UEA_datasets import *
+from Transformers.datasets.androzoo_dl import *
+#from transformers.datasets import *
 DATASETS = {
     "teps" : (Train_TEPS,Test_TEPS),
     "HAR" : (Train_HAR,Test_HAR),
@@ -15,8 +17,11 @@ DATASETS = {
     "PenDigits" : (Train_PenDigits,Test_PenDigits),
     "FORDB" : (Train_FORDB,Test_FORDB),
     "FaceDetection" : (Train_FaceDetection,Test_FaceDetection),
+    "Hex" : (Train_Hex,Test_Hex),
     "FaceDetectionVal" : (Train_FaceDetection,Validation_FaceDetection),
     "FaceDetectionTest" : (Train_FaceDetection,True_Test_FaceDetection),
+    "PenDigitsVal" : (Train_PenDigits,Validation_PenDigits),
+    "PenDigitsTest" : (Train_PenDigits,True_Test_PenDigits),
     "Full_FaceDetection" : (Full_FaceDetection,Full_FaceDetection),
     "Full_LSST" : (Full_LSST,Full_LSST),
     "Full_PhonemeSpectra" : (Full_PhonemeSpectra,Full_PhonemeSpectra),

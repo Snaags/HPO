@@ -4,7 +4,7 @@ import torch.nn as nn
 import numpy as np
 from torch import Tensor
 from HPO.utils.model_constructor import Model
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset, DataLoader, Sampler
 
 def cal_acc(y,t):
   c = np.count_nonzero(y.T==t)
@@ -41,6 +41,47 @@ def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tens
               "%.2f" % loss," Correct / Total : {} / {} ".format(correct , total),  end = '\r')
 
   return correct ,total ,peak_acc
+
+
+
+class BalancedBatchSampler(Sampler):
+    def __init__(self, dataset,batch_size, indices = None):
+        self.dataset = dataset
+        if indices is None:
+          self.indices = list(range(len(dataset)))
+        else:
+          self.indices = indices
+        self.num_classes = dataset.get_n_classes()
+        self.batch_size = batch_size
+        # create a dictionary of class labels and their respective indices
+        self.label_to_indices = {label: [] for label in range(self.num_classes)}
+        for index in self.indices:
+            label = dataset[index][1].item()
+            self.label_to_indices[label].append(index)
+
+        # ensure that batches are filled completely
+        print( self.label_to_indices )
+        #assert len(self.indices) % self.num_classes == 0
+        self.samples_per_class = self.batch_size // self.num_classes
+        self.remainder = self.batch_size % self.num_classes
+
+    def __iter__(self):
+        # shuffle labels for each class
+        i = 0
+        while i < len(self.indices) // self.batch_size:
+          indices = []
+          for label in self.label_to_indices:
+              indices.extend(list(np.random.choice(self.label_to_indices[label],
+                size = self.samples_per_class)))
+          indices.extend(list(np.random.choice(self.label_to_indices[2],
+                size = self.remainder)))    
+          np.random.shuffle(indices)
+          yield indices
+          i+=1 
+
+    def __len__(self):
+        return len(self.indices) // self.batch_size
+
 
 
 def collate_fn_padd(batch):

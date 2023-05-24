@@ -11,6 +11,7 @@ from datetime import datetime
 import sqlite3
 import cProfile
 
+
 def main(JSON_CONFIG):
   with open(JSON_CONFIG) as conf:
     data = json.load(conf)
@@ -24,6 +25,7 @@ def main(JSON_CONFIG):
       raise Exception("Experiment name exists, rename current experiment")
 
     os.system("mkdir experiments/{}".format(name))
+    os.system("mkdir experiments/{}/dataset".format(name))
     os.system("mkdir experiments/{}/weights".format(name))
   else:
     name = data["EXPERIMENT_NAME"]

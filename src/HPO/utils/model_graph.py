@@ -183,7 +183,7 @@ def transform_idx(original_list,original_list_permuted,new_list):
 class ModelGraph(nn.Module):
   def __init__(self,n_features, n_channels, n_classes,signal_length, 
     graph : list, ops : list, device,binary = False,data_dim = 1,sigmoid = False,
-    dropout = 0.3,droppath = False,raw_stem = False):
+    dropout = 0.3,droppath = False,raw_stem = False,embedding = False):
     super(ModelGraph,self).__init__()
     #INITIALISING MODEL VARIABLES
     self.DEBUG = False
@@ -207,7 +207,7 @@ class ModelGraph(nn.Module):
       self.dropout = nn.Identity()
     self.ops = nn.ModuleList()
     self.combine_ops = nn.ModuleDict() 
-    
+    self.embedding = embedding
     #BUILD STEM
     """
     This is a way of increasing the capacity of a model but upping the resolution of the image off the bat.
@@ -219,10 +219,13 @@ class ModelGraph(nn.Module):
       STEM_STRIDE = 2 
       self.stem = nn.Conv2d(n_features,n_channels,2,stride = STEM_STRIDE ,padding = STEM_PADDING)
     else:
-      if raw_stem == True:
-        self.stem = nn.Conv1d(n_features,n_channels,1,stride = 1)
+      if self.embedding:
+        self.stem = nn.Embedding(258,n_channels)
       else:
-        self.stem = nn.Conv1d(n_features,n_channels,2,stride = 2) #Will just leave this at defaults for now
+        if raw_stem == True:
+          self.stem = nn.Conv1d(n_features,n_channels,1,stride = 1)
+        else:
+          self.stem = nn.Conv1d(n_features,n_channels,2,stride = 2) #Will just leave this at defaults for now
     self.stem = self.stem.cuda(device)
 
     #DEFINE OP_MODULE BASED ON DATA_DIM
@@ -269,10 +272,13 @@ class ModelGraph(nn.Module):
     #GENERATE RANDOM DATA TO PASS THROUGH THE NETWORK
     batch = 16
     self.combine_index = 0
-    if self.data_dim == 2:
-      x = torch.rand(size = (batch, self.n_features,size,size)).cuda(self.device)
+    if self.embedding:
+      x = torch.zeros(size = (batch, self.n_features,size)).long().cuda(self.device)
     else:
-      x = torch.rand(size = (batch, self.n_features,size)).cuda(self.device)
+      if self.data_dim == 2:
+        x = torch.rand(size = (batch, self.n_features,size,size)).cuda(self.device)
+      else:
+        x = torch.rand(size = (batch, self.n_features,size)).cuda(self.device)      
     x = self.stem(x)
 
     self.states["S"] = x
@@ -382,7 +388,12 @@ class ModelGraph(nn.Module):
   def forward(self,x):
     self.combine_index = 0
     self.states = {}
-    self.states["S"] = self.stem(x)
+    if self.embedding:
+      x = x.squeeze().long()
+
+      self.states["S"] = self.stem(x).permute(0,2,1)
+    else: 
+      self.states["S"] = self.stem(x)
     self.current_iteration = -1
     hold = 0
     #while self.current_iteration < len(self.edges)-1:

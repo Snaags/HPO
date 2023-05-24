@@ -124,6 +124,17 @@ class Test_PenDigits(UEA):
     name = "{}_{}".format("PenDigits","test")
     super(Test_PenDigits,self).__init__(name = [name], device = cuda_device,**kwargs)
 
+class Validation_PenDigits(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("PenDigits","validation")
+    super(Validation_PenDigits,self).__init__(name = [name], device = cuda_device,**kwargs)
+    
+class True_Test_PenDigits(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("PenDigits","true_test")
+    super(True_Test_PenDigits,self).__init__(name = [name], device = cuda_device,**kwargs)
+
+
 
 class Train_FaceDetection(UEA):
   def __init__(self,cuda_device,**kwargs):
