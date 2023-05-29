@@ -45,15 +45,18 @@ def compute(*args, **kwargs):
 
 def _compute(hyperparameter,cuda_device, JSON_CONFIG):
   ### Configuration 
-  with open(JSON_CONFIG) as f:
-    data = json.load(f)
-    
-    SETTINGS = data["WORKER_CONFIG"]
-    SETTINGS["ID"] = hyperparameter["ID"]
-    SETTINGS["database"] = data["DATABASE_NAME"]
-    SETTINGS["experiment"] = data["EXPERIMENT_NAME"]
-    ARCH_SETTINGS = data["ARCHITECTURE_CONFIG"]
-    SAVE_PATH = data["SEARCH_CONFIG"]["PATH"]
+  if type(JSON_CONFIG) != dict:
+    with open(JSON_CONFIG) as f:
+      data = json.load(f)
+  else:
+    data = JSON_CONFIG
+      
+  SETTINGS = data["WORKER_CONFIG"]
+  SETTINGS["ID"] = hyperparameter["ID"]
+  SETTINGS["database"] = data["DATABASE_NAME"]
+  SETTINGS["experiment"] = data["EXPERIMENT_NAME"]
+  ARCH_SETTINGS = data["ARCHITECTURE_CONFIG"]
+  SAVE_PATH = data["SEARCH_CONFIG"]["PATH"]
   acc = []
   metric_logger = MetricLogger(SAVE_PATH) 
   recall = []
@@ -67,13 +70,17 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
 
   ##Dataset Initialisation
   name = SETTINGS["DATASET_CONFIG"]["NAME"]
+  if data["GENERATE_PARTITION"]:
+    DS_PATH = SETTINGS["DATASET_CONFIG"]["DATASET_PATH"]
+  else:
+    DS_PATH = None
   if "AUGMENTATIONS" in SETTINGS:
     augs = aug.initialise_augmentations(SETTINGS["AUGMENTATIONS"])
   else: 
     augs = None
 
-  train_args = {"cuda_device":cuda_device,"augmentation" : augs, "binary" :SETTINGS["BINARY"]}
-  test_args = {"cuda_device":cuda_device,"augmentation" :None, "binary" :SETTINGS["BINARY"]}
+  train_args = {"cuda_device":cuda_device,"augmentation" : augs, "binary" :SETTINGS["BINARY"],"path" : DS_PATH}
+  test_args = {"cuda_device":cuda_device,"augmentation" :None, "binary" :SETTINGS["BINARY"],"path" : DS_PATH}
 
   if SETTINGS["RESAMPLES"]:
     dataset = get_dataset(name,train_args,None )
@@ -206,8 +213,14 @@ if __name__ == "__main__":
     with open(sys.argv[1]) as f:
       DATA = json.load(f)
       HP = DATA["WORKER_CONFIG"]
+      j = DATA
+      j["WORKER_CONFIG"]["MODEL_VALIDATION_RATE"] = 10
+      j["WORKER_CONFIG"]["REPEAT"] = 10
+      j["WORKER_CONFIG"]["PRINT_RATE_TRAIN"] = 50
+      j["WORKER_CONFIG"]["LIVE_EVAL"] = True
+      j["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"] = "{}Retrain".format(HP["DATASET_CONFIG"]["NAME"] )
       search = load( "{}/{}".format(DATA["SEARCH_CONFIG"]["PATH"],"evaluations.csv"))
       HP["ID"] = "val"
       HP["graph"] = search["config"][search["best"].index(min(search["best"]))]["graph"]
       HP["ops"] = search["config"][search["best"].index(min(search["best"]))]["ops"]
-    _compute(HP,1,sys.argv[1])
+    _compute(HP,1,j)

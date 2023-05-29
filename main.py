@@ -11,19 +11,30 @@ from datetime import datetime
 import sqlite3
 import cProfile
 
-
-from sklearn.model_selection import StratifiedKFold 
+from HPO.data.dataset import get_dataset
+from sklearn.model_selection import train_test_split
 def partition_dataset(JSON_CONFIG):
+  with open(JSON_CONFIG, "r") as f:
+        data = json.load(f)
   #load the dataset
-  #dataset =
-  PATH = "experiments/{}/weights".format(JSON_CONFIG["EXPERIMENT_NAME"])
-  names = ["train", "val", "test"]
+  train_args = {"cuda_device":"cpu","augmentation" :None, "binary" :False}
+  dataset = get_dataset("Full_{}".format(data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]),train_args,None )
+  PATH = "experiments/{}/dataset/".format(data["EXPERIMENT_NAME"])
+  names = ["train", "validation", "test"]
   #generate random split
-
-
+  PATH
+  # Assuming 'X' is your features and 'y' is your target variable
+  X_train, X_test, y_train, y_test = train_test_split(dataset.x, dataset.y, test_size=dataset.get_proportions(), random_state=42,stratify =dataset.y)
+  X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=data["SEED"],stratify = y_test)
   #save datasets
 
-
+  np.save('{}{}_train_samples.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), X_train.cpu().numpy())
+  np.save('{}{}_train_labels.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), y_train.cpu().numpy())
+  np.save('{}{}_validation_samples.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), X_val.cpu().numpy())
+  np.save('{}{}_validation_labels.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), y_val.cpu().numpy())
+  np.save('{}{}_test_samples.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), X_test.cpu().numpy())
+  np.save('{}{}_test_labels.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), y_test.cpu().numpy())
+  return PATH
 
 def main(JSON_CONFIG):
   with open(JSON_CONFIG) as conf:
@@ -61,6 +72,12 @@ def main(JSON_CONFIG):
   experiment_json = "experiments/{}/configuration.json".format(name)
   with open(experiment_json,"w") as f:
     json.dump(data,f, indent=4)
+    
+      
+  with open(experiment_json,"w") as f:    
+    if data["GENERATE_PARTITION"]:
+      data["WORKER_CONFIG"]["DATASET_CONFIG"]["DATASET_PATH"] =  partition_dataset(JSON_CONFIG)
+    json.dump(data,f, indent=4)
   logging.basicConfig(filename='experiments/{}/experiment.log'.format(name),  level=logging.DEBUG)
   time.sleep(1) 
   set_seed(experiment_json)
@@ -94,7 +111,8 @@ def main(JSON_CONFIG):
         PRIMARY KEY (model_id, epoch)
     )
     """)
-    conn.commit()
+
+
 
   if False:
     def profiled_worker(*args, **kwargs):

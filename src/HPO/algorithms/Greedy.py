@@ -39,7 +39,7 @@ def main(worker, configspace : ConfigurationSpace, json_config):
     best_configs = [history_conf[i] for i in max_indices ]
     configs = []
     while train.config_queue.qsize() < SETTINGS["CORES"]/2:
-      train.update_async(configspace.mutate_graph(random.choice(best_configs),0))
+      train.update_async(configspace.mutate_graph(random.choice(best_configs),2))
     if max_indices == last_max_indexs:
       TIME_SINCE_IMPROVE+=len(scores)
     else:
