@@ -115,8 +115,8 @@ class GraphConfigSpace:
       self.g.add_edges_from(graph)
       model_stride = random.choice(self.data["STRIDE_RATE"])
       model_stride_channel_ratio = random.choice(self.data["CHANNEL_DEPTH_RATE"])
-      if model_stride == 4:
-        stride = self.data["STRIDE_COUNT"]/2
+      if self.data["STRIDE_VARIABLE"]:
+        stride = random.randint(1,self.data["STRIDE_COUNT"])
       else:
         stride = self.data["STRIDE_COUNT"]
       ops = generate_op_names(self.g)
@@ -124,6 +124,7 @@ class GraphConfigSpace:
       ops = random_activation_unweighted(ops,self.data)
       ops = random_normalisation_unweighted(ops,self.data)
       ops = random_combine_unweighted(ops,self.data)
+      
       del ops["T_stride"]
       del ops["T_channel_ratio"]
       del ops["S_stride"]

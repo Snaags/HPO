@@ -61,11 +61,11 @@ class EEG(Dataset):
 
 class Train_EEG(EEG):
 
-  def __init__(self, window_size = 500, augmentation = False,samples_per_class = None,binary = False,one_hot = True,samples_per_epoch = 1,PATH= None,cuda_device = None,sub_set_classes = None): 
-    super(Train_EEG,self).__init__(True, augmentation,samples_per_class = samples_per_class,binary = binary ,one_hot = one_hot,samples_per_epoch = samples_per_epoch,PATH = PATH,cuda_device = cuda_device,sub_set_classes = sub_set_classes)
+  def __init__(self, window_size = 500, augmentation = False,samples_per_class = None,binary = False,one_hot = True,samples_per_epoch = 1,PATH= None,cuda_device = None,sub_set_classes = None,**kwargs): 
+    super(Train_EEG,self).__init__(True, augmentation,samples_per_class = samples_per_class,binary = binary ,one_hot = one_hot,samples_per_epoch = samples_per_epoch,PATH = PATH,cuda_device = cuda_device,sub_set_classes = sub_set_classes,**kwargs)
 
 class Test_EEG(EEG):
 
-  def __init__(self, window_size = 500, augmentation = False,samples_per_class = None,binary = False,one_hot = False,samples_per_epoch = 1,cuda_device = None,sub_set_classes = None): 
-    super(Test_EEG,self).__init__(False , augmentation,samples_per_class =samples_per_class,binary = binary ,one_hot = one_hot,samples_per_epoch = samples_per_epoch,cuda_device = cuda_device,sub_set_classes = sub_set_classes)
+  def __init__(self, window_size = 500, augmentation = False,samples_per_class = None,binary = False,one_hot = False,samples_per_epoch = 1,cuda_device = None,sub_set_classes = None,**kwargs): 
+    super(Test_EEG,self).__init__(False , augmentation,samples_per_class =samples_per_class,binary = binary ,one_hot = one_hot,samples_per_epoch = samples_per_epoch,cuda_device = cuda_device,sub_set_classes = sub_set_classes,**kwargs)
 

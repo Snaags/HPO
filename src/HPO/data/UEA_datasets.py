@@ -218,3 +218,40 @@ class Full_UWaveGestureLibrary(UEA):
     name = ["{}_{}".format("UWaveGestureLibrary","train") , "{}_{}".format("UWaveGestureLibrary","test")]
     super(Full_UWaveGestureLibrary,self).__init__(name = name, device = cuda_device,**kwargs)
  
+
+class Train_SpokenArabicDigits(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("SpokenArabicDigits","train")
+    super(Train_SpokenArabicDigits,self).__init__(name = [name], device = cuda_device,**kwargs)
+    
+class Test_SpokenArabicDigits(UEA):
+  def __init__(self,cuda_device,**kwargs):
+    name = "{}_{}".format("SpokenArabicDigits","test")
+    super(Test_SpokenArabicDigits,self).__init__(name = [name], device = cuda_device,**kwargs)
+
+class Full_SpokenArabicDigits(UEA):
+  def __init__(self, cuda_device,**kwargs):
+    name = ["{}_{}".format("SpokenArabicDigits","train") , "{}_{}".format("SpokenArabicDigits","test")]
+    super(Full_SpokenArabicDigits,self).__init__(name = name, device = cuda_device,**kwargs)
+
+
+
+class Train_N(UEA):
+  def __init__(self,ds,cuda_device,**kwargs):
+    name = "{}_{}".format(ds,"train")
+    super(Train_N,self).__init__(name = [name], device = cuda_device,**kwargs)
+    
+class Test_N(UEA):
+  def __init__(self,ds,cuda_device,**kwargs):
+    name = "{}_{}".format(ds,"test")
+    super(Test_N,self).__init__(name = [name], device = cuda_device,**kwargs)
+
+class Full_N(UEA):
+  def __init__(self,ds, cuda_device,**kwargs):
+    name = ["{}_{}".format(ds,"train") , "{}_{}".format(ds,"test")]
+    super(Full_N,self).__init__(name = name, device = cuda_device,**kwargs)
+
+class Validation_N(UEA):
+  def __init__(self,ds,cuda_device,**kwargs):
+    name = "{}_{}".format(ds,"validation")
+    super(Validation_N,self).__init__(name = [name], device = cuda_device,**kwargs)

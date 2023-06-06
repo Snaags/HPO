@@ -7,6 +7,7 @@ import time
 import sys
 from HPO.utils.utils import MetricLogger
 import os 
+from HPO.utils.benchmark_models import InceptionTime, MultiResAtt
 import matplotlib.pyplot as plt
 from HPO.utils.model import NetworkMain
 from HPO.utils.DARTS_utils import config_space_2_DARTS
@@ -107,13 +108,13 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
     
     if SETTINGS["GROUPED_RESAMPLES"]:
       # Initialize GroupKFold cross-validator with desired number of splits
-      kfold = GroupKFold(n_splits=5)
+      kfold = GroupKFold(n_splits=2)
       splits = [(None,None)]*SETTINGS["RESAMPLES"]
       train_dataset = dataset
       test_dataset = dataset
 
     elif SETTINGS["RESAMPLES"]:
-      kfold = KFold(n_splits = 5, shuffle = True)
+      kfold = KFold(n_splits = 2, shuffle = True)
       splits = [(None,None)]*SETTINGS["RESAMPLES"]
       train_dataset = dataset
       test_dataset = dataset
@@ -168,10 +169,14 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
         stem_size = hyperparameter["ops"]["stem"]
       else:
         stem_size = ARCH_SETTINGS["STEM_SIZE"][0]
-      model = ModelGraph(train_dataset.get_n_features(),stem_size,train_dataset.get_n_classes(),
-          train_dataset.get_length(),hyperparameter["graph"],hyperparameter["ops"],device = cuda_device,
-          binary = SETTINGS["BINARY"],dropout = SETTINGS["DROPOUT"],droppath = SETTINGS["DROPPATH"],
-          raw_stem = SETTINGS["RAW_STEM"],embedding = SETTINGS["EMBEDDING"])
+
+      model = InceptionTime(
+        in_channels = train_dataset.get_n_features(), length = train_dataset.get_length() , 
+        num_classes = train_dataset.get_n_classes() ,n_filters=64, kernel_sizes=[9,19,39], 
+        use_residual=True, activation=nn.ReLU(), return_indices=False)
+
+      #model = MultiResAtt(  input_channels = train_dataset.get_n_features(), n_filters = 64,num_classes =  train_dataset.get_n_classes())
+      
       model = model.cuda(device = cuda_device)
       summary(model, (train_dataset.get_n_features(),test_dataset.get_length()))
       if SETTINGS["COMPILE"]:
@@ -219,9 +224,9 @@ if __name__ == "__main__":
       j["WORKER_CONFIG"]["RESAMPLES"] = False
       j["WORKER_CONFIG"]["PRINT_RATE_TRAIN"] = 50
       j["WORKER_CONFIG"]["LIVE_EVAL"] = True
-      #j["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"] = "{}_Retrain".format(HP["DATASET_CONFIG"]["NAME"] )
+      j["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"] = "{}_Retrain".format(HP["DATASET_CONFIG"]["NAME"] )
       search = load( "{}/{}".format(DATA["SEARCH_CONFIG"]["PATH"],"evaluations.csv"))
-      HP["ID"] = "val"
+      HP["ID"] = "Inception_64"
       HP["graph"] = search["config"][search["best"].index(min(search["best"]))]["graph"]
       HP["ops"] = search["config"][search["best"].index(min(search["best"]))]["ops"]
-    _compute(HP,0,j)
+    _compute(HP,2,j)
