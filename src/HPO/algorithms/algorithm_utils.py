@@ -164,6 +164,7 @@ class train_eval:
         c = i
       if not "ID" in c:
         c["ID"] = len(self.config_list_full) + ID + self.ID_INIT
+
       self.config_queue.put(c)
     
     #Initialise GPU slots

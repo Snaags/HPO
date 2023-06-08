@@ -128,16 +128,17 @@ def propagate_resolution(edges, ops):
           update_list = list(nx.bfs_tree(g, source=i).nodes())
           for _nodes in update_list:
               res_dict[_nodes] *= ops["{}_stride".format(i)]
-
+  """
   plt.figure(figsize = (19,12))
   nx.draw(
       g, edge_color='black', width=1, linewidths=1,
       node_size=500, node_color='pink', alpha=0.9,
       labels={node: "{}({})".format(node,res_dict[node]) for node in g.nodes()}
       )
+
   plt.axis('off')
   plt.savefig("resolutions")
-
+  """
   return res_dict
 
 class Node:

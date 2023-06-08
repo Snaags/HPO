@@ -24,7 +24,7 @@ def main(worker, configspace : ConfigurationSpace, json_config):
     history_conf = pop
     last_max_indexs = None
     iteration = 0
-  while True:
+  while iteration < SETTINGS["TOTAL_EVALUATIONS"]:
     scores ,recall , pop = [], [], []
     while len(scores) == 0:
       time.sleep(0.5)

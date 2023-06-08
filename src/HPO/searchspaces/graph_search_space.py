@@ -6,6 +6,7 @@ import ConfigSpace as CS
 import time
 import networkx as nx
 
+
 def is_fully_connected(G: nx.DiGraph) -> bool:
     # Count nodes with in-degree of 0 and out-degree of 0
     no_input_nodes = sum(1 for _, indeg in G.in_degree() if indeg == 0)
@@ -141,7 +142,12 @@ class GraphConfigSpace:
     ops = m["ops"]
     g = nx.DiGraph()
     g.add_edges_from(edges )
-    model = Graph(edges,g.nodes,ops,self.data)
+    if "ID" in m:
+      model = Graph(edges,g.nodes,ops,self.data,parent = m["ID"])
+    elif "parent" in m["ops"]:
+      model = Graph(edges,g.nodes,ops,self.data,parent = m["ops"]["parent"])
+    else:
+      model = Graph(edges,g.nodes,ops,self.data)
     result = False
     while result == False:
       result = self.check_valid(copy.deepcopy(model))
@@ -238,10 +244,11 @@ class Vertex:
 
 
 class Graph:
-    def __init__(self,edges,nodes,ops,data):
+    def __init__(self,edges,nodes,ops,data,parent = None):
         self.vertices = {}
         self.data = data
         self.edges = {}
+        self.parent = parent
         self.max_vertex = 1
         for e in edges:
           self.edges[e] = Edge(e[0],e[1],ops["{}_{}_OP".format(e[0],e[1])])
@@ -255,6 +262,8 @@ class Graph:
     def __call__(self):
       ops = {k: v for d in self.vertices for k, v in self.vertices[d]().items()}
       ops.update({k: v for d in self.edges for k, v in self.edges[d]().items()})
+      if self.parent != None:
+        ops["parent"] = self.parent
       graph = [ self.edges[e].get_edge() for e in self.edges]
       return { "graph":graph,"ops":ops}
 

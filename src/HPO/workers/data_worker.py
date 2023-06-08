@@ -172,6 +172,21 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
           train_dataset.get_length(),hyperparameter["graph"],hyperparameter["ops"],device = cuda_device,
           binary = SETTINGS["BINARY"],dropout = SETTINGS["DROPOUT"],droppath = SETTINGS["DROPPATH"],
           raw_stem = SETTINGS["RAW_STEM"],embedding = SETTINGS["EMBEDDING"])
+
+      if "parent" in hyperparameter["ops"]:
+        print("LOADING PARENT ID", hyperparameter["ops"]["parent"])
+        files = os.listdir("{}/weights/".format(SAVE_PATH))
+        for i in files:
+          splits = i.split("-")
+
+          if ( int(splits[0]) == hyperparameter["ops"]["parent"]) and (int(splits[1]) == _):
+            state_dict = torch.load("{}/weights/{}".format(SAVE_PATH,i))
+            break
+        print(model.load_state_dict(state_dict, strict=False))
+      else:
+        print("WARNING PARENT NOT IN OPS")
+
+
       model = model.cuda(device = cuda_device)
       summary(model, (train_dataset.get_n_features(),test_dataset.get_length()))
       if SETTINGS["COMPILE"]:
@@ -182,6 +197,8 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       """
       ### Train the model
       """
+
+
       params = sum(p.numel() for p in model.parameters() if p.requires_grad)
       #print("Size: {}".format(params))
       train_model(model , SETTINGS, trainloader , cuda_device, evaluator = evaluator if SETTINGS["LIVE_EVAL"] else None, fold = fold, repeat = _) 
@@ -199,7 +216,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       print("Accuracy: ", "%.4f" % ((acc[-1])*100), "%")
       #print("Recall: ", "%.4f" % ((recall[-1])*100), "%")
       if SETTINGS["SAVE_WEIGHTS"]:
-        torch.save(model.state_dict(),"{}/weights/{:.02f}-{}".format(SAVE_PATH,acc[-1],hyperparameter["ID"]))
+        torch.save(model.state_dict(),"{}/weights/{}-{}-{:.02f}".format(SAVE_PATH,hyperparameter["ID"],_,acc[-1]))
       metric_logger.update({"ID" : hyperparameter["ID"], "accuracy" : acc[-1], "recall": recall[-1]})
     acc_ = np.mean(acc)
     recall_ = np.mean(recall)

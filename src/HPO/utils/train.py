@@ -179,7 +179,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
           model.eval()
           evaluator.forward_pass(model,binary = BINARY)
           evaluator.predictions(model_is_binary = BINARY,THRESHOLD = hyperparameter["THRESHOLD"])
-          val_loss = evaluator.calculate_loss(criterion,BINARY)
+          val_loss = 0#evaluator.calculate_loss(criterion,BINARY)
           val_acc = evaluator.T_ACC()
           recall = evaluator.TPR(1)
           cm_test = evaluator.confusion_matrix.copy()
