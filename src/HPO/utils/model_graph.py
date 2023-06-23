@@ -15,7 +15,7 @@ def propagate_channels(edges,ops):
   for i in ops:
     if "channel" in i:
         if ops[i] != 1:
-          #print(i,ops[i])
+          ##print(i,ops[i])
           down_sample_nodes.append((int(i.split("_")[0])))
   res_dict = {}
   for n in g.nodes():
@@ -57,7 +57,7 @@ def propagate_channels_combine(edges,ops):
     if i in combine_nodes:
       if ops["{}_combine".format(i)] == "CONCAT":
           predecessor_nodes = list(g.predecessors(i))
-          print("Combine values: {}".format(predecessor_nodes))
+          ##print("Combine values: {}".format(predecessor_nodes))
           if len(predecessor_nodes) > 1:
             res_dict[i] *= len([res_dict[x] for x in predecessor_nodes])
       else:
@@ -70,12 +70,12 @@ def propagate_channels_combine(edges,ops):
       res_dict[i] *= ops["{}_channel_ratio".format(i)]
       #    update_list = list(nx.bfs_tree(g, source=i).nodes())
       #    update_list.remove(i)
-      #    print("Down Stream Nodes: {}".format(update_list))
+      #    #print("Down Stream Nodes: {}".format(update_list))
       #    for _nodes in update_list:
 
-      #print(res_dict)
-  #print("combines: {}".format(res_dict))
-  #print(ops)
+      ##print(res_dict)
+  ##print("combines: {}".format(res_dict))
+  ##print(ops)
   return res_dict
 
 
@@ -95,14 +95,14 @@ def propagate_cat_num(edges,ops):
   res_dict = {}
   for n in g.nodes():
       res_dict[n] = 1
-      #print(n)
+      ##print(n)
   nodes = list(nx.topological_sort(g))
   for i in nodes:
     if i in combine_nodes:
-      #print("Node: {}".format(i))
+      ##print("Node: {}".format(i))
       if ops["{}_combine".format(i)] == "CONCAT":
           predecessor_nodes = list(g.predecessors(i))
-          print("Combine values: {}".format(predecessor_nodes))
+          #print("Combine values: {}".format(predecessor_nodes))
           if len(predecessor_nodes) > 1:
             res_dict[i] = len([res_dict[x] for x in predecessor_nodes])
     
@@ -110,14 +110,14 @@ def propagate_cat_num(edges,ops):
 
 
 def propagate_resolution(edges, ops):
-  #print(edges)
+  ##print(edges)
   down_sample_nodes = []
   g = nx.DiGraph()
   g.add_edges_from(edges)
   for i in ops:
     if "stride" in i:
       if ops[i] > 1:
-        print(i,ops[i])
+        ##print(i,ops[i])
         down_sample_nodes.append(int(i.split("_")[0]))
   res_dict = {}
   for n in g.nodes():
@@ -156,12 +156,12 @@ class Node:
 
   def generate_edge(self,node_previous) -> list: 
     ops = []#nn.ModuleList()
-    #print("output channel sizes : {} {} {}".format(self.channels, self.cat_num,self.channels/self.cat_num))
+    ##print("output channel sizes : {} {} {}".format(self.channels, self.cat_num,self.channels/self.cat_num))
     if self.channels/self.cat_num != node_previous.channels:
       ops.append(OPS["resample_channels"](node_previous.channels,int(self.channels/self.cat_num)))
     self.stride = 2**round(math.log(node_previous.length // self.length,2))
-    if self.stride > 513:
-      print("lengths:",node_previous.length,self.length,self.stride)
+    #if self.stride > 513:
+      #print("lengths:",node_previous.length,self.length,self.stride)
     if self.stride != 1:
       ops.append(OPS["downsample_resolution"](int(self.channels/self.cat_num),self.stride))
     if self.normalisation != "none":
@@ -206,7 +206,7 @@ class ModelGraph(nn.Module):
       self.dropout = nn.Dropout(dropout)
     else:
       self.dropout = nn.Identity()
-    self.ops = nn.ModuleList()
+    self.ops = nn.ModuleDict()
     self.combine_ops = nn.ModuleDict() 
     self.embedding = embedding
     #BUILD STEM
@@ -239,8 +239,8 @@ class ModelGraph(nn.Module):
     self.resolution_dict = propagate_resolution(self.sorted_graph, self.ops_list)
     self.channel_dict = propagate_channels(self.sorted_graph, self.ops_list)
     self.cat_num_dict = propagate_cat_num(self.sorted_graph, self.ops_list)
-    #print(self.channel_dict)
-    #print(self.resolution_dict)
+    ##print(self.channel_dict)
+    ##print(self.resolution_dict)
     signal_length = signal_length//2
     g = nx.DiGraph()
     g.add_edges_from(self.sorted_graph)
@@ -286,9 +286,8 @@ class ModelGraph(nn.Module):
     
     #ITERATE THROUGH EDGES
     for iteration,edge in enumerate(self.sorted_graph):
-      if self.DEBUG:
-        print(edge, self.ops_list["{}_{}_OP".format(edge[0],edge[1])])
-        print(self.channel_dict[edge[0]]*self.n_channels,self.channel_dict[edge[1]]*self.n_channels)
+        #print(edge, self.ops_list["{}_{}_OP".format(edge[0],edge[1])])
+        #print(self.channel_dict[edge[0]]*self.n_channels,self.channel_dict[edge[1]]*self.n_channels)
       
       #INITIALISE CONTAINER FOR EDGE OPERATIONS 
       edge_container = nn.Sequential()
@@ -311,7 +310,7 @@ class ModelGraph(nn.Module):
        
 
       #ADD OP TO THE MODULE LIST AND PASS THROUGH DATA
-      self.ops.append(edge_container)
+      self.ops[str(edge)] = edge_container
       
 
   def combine(self,x1,x2):
@@ -363,8 +362,8 @@ class ModelGraph(nn.Module):
 
   def _forward(self, op,edge):
     self.states[edge[0]] = self.dropout(self.states[edge[0]])
-    #print(edge,self.states[edge[0]].shape, op)
-    #print("Predicted channels: {} {}".format(self.channel_dict[edge[0]],self.channel_dict[edge[1]]))
+    ##print(edge,self.states[edge[0]].shape, op)
+    ##print("Predicted channels: {} {}".format(self.channel_dict[edge[0]],self.channel_dict[edge[1]]))
     h = op(self.states[edge[0]])
     #CASE 1 - 1 INPUT
     if not (edge[1] in self.states.keys()):
@@ -373,17 +372,17 @@ class ModelGraph(nn.Module):
     elif self.nodes[edge[1]].combine == "ADD":
       """
       if self.states[edge[1]].shape != h.shape:
-        print("PREADD SHAPE: {} - {}".format(self.states[edge[1]].shape, h.shape))
-        print("OP: {}".format(op))
-        print("PREVIOUS SHAPE: {}".format(self.states[edge[0]].shape))
+        #print("PREADD SHAPE: {} - {}".format(self.states[edge[1]].shape, h.shape))
+        #print("OP: {}".format(op))
+        #print("PREVIOUS SHAPE: {}".format(self.states[edge[0]].shape))
       """
       self.states[edge[1]] = self.states[edge[1]] + h
     elif self.nodes[edge[1]].combine == "CONCAT":
-      #print("PRECONCAT: {} - {}".format(self.states[edge[1]].shape, h.shape))
+      ##print("PRECONCAT: {} - {}".format(self.states[edge[1]].shape, h.shape))
       self.states[edge[1]] = torch.cat((self.states[edge[1]], h),dim = 1)
     elif self.nodes[edge[1]].combine == "MULT":
       self.states[edge[1]] = self.states[edge[1]] * h
-    #print(edge,self.states[edge[1]].shape)
+    ##print(edge,self.states[edge[1]].shape)
     else:
       self.states[edge[1]] = self.states[edge[1]] + h
   def forward(self,x):
@@ -391,14 +390,14 @@ class ModelGraph(nn.Module):
     self.states = {}
     if self.embedding:
       x = x.squeeze().long()
-
       self.states["S"] = self.stem(x).permute(0,2,1)
     else: 
       self.states["S"] = self.stem(x)
     self.current_iteration = -1
     hold = 0
     #while self.current_iteration < len(self.edges)-1:
-    for iteration, (op,edge) in enumerate(zip(self.ops,self.sorted_graph)):
+    for iteration, edge in enumerate(self.sorted_graph):
+      op = self.ops[str(edge)]
       self._forward(op,edge)
     #FC LAYER
     x = self.global_pooling(self.states["T"])

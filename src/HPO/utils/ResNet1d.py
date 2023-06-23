@@ -181,7 +181,7 @@ class ResNet(nn.Module):
             norm_layer = nn.BatchNorm1d
         self._norm_layer = norm_layer
 
-        self.inplanes = 64
+        self.inplanes = 32
         self.dilation = 1
         if replace_stride_with_dilation is None:
             # each element in the tuple indicates if we should replace
@@ -438,7 +438,7 @@ def wide_resnet101_2(pretrained: bool = False, progress: bool = True, **kwargs: 
     return _resnet("wide_resnet101_2", Bottleneck, [3, 4, 23, 3], pretrained, progress, **kwargs)
 
 
-
+"""
 
 class Bottleneck(nn.Module):
     expansion = 4
@@ -562,4 +562,4 @@ class ResNet(nn.Module):
             layers.append(ResBlock(self.in_channels, planes))
             
         return nn.Sequential(*layers)
-
+"""

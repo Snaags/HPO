@@ -139,13 +139,35 @@ def create_exp_dir(path, scripts_to_save=None):
 
 import pandas as pd
 
+
+class BernoulliLogger:
+  def __init__(self,PATH,ID): 
+    if not os.path.exists("{}/{}".format(PATH,"metrics")):
+      os.mkdir("{}/metrics".format(self.PATH))
+    self.path = "{}/{}/{}-bin.npy".format(PATH,"metrics",ID)
+  def update(self,data):
+    if os.path.exists(self.path):
+      x = np.load(self.path)
+      np.save(self.path,np.vstack((x,data)))
+    else:
+      np.save(self.path,data)
+
 class MetricLogger:
   def __init__(self,PATH):
     self.performance_data = {"ID": [],"accuracy": [], "recall":[]}
     self.PATH = PATH
     if not os.path.exists("{}/{}".format(PATH,"metrics")):
       os.mkdir("{}/metrics".format(self.PATH))
+    self.initial = True 
+  def load(self,ID):
+    path = "{}/{}/{}".format(self.PATH,"metrics",ID)
+    data = pd.read_csv(path).to_dict('list')
+    self.performance_data = {"ID": data["ID"],"accuracy": data["accuracy"], "recall":data["recall"]}
+
   def update(self, new_data : dict):
+    if self.initial and os.path.exists("{}/{}/{}".format(self.PATH,"metrics",new_data["ID"])):
+      self.load(new_data["ID"])
+      self.initial = False
     for i in new_data:
       self.performance_data[i].append(new_data[i])
 

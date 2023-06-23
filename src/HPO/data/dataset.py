@@ -4,12 +4,12 @@ from HPO.data.TEPS import *
 from HPO.data.EEG import *
 from HPO.data.FORDB import *
 from HPO.data.UEA_datasets import *
-#from Transformers.datasets.androzoo_dl import *
-#from transformers.datasets import *
+from Transformers.datasets.androzoo_dl import *
+from Transformers.datasets import *
 DATASETS = {
     "teps" : (Train_TEPS,Test_TEPS),
     "HAR" : (Train_HAR,Test_HAR),
-    "SHAR" : (SHAR, SHAR_TEST),
+    #"Full_SHAR" : (Full_SHAR, Full_SHAR),
     "EEG" : (Train_EEG,Test_EEG),
     "EEG_Retrain" : (Train_EEG,Test_EEG),
     "LSST" : (Train_LSST,Test_LSST),
@@ -25,8 +25,8 @@ DATASETS = {
     "PhonemeSpectraRetrain" : (Train_PhonemeSpectra,Validation_PhonemeSpectra),
     "EthanolConcentration" : (Train_EthanolConcentration,Test_EthanolConcentration),
     
-    "LSSTRetrain" : (Train_LSST,Validation_LSST),
-    #"Hex" : (Train_Hex,Test_Hex),
+    "LSST_Retrain" : (Train_LSST,Validation_LSST),
+    "Hex" : (Train_Hex,Test_Hex),
     "FaceDetectionVal" : (Train_FaceDetection,Validation_FaceDetection),
     "FaceDetectionTest" : (Train_FaceDetection,True_Test_FaceDetection),
     "PenDigitsVal" : (Train_PenDigits,Validation_PenDigits),
@@ -50,10 +50,13 @@ def get_dataset(name,train_args,test_args):
             return DATASETS[name][0](**train_args)
         return DATASETS[name][0](**train_args),DATASETS[name][1](**test_args)
     else:
+
         if "Full" in name:
             return Full_N(name.split("_")[-1],**train_args)
         elif "Retrain" in name:
-            return Train_N(name.split("_")[0],**train_args), Validation_N(name.split("_")[0],**test_args)
+            return Retrain_N(name.split("_")[0],**train_args), Validation_N(name.split("_")[0],**test_args)
+        if test_args == None:
+            return Train_N(name,**train_args)
         else:
             return Train_N(name,**train_args), Test_N(name,**test_args)
 

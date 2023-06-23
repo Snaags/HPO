@@ -40,7 +40,7 @@ def load(FILENAME):
       best_list.append(e_min)
     return {"accuracy":scores,"recall":recall,"config":config ,"params": params, "ID": ID}
 
-def assign_gpu():
+def assign_gpu(devices):
   nvmlInit()
   max_memory = 1000000000
   count = nvmlDeviceGetCount()  
@@ -56,6 +56,9 @@ def assign_gpu():
       gpu_list[-1] += 1
   print("GPU list is ",str(gpu_list))
   nvmlShutdown()
+  for e,i in enumerate(gpu_list):
+    if not (e in devices):
+      gpu_list[e] = 0
   return gpu_list
 
 class train_eval:
@@ -69,6 +72,7 @@ class train_eval:
     self.JSON_CONFIG = json_config
     self.config_queue = Queue()
     self.gpu_slots = Queue()
+    self.devices = SETTINGS["DEVICES"]
     self.results = Queue()
     self.acc_list_full = []
     self.recall_list_full = []
@@ -103,7 +107,7 @@ class train_eval:
     self.param_list = []
     self.config_list = []
     self.processes = []
-    gpu = assign_gpu()
+    gpu = assign_gpu(self.devices)
     self.gpu =gpu
     for ID,i in enumerate(population):
       if type(i) != dict:
@@ -122,10 +126,11 @@ class train_eval:
       else:
         self.gpu_slots.put(slot)
     #Initialise Processes
+    i = 0
     while len(self.processes) < self.num_worker:
       print("Number of workers: {}".format(self.num_worker))
       self.processes.append(Process(target = self.worker , args = (i, self.config_queue , self.gpu_slots, self.results,self.JSON_CONFIG)))
-
+      i+= 1
     ###Main Evaluation Loop###
     for i in self.processes:
       i.start()
@@ -133,6 +138,10 @@ class train_eval:
     return [],[],[]
 
   def update_async(self,config):
+    for idx,i in enumerate(self.processes):
+      if not i.is_alive():
+        self.processes[idx] = Process(target = self.worker , args = (idx, self.config_queue , self.gpu_slots, self.results,self.JSON_CONFIG))
+
     if type(config) != dict:
       c = config.get_dictionary()
     else:
@@ -155,7 +164,7 @@ class train_eval:
     self.param_list = []
     self.config_list = []
     self.processes = []
-    gpu = assign_gpu()
+    gpu = assign_gpu(self.devices)
     self.gpu =gpu
     for ID,i in enumerate(population):
       if type(i) != dict:

@@ -411,6 +411,7 @@ class Evaluator:
       else:
         self.prediction = np.argmax(self.model_prob, axis = 1).reshape(-1,1)
         assert self.prediction.shape == (len(self.model_prob),1),  "Shape of prediction is {} when it should be {}".format(self.prediction.shape, (len(self.model_prob),1))
+      self.correct = np.where(self.labels == self.prediction,1,0)
       self.update_CM()
       if not no_print:
           with np.printoptions(linewidth = (10*self.n_classes+20),precision=4, suppress=True):

@@ -12,28 +12,47 @@ import sqlite3
 import cProfile
 
 from HPO.data.dataset import get_dataset
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GroupShuffleSplit
 def partition_dataset(JSON_CONFIG):
   with open(JSON_CONFIG, "r") as f:
         data = json.load(f)
   #load the dataset
   train_args = {"cuda_device":"cpu","augmentation" :None, "binary" :False}
   dataset = get_dataset("Full_{}".format(data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]),train_args,None )
+  print(dataset.x.shape)
   PATH = "experiments/{}/dataset/".format(data["EXPERIMENT_NAME"])
   names = ["train", "validation", "test"]
   #generate random split
-  PATH
   # Assuming 'X' is your features and 'y' is your target variable
-  X_train, X_test, y_train, y_test = train_test_split(dataset.x, dataset.y, test_size=dataset.get_proportions(), random_state=42,stratify =dataset.y)
-  X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=data["SEED"],stratify = y_test)
+  if data["GROUPED_PARTITION"]:
+    gss = GroupShuffleSplit(n_splits = 1 ,test_size=dataset.get_proportions(), random_state=data["SEED"])
+    train_idx , test_idx  = next(gss.split(dataset.x, dataset.y, dataset.groups))
+    X_train, X_test, y_train, y_test,  = dataset.x[train_idx], dataset.x[test_idx], dataset.y[train_idx], dataset.y[test_idx]
+    groups_train = dataset.groups[train_idx]
+    groups_test = dataset.groups[test_idx]
+
+    np.save('{}{}_train_groups.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), groups_train)
+    np.save('{}{}_test_groups.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), groups_test)
+    if data["PARTITION_VAL_SET"]:
+      gss = GroupShuffleSplit(n_splits = 1 ,test_size=0.5, random_state=data["SEED"])
+      train_idx , test_idx  = next(gss.split(X_test, y_test, groups_test))
+      X_val, X_test, y_val, y_test = X_test[train_idx], X_test[test_idx], y_test[train_idx], y_test[test_idx]
+
+
+  else:
+    X_train, X_test, y_train, y_test = train_test_split(dataset.x, dataset.y, test_size=dataset.get_proportions(), random_state=data["SEED"],stratify =dataset.y)
+    if data["PARTITION_VAL_SET"]:
+      X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=data["SEED"],stratify = y_test)
   #save datasets
 
   np.save('{}{}_train_samples.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), X_train.cpu().numpy())
   np.save('{}{}_train_labels.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), y_train.cpu().numpy())
-  np.save('{}{}_validation_samples.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), X_val.cpu().numpy())
-  np.save('{}{}_validation_labels.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), y_val.cpu().numpy())
   np.save('{}{}_test_samples.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), X_test.cpu().numpy())
   np.save('{}{}_test_labels.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), y_test.cpu().numpy())
+
+  if data["PARTITION_VAL_SET"]:
+    np.save('{}{}_validation_samples.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), X_val.cpu().numpy())
+    np.save('{}{}_validation_labels.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), y_val.cpu().numpy())
   return PATH
 
 def main(JSON_CONFIG):

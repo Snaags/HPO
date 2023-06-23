@@ -6,6 +6,11 @@ import json
 import copy
 import random
 import time
+
+def load_scores(config):
+  path = "{}/{}".format(SETTINGS["PATH"],"metrics/")
+
+
 def main(worker, configspace : ConfigurationSpace, json_config):
   with open(json_config) as f:
     SETTINGS = json.load(f)["SEARCH_CONFIG"]

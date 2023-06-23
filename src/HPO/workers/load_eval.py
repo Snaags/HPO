@@ -5,7 +5,7 @@ import numpy as np
 from HPO.data.UEA_datasets import UEA_Train, UEA_Test, UEA_Full
 import time
 import sys
-from HPO.utils.utils import MetricLogger, BernoulliLogger
+from HPO.utils.utils import MetricLogger
 import os 
 import matplotlib.pyplot as plt
 from HPO.utils.model import NetworkMain
@@ -59,7 +59,6 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
   SAVE_PATH = data["SEARCH_CONFIG"]["PATH"]
   acc = []
   metric_logger = MetricLogger(SAVE_PATH) 
-  binary_logger = BernoulliLogger(SAVE_PATH,hyperparameter["ID"]) 
   recall = []
   if cuda_device == None:
      cuda_device = 3
@@ -175,66 +174,27 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
           raw_stem = SETTINGS["RAW_STEM"],embedding = SETTINGS["EMBEDDING"])
 
 
-      if SETTINGS["EFFICIENT_WEIGHTS"] and "parent" in hyperparameter["ops"]:
-          print("LOADING PARENT ID", hyperparameter["ops"]["parent"])
-          files = os.listdir("{}/weights/".format(SAVE_PATH))
-          for i in files:
-            splits = i.split("-")
 
-            if ( int(splits[0]) == hyperparameter["ops"]["parent"]) and (int(splits[1]) == _):
-              state_dict = torch.load("{}/weights/{}".format(SAVE_PATH,i))
-              break
+      files = os.listdir("{}/weights/".format(SAVE_PATH))
 
-          own_state = model.state_dict()
-          for name, param in state_dict.items():
-              if name not in own_state:
-                   #print('Ignoring {} since it is not in current model.'.format(name))
-                   continue
-              if isinstance(param, nn.Parameter):
-                  # backwards compatibility for serialized parameters
-                  param = param.data
-              try:
-                  own_state[name].copy_(param)
-                  #print('Successfully loaded {}'.format(name))
-              except Exception:
-                  pass
-                  #print('While copying the parameter named {}, whose dimensions in the model are {} and dimensions in the saved model are {}, ...'.format(name, own_state[name].size(), param.size()))
+      valid_weights = []
 
-          #print('Finished loading weights.')
-      else:
-          print("WARNING PARENT NOT IN OPS - ID: {}".format(hyperparameter["ID"]))
-      """
-      if "parent" in hyperparameter["ops"]:
-        print("LOADING PARENT ID", hyperparameter["ops"]["parent"])
-        files = os.listdir("{}/weights/".format(SAVE_PATH))
-        for i in files:
-          splits = i.split("-")
-
-          if ( int(splits[0]) == hyperparameter["ops"]["parent"]) and (int(splits[1]) == _):
-            state_dict = torch.load("{}/weights/{}".format(SAVE_PATH,i))
-            break
-        print(model.load_state_dict(state_dict, strict=False))
-      else:
-        print("WARNING PARENT NOT IN OPS")
-      """
+      for i in files:
+        splits = i.split("-")
+        if splits[0] == str(hyperparameter["LOAD_ID"]):
+           valid_weights.append(i)
+      idx = np.argmax([ float(i.split("-")[-1]) for i in valid_weights]) #Best weights
+      #idx = random.randint(0,len(valid_weights)-1)
+      state_dict = torch.load("{}/weights/{}".format(SAVE_PATH,valid_weights[idx]))
+      model.load_state_dict(state_dict, strict=True)
 
       model = model.cuda(device = cuda_device)
-      #summary(model, (train_dataset.get_n_features(),test_dataset.get_length()))
-      if SETTINGS["COMPILE"]:
-        torch.set_float32_matmul_precision('high')
-        model = torch.compile(model)
-      #print(model)
 
-      """
-      ### Train the model
-      """
 
 
       params = sum(p.numel() for p in model.parameters() if p.requires_grad)
       #print("Size: {}".format(params))
-      train_model(model , SETTINGS, trainloader , cuda_device, evaluator = evaluator if SETTINGS["LIVE_EVAL"] else None, fold = fold, repeat = _) 
-    #print(prof.key_averages().table(sort_by="self_cpu_time_total"))
-      torch.cuda.empty_cache()
+
       model.eval()
       if (SETTINGS["RESAMPLES"] or SETTINGS["CROSS_VALIDATION_FOLDS"] ) and SETTINGS["TEST_TIME_AUGMENTATION"] == False:
         dataset.disable_augmentation()  
@@ -246,35 +206,37 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       recall_total = evaluator.P(1)
       print("Accuracy: ", "%.4f" % ((acc[-1])*100), "%")
       #print("Recall: ", "%.4f" % ((recall[-1])*100), "%")
-      if SETTINGS["SAVE_WEIGHTS"]:
-        torch.save(model.state_dict(),"{}/weights/{}-{}-{:.02f}".format(SAVE_PATH,hyperparameter["ID"],_,acc[-1]))
-      metric_logger.update({"ID" : hyperparameter["ID"], "accuracy" : acc[-1], "recall": recall[-1]})
-      binary_logger.update(evaluator.correct)
     acc_ = np.mean(acc)
     recall_ = np.mean(recall)
-    #print("Average Accuracy: ", "%.4f" % ((acc_)*100), "%")
+    print("Average Accuracy: ", "%.4f" % ((acc_)*100), "%")
   return acc_, recall_,params
 
 
 
 if __name__ == "__main__":
-    from HPO.general_utils import load
+    from HPO.algorithms.algorithm_utils import load
     with open(sys.argv[1]) as f:
       DATA = json.load(f)
       HP = DATA["WORKER_CONFIG"]
       j = DATA
       j["WORKER_CONFIG"]["MODEL_VALIDATION_RATE"] = 10
-      j["WORKER_CONFIG"]["REPEAT"] = 10
-      j["WORKER_CONFIG"]["GROUPED_RESAMPLES"] = False
-      #j["WORKER_CONFIG"]["LR_MIN"] =  1e-07
+      j["WORKER_CONFIG"]["REPEAT"] = 30
       j["WORKER_CONFIG"]["RESAMPLES"] = False
-      j["WORKER_CONFIG"]["EPOCHS"] = 200
       j["WORKER_CONFIG"]["PRINT_RATE_TRAIN"] = 50
       j["WORKER_CONFIG"]["LIVE_EVAL"] = True
-      j["WORKER_CONFIG"]["EFFICIENT_WEIGHTS"] = False
-      #j["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"] = "{}_Retrain".format(HP["DATASET_CONFIG"]["NAME"] )
+      j["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"] = "{}_Retrain".format(HP["DATASET_CONFIG"]["NAME"] )
       search = load( "{}/{}".format(DATA["SEARCH_CONFIG"]["PATH"],"evaluations.csv"))
-      HP["ID"] = "reval"
-      HP["graph"] = search["config"][search["best"].index(min(search["best"]))]["graph"]
-      HP["ops"] = search["config"][search["best"].index(min(search["best"]))]["ops"]
-    _compute(HP,2,j)
+      scores = []
+      for ID in search["ID"]:
+        path = "{}/{}/{}".format(DATA["SEARCH_CONFIG"]["PATH"],"metrics",ID)
+        df = pd.read_csv(path)
+        mu = df["accuracy"].mean()
+        scores.append(mu)
+      print("Best Accuracy: ",max(scores))
+      #idx_max = np.argpartition(scores, -2)[-2]
+      idx_max = scores.index(max(scores))
+      HP["LOAD_ID"] = search["config"][idx_max]["ID"]
+      HP["ID"] = "val"
+      HP["graph"] = search["config"][idx_max]["graph"]
+      HP["ops"] = search["config"][idx_max]["ops"]
+    _compute(HP,3,j)

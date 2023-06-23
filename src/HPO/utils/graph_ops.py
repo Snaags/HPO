@@ -453,3 +453,57 @@ class MHA(nn.Module):
         output = self.out_linear(attn_output)
         output = output.permute(0, 2, 1)
         return output
+
+
+class MHA_pt(nn.Module):
+    def __init__(self, d_model, num_heads):
+        super(MHA, self).__init__()
+
+        assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
+        
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.head_dim = d_model // num_heads
+
+        self.q_linear = nn.Linear(d_model, d_model)
+        self.k_linear = nn.Linear(d_model, d_model)
+        self.v_linear = nn.Linear(d_model, d_model)
+        self.out_linear = nn.Linear(d_model, d_model)
+        self.pe = None
+        self.mha = nn.MultiheadAttention(d_model, num_heads, dropout=0.0, bias=False, add_bias_kv=False, add_zero_attn=False, kdim=None, vdim=None, batch_first=True)
+
+    def forward(self, x):
+        batch_size = x.size(0)
+        if self.pe == None or self.pe.shape[0] != 16:
+          pe = torch.zeros(x.shape)
+          pos = torch.arange(x.shape[2]).unsqueeze(1).view(1,-1)
+          denominator = torch.exp(torch.arange(0,self.d_model,2)*(-math.log(10000.0)/self.d_model)).unsqueeze(1)
+          pe[:,0::2,:] = torch.sin(pos *denominator)
+          pe[:,1::2,:] = torch.cos(pos *denominator)
+          self.pe = pe.cuda(x.device)
+        x += self.pe
+        # Calculate q, k, and v
+
+
+        x = x.permute(0, 2, 1)
+        q = self.q_linear(x)
+        k = self.k_linear(x)
+        v = self.v_linear(x)
+
+        # Split the last dimension into (heads, depth)
+        q = q.view(batch_size, -1, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
+        k = k.view(batch_size, -1, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
+        v = v.view(batch_size, -1, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
+
+        # Scaled Dot-Product Attention
+        attn_weights = torch.matmul(q, k.transpose(-1, -2)) / torch.sqrt(torch.tensor(self.head_dim, dtype=torch.float))
+        attn_weights = torch.softmax(attn_weights, dim=-1)
+        attn_output = torch.matmul(attn_weights, v)
+
+        # Concatenate heads and put through final linear layer
+        attn_output = attn_output.permute(0, 2, 1, 3).contiguous()
+        attn_output = attn_output.view(batch_size, -1, self.d_model)
+
+        output = self.out_linear(attn_output)
+        output = output.permute(0, 2, 1)
+        return output
