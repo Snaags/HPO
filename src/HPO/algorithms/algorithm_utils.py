@@ -107,6 +107,7 @@ class train_eval:
     self.param_list = []
     self.config_list = []
     self.processes = []
+    self.initial_pop_size = len(population)
     gpu = assign_gpu(self.devices)
     self.gpu =gpu
     for ID,i in enumerate(population):
@@ -128,26 +129,26 @@ class train_eval:
     #Initialise Processes
     i = 0
     while len(self.processes) < self.num_worker:
-      print("Number of workers: {}".format(self.num_worker))
       self.processes.append(Process(target = self.worker , args = (i, self.config_queue , self.gpu_slots, self.results,self.JSON_CONFIG)))
       i+= 1
     ###Main Evaluation Loop###
     for i in self.processes:
       i.start()
-    print("returning to main loop!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     return [],[],[]
 
   def update_async(self,config):
     for idx,i in enumerate(self.processes):
       if not i.is_alive():
         self.processes[idx] = Process(target = self.worker , args = (idx, self.config_queue , self.gpu_slots, self.results,self.JSON_CONFIG))
+        self.processes[idx].start()
 
     if type(config) != dict:
       c = config.get_dictionary()
     else:
       c = config
     if not "ID" in c:
-      c["ID"] = len(self.config_list_full) + 1 + self.ID_INIT
+      self.initial_pop_size += 1
+      c["ID"] = self.initial_pop_size + self.ID_INIT
     self.config_queue.put(c)
 
   def get_async(self):
@@ -156,6 +157,14 @@ class train_eval:
     self.config_list = []
     self.write2file()
     return self.acc_list, self.recall_list, self.config_list
+
+  def kill_workers(self):
+    time.sleep(30)
+    print("Post Join print")
+    for e,i in enumerate(self.processes):
+      i.join(5)
+      i.terminate()
+    print("Post close print")
 
 
   def eval(self, population, datasets = None):

@@ -11,7 +11,6 @@ def __compute( ID, configs , gpus , res   , JSON_CONFIG, _compute):
       if device == None:
         device = gpus.get(timeout = 10)
       config = configs.get(timeout = 10)
-      print("configs in queue: ",configs.qsize())
     except Empty:
       if device != None:
         gpus.put(device)
@@ -22,16 +21,13 @@ def __compute( ID, configs , gpus , res   , JSON_CONFIG, _compute):
       if device != None:
         gpus.put(device)
       return
-    if config != None:
-      print("Got Configuration!")
 
     if device != None:
-      print("Starting config with device: {}".format(device))
       acc , rec, params =  _compute(hyperparameter = config , cuda_device = device,JSON_CONFIG = JSON_CONFIG)
       res.put([config , acc , rec ,params]) 
 
   torch.cuda.empty_cache()
   print("Got out of configs.empty loop")
-  return None
+  return True
 
 

@@ -21,7 +21,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchsummary import summary
 import random
 import HPO.utils.augmentation as aug
-from HPO.utils.train_utils import collate_fn_padd,BalancedBatchSampler
+from HPO.utils.train_utils import collate_fn_padd,BalancedBatchSampler, highest_power_of_two
 from HPO.utils.train import train_model
 from HPO.utils.weight_freezing import freeze_FCN, freeze_resnet
 from HPO.utils.ResNet1d import resnet18
@@ -35,12 +35,9 @@ from HPO.workers.worker_wrapper import __compute
 from HPO.data.dataset import get_dataset
 Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
 
-
-
-
 def compute(*args, **kwargs):
   __compute(*args, **kwargs, _compute = _compute)
-  return None
+  return True
 
 
 def _compute(hyperparameter,cuda_device, JSON_CONFIG):
@@ -114,7 +111,8 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       test_dataset = dataset
 
     elif SETTINGS["RESAMPLES"]:
-      kfold = KFold(n_splits = 5, shuffle = True)
+      splits = min([dataset.min_samples_per_class(), 5])
+      kfold = KFold(n_splits = splits, shuffle = True,random_state = _)
       splits = [(None,None)]*SETTINGS["RESAMPLES"]
       train_dataset = dataset
       test_dataset = dataset
@@ -127,6 +125,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       test_dataset = dataset
     #print("train",train_dataset.y.shape,train_dataset.y )
     #print("test",test_dataset.y.shape,test_dataset.y )
+    
     for fold, (train_ids, test_ids) in enumerate(splits):    
       #print('---Fold No.--{}--------------------'.format(fold))
       torch.cuda.empty_cache()
@@ -135,8 +134,10 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
          dataset.get_groups(train_ids,test_ids)
       elif SETTINGS["RESAMPLES"]:
         train_ids, test_ids = next(kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy()))
+        SETTINGS["BATCH_SIZE"] = min( [highest_power_of_two(len(test_ids)),  SETTINGS["BATCH_SIZE"]]  )
       if SETTINGS["CROSS_VALIDATION_FOLDS"] or SETTINGS["RESAMPLES"]: 
         # Sample elements randomly from a given list of ids, no replacement.
+      
         if SETTINGS["BALANCED_BATCH"]:
           train_batch_sampler = BalancedBatchSampler(dataset,SETTINGS["BATCH_SIZE"],train_ids)
           trainloader = torch.utils.data.DataLoader(dataset,collate_fn = collate_fn_padd,batch_sampler =train_batch_sampler)
@@ -176,7 +177,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
 
 
       if SETTINGS["EFFICIENT_WEIGHTS"] and "parent" in hyperparameter["ops"]:
-          print("LOADING PARENT ID", hyperparameter["ops"]["parent"])
+          #print("LOADING PARENT ID", hyperparameter["ops"]["parent"])
           files = os.listdir("{}/weights/".format(SAVE_PATH))
           for i in files:
             splits = i.split("-")
@@ -201,8 +202,6 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
                   #print('While copying the parameter named {}, whose dimensions in the model are {} and dimensions in the saved model are {}, ...'.format(name, own_state[name].size(), param.size()))
 
           #print('Finished loading weights.')
-      else:
-          print("WARNING PARENT NOT IN OPS - ID: {}".format(hyperparameter["ID"]))
       """
       if "parent" in hyperparameter["ops"]:
         print("LOADING PARENT ID", hyperparameter["ops"]["parent"])
@@ -219,15 +218,10 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       """
 
       model = model.cuda(device = cuda_device)
-      #summary(model, (train_dataset.get_n_features(),test_dataset.get_length()))
+
       if SETTINGS["COMPILE"]:
         torch.set_float32_matmul_precision('high')
         model = torch.compile(model)
-      #print(model)
-
-      """
-      ### Train the model
-      """
 
 
       params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -239,7 +233,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       if (SETTINGS["RESAMPLES"] or SETTINGS["CROSS_VALIDATION_FOLDS"] ) and SETTINGS["TEST_TIME_AUGMENTATION"] == False:
         dataset.disable_augmentation()  
       evaluator.forward_pass(model, testloader,SETTINGS["BINARY"],n_iter = SETTINGS["TEST_ITERATION"])
-      evaluator.predictions(model_is_binary = SETTINGS["BINARY"] , THRESHOLD = SETTINGS["THRESHOLD"])
+      evaluator.predictions(model_is_binary = SETTINGS["BINARY"] , THRESHOLD = SETTINGS["THRESHOLD"],no_print = SETTINGS["LIVE_EVAL"])
       total = evaluator.T()
       acc.append( evaluator.T_ACC())
       recall.append(evaluator.TPR(1))
@@ -247,9 +241,12 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       print("Accuracy: ", "%.4f" % ((acc[-1])*100), "%")
       #print("Recall: ", "%.4f" % ((recall[-1])*100), "%")
       if SETTINGS["SAVE_WEIGHTS"]:
+        #compare_weights_debug(model.state_dict(),,"{}/weights/{}-{}-{:.02f}".format(SAVE_PATH,hyperparameter["ID"],_,acc[-1]),hyperparameter["ID"])
         torch.save(model.state_dict(),"{}/weights/{}-{}-{:.02f}".format(SAVE_PATH,hyperparameter["ID"],_,acc[-1]))
+
       metric_logger.update({"ID" : hyperparameter["ID"], "accuracy" : acc[-1], "recall": recall[-1]})
-      binary_logger.update(evaluator.correct)
+      if False:
+        binary_logger.update(evaluator.correct)
     acc_ = np.mean(acc)
     recall_ = np.mean(recall)
     #print("Average Accuracy: ", "%.4f" % ((acc_)*100), "%")
@@ -263,18 +260,20 @@ if __name__ == "__main__":
       DATA = json.load(f)
       HP = DATA["WORKER_CONFIG"]
       j = DATA
-      j["WORKER_CONFIG"]["MODEL_VALIDATION_RATE"] = 10
+      j["WORKER_CONFIG"]["MODEL_VALIDATION_RATE"] = 5
       j["WORKER_CONFIG"]["REPEAT"] = 10
       j["WORKER_CONFIG"]["GROUPED_RESAMPLES"] = False
+      j["WORKER_CONFIG"]["WEIGHT_AVERAGING_RATE"] =  False
+
       #j["WORKER_CONFIG"]["LR_MIN"] =  1e-07
       j["WORKER_CONFIG"]["RESAMPLES"] = False
-      j["WORKER_CONFIG"]["EPOCHS"] = 200
+      j["WORKER_CONFIG"]["EPOCHS"] = 50
       j["WORKER_CONFIG"]["PRINT_RATE_TRAIN"] = 50
       j["WORKER_CONFIG"]["LIVE_EVAL"] = True
       j["WORKER_CONFIG"]["EFFICIENT_WEIGHTS"] = False
       #j["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"] = "{}_Retrain".format(HP["DATASET_CONFIG"]["NAME"] )
       search = load( "{}/{}".format(DATA["SEARCH_CONFIG"]["PATH"],"evaluations.csv"))
-      HP["ID"] = "reval"
+      HP["ID"] = "val"
       HP["graph"] = search["config"][search["best"].index(min(search["best"]))]["graph"]
       HP["ops"] = search["config"][search["best"].index(min(search["best"]))]["ops"]
     _compute(HP,2,j)

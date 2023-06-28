@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 import sqlite3
 import cProfile
-
+import math
 from HPO.data.dataset import get_dataset
 from sklearn.model_selection import train_test_split, GroupShuffleSplit
 def partition_dataset(JSON_CONFIG):
@@ -19,7 +19,6 @@ def partition_dataset(JSON_CONFIG):
   #load the dataset
   train_args = {"cuda_device":"cpu","augmentation" :None, "binary" :False}
   dataset = get_dataset("Full_{}".format(data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]),train_args,None )
-  print(dataset.x.shape)
   PATH = "experiments/{}/dataset/".format(data["EXPERIMENT_NAME"])
   names = ["train", "validation", "test"]
   #generate random split
@@ -45,6 +44,7 @@ def partition_dataset(JSON_CONFIG):
       X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=data["SEED"],stratify = y_test)
   #save datasets
 
+  stride_count = int(math.log(dataset.x.shape[-1],2)-1 )
   np.save('{}{}_train_samples.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), X_train.cpu().numpy())
   np.save('{}{}_train_labels.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), y_train.cpu().numpy())
   np.save('{}{}_test_samples.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), X_test.cpu().numpy())
@@ -53,7 +53,7 @@ def partition_dataset(JSON_CONFIG):
   if data["PARTITION_VAL_SET"]:
     np.save('{}{}_validation_samples.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), X_val.cpu().numpy())
     np.save('{}{}_validation_labels.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), y_val.cpu().numpy())
-  return PATH
+  return PATH,stride_count
 
 def main(JSON_CONFIG):
   with open(JSON_CONFIG) as conf:
@@ -82,21 +82,24 @@ def main(JSON_CONFIG):
 
 
 
-  config = eval("_config.{}({})".format(data["CONFIG_MODULE_NAME"],data))
+
+  experiment_json = "experiments/{}/configuration.json".format(name)
+
   #STORE DATA IN EXPERIMENT JSON FILE 
   data["DATE"] = "".join(str(datetime.now()).split(" "))
   data["START_TIME"] = time.time()
   data["SEARCH_CONFIG"]["PATH"] = "experiments/{}".format(name)
-  data["SEARCH_SPACE"] = str(config)
-  experiment_json = "experiments/{}/configuration.json".format(name)
   with open(experiment_json,"w") as f:
     json.dump(data,f, indent=4)
     
       
   with open(experiment_json,"w") as f:    
     if data["GENERATE_PARTITION"]:
-      data["WORKER_CONFIG"]["DATASET_CONFIG"]["DATASET_PATH"] =  partition_dataset(JSON_CONFIG)
+      path_ds, stride = partition_dataset(JSON_CONFIG)
+      data["WORKER_CONFIG"]["DATASET_CONFIG"]["DATASET_PATH"] = path_ds
+      data["ARCHITECTURE_CONFIG"]["STRIDE_COUNT"] = stride
     json.dump(data,f, indent=4)
+  config_str = "_config.{}".format(data["CONFIG_MODULE_NAME"])
   logging.basicConfig(filename='experiments/{}/experiment.log'.format(name),  level=logging.DEBUG)
   time.sleep(1) 
   set_seed(experiment_json)
@@ -131,8 +134,8 @@ def main(JSON_CONFIG):
     )
     """)
 
-
-
+  print(config_str)
+  config = eval(config_str)( experiment_json)
   if False:
     def profiled_worker(*args, **kwargs):
         profiler = cProfile.Profile()

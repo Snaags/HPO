@@ -12,7 +12,7 @@ import numpy as np
 
 
 
-class model-ts:
+class model_ts:
   def __init__(self,acc ,recall , config,SETTINGS):
     self.SETTINGS = SETTINGS
     self.ID = config["ID"]
@@ -21,23 +21,19 @@ class model-ts:
     self.offspring = 0
     self.evals = 1
   def load_scores(self):
-    path = "{}/{}/{}".format(self.SETTINGS["PATH"],"metrics",self.ID)
-    try:
-      x = np.load(path)
-      a = sum(x) + 1
-      b = len(x) - sum(x) + 1
-      A = np.random.beta(a,b,1000000)
-      self.evals = len(self.df["accuracy"])
-    except:
-      self.mu = self.mean_acc
+    path = "{}/{}/{}-bin.npy".format(self.SETTINGS["PATH"],"metrics",self.ID)
+    x = np.load(path)
+    self.a = sum(x) + 1
+    self.b = len(x) - sum(x) + 1
+    self.evals = len(x)/1500
 
   def sample(self):
     self.load_scores()
-    return np.random.normal(self.mu,self.sigma)
+    return np.random.beta(self.a,self.b)
 
   def sample_mu(self):
     self.load_scores()
-    return self.mu
+    return np.mean(np.random.beta(self.a,self.b,1000))
 
   def get_config(self):
     self.offspring += 1 
@@ -67,7 +63,7 @@ class model:
 
   def sample(self):
     self.load_scores()
-    return np.random.normal(self.mu,self.sigma)
+    return self.mu
 
   def sample_mu(self):
     self.load_scores()
@@ -81,21 +77,32 @@ class model:
     return self.offspring / self.evals
 
 def main(worker, configspace : ConfigurationSpace, json_config):
+
   #INITIALISATION
+  M_FORMAT = model
   with open(json_config) as f:
     SETTINGS = json.load(f)["SEARCH_CONFIG"]
   TIME_SINCE_IMPROVE = 0
   EARLY_STOP = SETTINGS["EARLY_STOP"]
+  START_TIME = time.time()
+  RUNTIME = SETTINGS["RUNTIME"]
+  last_print = time.time()
+
   train = train_eval( worker , json_config)
+
+
+
+
   if SETTINGS["RESUME"]:
     data = load(SETTINGS["EXPERIMENT_NAME"])
+    history.extend([M_FORMAT(s,r,p,SETTINGS) for s,r,p in zip( data["scores"] ,data["recall"] , data["config"])])
     history_scores = data["scores"]
     history_conf = data["config"]
   else:
     configs = configspace.sample_configuration(SETTINGS["INITIAL_POPULATION_SIZE"])
     scores , recall , pop= train.init_async(configs)
     
-    history = [model(s,r,p,SETTINGS) for s,r,p in zip(scores ,recall , pop)]
+    history = [M_FORMAT(s,r,p,SETTINGS) for s,r,p in zip(scores ,recall , pop)]
 
     last_mean_best = None
     iteration = 0
@@ -106,17 +113,17 @@ def main(worker, configspace : ConfigurationSpace, json_config):
 
     #WAIT FOR NEW RESULTS
     while len(scores) == 0:
-      time.sleep(0.5)
+      time.sleep(0.2)
       scores ,recall , pop = train.get_async()
 
     
 
-    history.extend([model(s,r,p,SETTINGS) for s,r,p in zip(scores ,recall , pop)])
+    history.extend([M_FORMAT(s,r,p,SETTINGS) for s,r,p in zip(scores ,recall , pop)])
 
     print("Generation: {}".format(iteration))
     #Thompson Sampling
-    max_index = np.argmax([i.sample_mu() for i in history])
-    mean_best = max([i.mu for i in history])
+    max_index = np.argmax([i.sample() for i in history])
+    mean_best = max([i.sample_mu() for i in history])
     print("Best (Mean) Score: {}".format(mean_best))
 
     while train.config_queue.qsize() < SETTINGS["CORES"]/2:
@@ -124,6 +131,15 @@ def main(worker, configspace : ConfigurationSpace, json_config):
         train.update_async(history[max_index].get_config())
       else:
         train.update_async(configspace.mutate_graph(history[max_index].get_config(),2))
+
+
+    if time.time() > START_TIME + RUNTIME:
+      print("Reached Total Alloted Time: {}".format(RUNTIME))
+      break
+    elif (time.time() - last_print) > 30:
+      print("TIME LEFT: {} SECONDS".format((START_TIME + RUNTIME) - time.time() ))
+      last_print = time.time()
+
     if mean_best == last_mean_best:
       TIME_SINCE_IMPROVE+=len(scores)
     else:
@@ -133,9 +149,5 @@ def main(worker, configspace : ConfigurationSpace, json_config):
       break
     iteration+= 1
 
-  #plot_scores(scores)
+  train.kill_workers()
   
-  best_score = max(scores)
-  best_config = pop[scores.index(max(scores))]
-  best_rec = recall[scores.index(max(scores))]
-

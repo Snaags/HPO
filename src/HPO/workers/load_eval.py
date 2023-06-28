@@ -21,7 +21,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchsummary import summary
 import random
 import HPO.utils.augmentation as aug
-from HPO.utils.train_utils import collate_fn_padd,BalancedBatchSampler
+from HPO.utils.train_utils import collate_fn_padd,BalancedBatchSampler, highest_power_of_two
 from HPO.utils.train import train_model
 from HPO.utils.weight_freezing import freeze_FCN, freeze_resnet
 from HPO.utils.ResNet1d import resnet18
@@ -103,6 +103,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
   multibatch = False
   torch.cuda.empty_cache()
    
+  SETTINGS["BATCH_SIZE"] = min( [highest_power_of_two(len(test_dataset)*4),  SETTINGS["BATCH_SIZE"]]  )
   for _ in range(SETTINGS["REPEAT"]):
     
     if SETTINGS["GROUPED_RESAMPLES"]:
@@ -184,16 +185,17 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
         if splits[0] == str(hyperparameter["LOAD_ID"]):
            valid_weights.append(i)
       idx = np.argmax([ float(i.split("-")[-1]) for i in valid_weights]) #Best weights
-      #idx = random.randint(0,len(valid_weights)-1)
+      idx = random.randint(0,len(valid_weights)-1)
       state_dict = torch.load("{}/weights/{}".format(SAVE_PATH,valid_weights[idx]))
       model.load_state_dict(state_dict, strict=True)
 
       model = model.cuda(device = cuda_device)
 
 
-
       params = sum(p.numel() for p in model.parameters() if p.requires_grad)
       #print("Size: {}".format(params))
+
+
 
       model.eval()
       if (SETTINGS["RESAMPLES"] or SETTINGS["CROSS_VALIDATION_FOLDS"] ) and SETTINGS["TEST_TIME_AUGMENTATION"] == False:
@@ -221,10 +223,12 @@ if __name__ == "__main__":
       j = DATA
       j["WORKER_CONFIG"]["MODEL_VALIDATION_RATE"] = 10
       j["WORKER_CONFIG"]["REPEAT"] = 30
+      j["WORKER_CONFIG"]["TEST_TIME_AUGMENTATION"] = False
       j["WORKER_CONFIG"]["RESAMPLES"] = False
       j["WORKER_CONFIG"]["PRINT_RATE_TRAIN"] = 50
       j["WORKER_CONFIG"]["LIVE_EVAL"] = True
-      j["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"] = "{}_Retrain".format(HP["DATASET_CONFIG"]["NAME"] )
+      if DATA["PARTITION_VAL_SET"]:
+        j["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"] = "{}_Retrain".format(HP["DATASET_CONFIG"]["NAME"] )
       search = load( "{}/{}".format(DATA["SEARCH_CONFIG"]["PATH"],"evaluations.csv"))
       scores = []
       for ID in search["ID"]:

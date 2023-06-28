@@ -11,6 +11,7 @@ from HPO.utils.model_constructor import Model
 from torch.utils.data import DataLoader
 from HPO.utils.train_utils import stdio_print_training_data
 from sklearn.metrics import confusion_matrix
+from torchcontrib.optim import SWA
 
 def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tensor , epoch : int, epochs : int, correct :int , total : int , peak_acc : float , loss : Tensor, n_iter, loss_list = None, binary = True):
   def cal_acc(y,t):
@@ -101,6 +102,14 @@ def train_model_triplet(model : Model , hyperparameter : dict, dataloader : Data
   print("Num epochs: {}".format(epoch))
   return logger
 
+def clone_state_dict(state_dict):
+    return {name: val.clone() for name, val in state_dict.items()}
+
+def average_state_dicts(state_dicts):
+    avg_state_dict = {name: torch.stack([d[name] for d in state_dicts], dim=0).mean(dim=0)
+                      for name in state_dicts[0] if state_dicts[0][name].dtype.is_floating_point}
+    return avg_state_dict
+
 def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
      cuda_device = None, evaluator= None,logger = None,run = None,fold = None, repeat = None):
 
@@ -147,7 +156,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
       pred_tensor = torch.Tensor()
       gt_tensor = torch.Tensor()
       correct = 0
-
+    weights =[]
     for i, (samples, labels) in enumerate( dataloader ):
       optimizer.zero_grad()
       #samples, labels = samples.cuda(cuda_device).float(), labels.cuda(cuda_device).long()
@@ -158,6 +167,8 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
         loss = criterion(outputs, labels)
       loss.backward()
       optimizer.step()
+      if hyperparameter["WEIGHT_AVERAGING_RATE"] and epoch+1 == EPOCHS:
+        weights.append(clone_state_dict(model.state_dict()))
       if hyperparameter["LOGGING"]:
         pred_tensor = torch.cat((pred_tensor, outputs.detach().cpu().flatten(end_dim = 0)))
         gt_tensor = torch.cat((gt_tensor, labels.detach().cpu().flatten()))
@@ -172,8 +183,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
         gt_labels = gt_tensor.numpy()
         with np.printoptions(linewidth = (10*len(np.unique(gt_labels))+20),precision=4, suppress=True):
           print(confusion_matrix(gt_labels,pred_labels))
-    if hyperparameter["WEIGHT_AVERAGING_RATE"] and epoch % hyperparameter["WEIGHT_AVERAGING_RATE"] == 0:
-        torch.save(model.state_dict() ,"SWA/run-{}-checkpoint-{}".format(run, epoch))
+
     if hyperparameter["MODEL_VALIDATION_RATE"] and epoch % hyperparameter["MODEL_VALIDATION_RATE"] == 0:
         if evaluator != None:
           model.eval()
@@ -208,6 +218,8 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
     if hyperparameter["SCHEDULE"] == True:
       scheduler.step()
     epoch += 1
+  if hyperparameter["WEIGHT_AVERAGING_RATE"]:  
+    model.load_state_dict(average_state_dicts(weights))
   print()
   print("Num epochs: {}".format(epoch))
   if hyperparameter["LOGGING"]:

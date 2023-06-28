@@ -401,7 +401,7 @@ class Evaluator:
       print("Threshold: {} -- Accuracy: {} -- Recall: {}".format(threshold,acc,recall)) 
       self.reset_cm()
 
-  def predictions(self, model_is_binary = False, THRESHOLD = None, no_print = False):
+  def predictions(self, model_is_binary = False, THRESHOLD = None, no_print = True):
       if model_is_binary:
 
         self.prediction = np.where(self.model_prob > THRESHOLD, 1,0)

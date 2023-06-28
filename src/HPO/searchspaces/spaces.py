@@ -108,6 +108,7 @@ class SearchSpace:
    
 
 def graph_config(JSON):
+  print("here")
   graph = GraphConfigSpace(JSON)
   return graph
 

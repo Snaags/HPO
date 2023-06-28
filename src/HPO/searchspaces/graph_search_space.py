@@ -4,6 +4,7 @@ import copy
 import ConfigSpace.hyperparameters as CSH
 import ConfigSpace as CS
 import time
+import json
 import networkx as nx
 
 
@@ -98,7 +99,9 @@ def get_ops(n_ops = 30):
 
 class GraphConfigSpace:
   def __init__(self,JSON):
-    self.data = JSON["ARCHITECTURE_CONFIG"]
+    with open(JSON) as conf:
+      self.data = json.load(conf)["ARCHITECTURE_CONFIG"]
+    #self.data = JSON["ARCHITECTURE_CONFIG"]
     self.g = nx.DiGraph
     self.n_operations = 32
     self.edge_options = self.data["N_EDGES"]

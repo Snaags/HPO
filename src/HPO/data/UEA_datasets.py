@@ -24,7 +24,7 @@ class UEA(Dataset):
       x.append(np.load("{}{}_samples.npy".format(self.PATH,n)))
       self.sizes.append(x[-1].shape[0])
       y.append(np.load("{}{}_labels.npy".format(self.PATH,n)))
-      print(os.listdir(self.PATH),"{}{}_groups.npy".format(self.PATH,n))
+      
       if "{}_groups.npy".format(n) in os.listdir(self.PATH):
         self.groups = np.load("{}{}_groups.npy".format(self.PATH,n))
     self.x = torch.from_numpy(np.concatenate(x,axis = 0)).to(device = device).float()
@@ -33,14 +33,14 @@ class UEA(Dataset):
     if kwargs["binary"]:
       self.y = np.where(self.y != 0, 1,0)
     self.y = torch.from_numpy(self.y).to(device).long()
-    print("Length of {}: {}".format(name, self.x.shape[0]))
+    
     if classes != None:
         """
         for c in classes:
             np.where(self.y == c)
         """
     self.n_classes = len(torch.unique(self.y))
-    print("number of classes: ",len(torch.unique(self.y)))
+    
     self.n_features = self.x.shape[1]
   def __getitem__(self,index):
     x ,y = self.x[index], self.y[index]
@@ -52,13 +52,16 @@ class UEA(Dataset):
     return len(self.y)
   def enable_augmentation(self,augs):
     self.augmentation = augs
+  def min_samples_per_class(self):
+    unique,counts = np.unique(self.y.cpu().numpy(), return_counts=True)
+    return min(counts)
   def disable_augmentation(self):
     self.augmentation = False 
   def get_groups(self, train_id, test_id):
       train_groups = self.groups[train_id]
       test_groups = self.groups[test_id]
-      print("Groups in train are: {} with a total length: {}".format(np.unique(train_groups),len(train_groups)))
-      print("Groups in test are: {} with a total length: {}".format(np.unique(test_groups),len(test_groups)))
+      #print("Groups in train are: {} with a total length: {}".format(np.unique(train_groups),len(train_groups)))
+      #print("Groups in test are: {} with a total length: {}".format(np.unique(test_groups),len(test_groups)))
   def get_n_classes(self):
     return self.n_classes
   def get_n_features(self):
