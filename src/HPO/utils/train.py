@@ -11,7 +11,6 @@ from HPO.utils.model_constructor import Model
 from torch.utils.data import DataLoader
 from HPO.utils.train_utils import stdio_print_training_data
 from sklearn.metrics import confusion_matrix
-from torchcontrib.optim import SWA
 
 def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tensor , epoch : int, epochs : int, correct :int , total : int , peak_acc : float , loss : Tensor, n_iter, loss_list = None, binary = True):
   def cal_acc(y,t):
