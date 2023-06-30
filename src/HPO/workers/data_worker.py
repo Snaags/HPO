@@ -35,19 +35,22 @@ from HPO.workers.worker_wrapper import __compute
 from HPO.data.dataset import get_dataset
 Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
 
+
+
+
 def compute(*args, **kwargs):
   __compute(*args, **kwargs, _compute = _compute)
   return True
 
 
-def _compute(hyperparameter,cuda_device, JSON_CONFIG):
+def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_dataset):
   ### Configuration 
   if type(JSON_CONFIG) != dict:
     with open(JSON_CONFIG) as f:
       data = json.load(f)
   else:
     data = JSON_CONFIG
-      
+  dataset = train_dataset
   SETTINGS = data["WORKER_CONFIG"]
   SETTINGS["ID"] = hyperparameter["ID"]
   SETTINGS["database"] = data["DATABASE_NAME"]
@@ -107,24 +110,19 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       # Initialize GroupKFold cross-validator with desired number of splits
       kfold = GroupKFold(n_splits=5, shuffle = True)
       splits = [(None,None)]*SETTINGS["RESAMPLES"]
-      train_dataset = dataset
-      test_dataset = dataset
+
 
     elif SETTINGS["RESAMPLES"]:
       splits = min([dataset.min_samples_per_class(), 5])
       kfold = KFold(n_splits = splits, shuffle = True,random_state = _)
       splits = [(None,None)]*SETTINGS["RESAMPLES"]
-      train_dataset = dataset
-      test_dataset = dataset
+
     elif SETTINGS["CROSS_VALIDATION_FOLDS"] == False: 
       splits = [(None,None)]
     elif SETTINGS["CROSS_VALIDATION_FOLDS"]:
       kfold = KFold(n_splits = SETTINGS["CROSS_VALIDATION_FOLDS"], shuffle = True)
       splits = kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy())
-      train_dataset = dataset
-      test_dataset = dataset
-    #print("train",train_dataset.y.shape,train_dataset.y )
-    #print("test",test_dataset.y.shape,test_dataset.y )
+
     
     for fold, (train_ids, test_ids) in enumerate(splits):    
       #print('---Fold No.--{}--------------------'.format(fold))
@@ -241,8 +239,13 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
       print("Accuracy: ", "%.4f" % ((acc[-1])*100), "%")
       #print("Recall: ", "%.4f" % ((recall[-1])*100), "%")
       if SETTINGS["SAVE_WEIGHTS"]:
+        dp = 2
         #compare_weights_debug(model.state_dict(),,"{}/weights/{}-{}-{:.02f}".format(SAVE_PATH,hyperparameter["ID"],_,acc[-1]),hyperparameter["ID"])
-        torch.save(model.state_dict(),"{}/weights/{}-{}-{:.02f}".format(SAVE_PATH,hyperparameter["ID"],_,acc[-1]))
+        _p = "{}/weights/{}-{}-{:.0"+str(dp)+"f}"
+        while os.path.exists(_p.format(SAVE_PATH,hyperparameter["ID"],_,acc[-1])):
+          dp += 1
+          _p = "{}/weights/{}-{}-{:.0"+str(dp)+"f}"
+        torch.save(model.state_dict(),_p.format(SAVE_PATH,hyperparameter["ID"],_,acc[-1]))
 
       metric_logger.update({"ID" : hyperparameter["ID"], "accuracy" : acc[-1], "recall": recall[-1]})
       if False:

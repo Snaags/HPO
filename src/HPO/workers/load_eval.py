@@ -185,7 +185,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
         if splits[0] == str(hyperparameter["LOAD_ID"]):
            valid_weights.append(i)
       idx = np.argmax([ float(i.split("-")[-1]) for i in valid_weights]) #Best weights
-      idx = random.randint(0,len(valid_weights)-1)
+      #idx = random.randint(0,len(valid_weights)-1)
       state_dict = torch.load("{}/weights/{}".format(SAVE_PATH,valid_weights[idx]))
       model.load_state_dict(state_dict, strict=True)
 
@@ -213,6 +213,38 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
     print("Average Accuracy: ", "%.4f" % ((acc_)*100), "%")
   return acc_, recall_,params
 
+
+
+def evaluate(config_path):
+    from HPO.algorithms.algorithm_utils import load
+    with open(config_path) as f:
+      DATA = json.load(f)
+      device = DATA["SEARCH_CONFIG"]["DEVICES"][0]
+      HP = DATA["WORKER_CONFIG"]
+      j = DATA
+      j["WORKER_CONFIG"]["MODEL_VALIDATION_RATE"] = 10
+      j["WORKER_CONFIG"]["REPEAT"] = 30
+      j["WORKER_CONFIG"]["TEST_TIME_AUGMENTATION"] = False
+      j["WORKER_CONFIG"]["RESAMPLES"] = False
+      j["WORKER_CONFIG"]["PRINT_RATE_TRAIN"] = 50
+      j["WORKER_CONFIG"]["LIVE_EVAL"] = True
+      if DATA["PARTITION_VAL_SET"]:
+        j["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"] = "{}_Retrain".format(HP["DATASET_CONFIG"]["NAME"] )
+      search = load( "{}/{}".format(DATA["SEARCH_CONFIG"]["PATH"],"evaluations.csv"))
+      scores = []
+      for ID in search["ID"]:
+        path = "{}/{}/{}".format(DATA["SEARCH_CONFIG"]["PATH"],"metrics",ID)
+        df = pd.read_csv(path)
+        mu = df["accuracy"].mean()
+        scores.append(mu)
+      print("Best Accuracy: ",max(scores))
+      #idx_max = np.argpartition(scores, -2)[-2]
+      idx_max = scores.index(max(scores))
+      HP["LOAD_ID"] = search["config"][idx_max]["ID"]
+      HP["ID"] = "val"
+      HP["graph"] = search["config"][idx_max]["graph"]
+      HP["ops"] = search["config"][idx_max]["ops"]
+    return _compute(HP,device,j)
 
 
 if __name__ == "__main__":

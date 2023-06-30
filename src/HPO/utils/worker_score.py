@@ -461,7 +461,10 @@ class Evaluator:
     return ( self.TP(value) + self.TN(value) ) / ( self.P(value) + self.N(value) )
 
   def TPR(self, value):
-    return self.TP(value)/self.P(value)
+    if self.P(value) >= 1:
+      return self.TP(value)/self.P(value)
+    else:
+      return 0
 
   def TNR(self, value):
     return self.TN(value)/self.N(value)

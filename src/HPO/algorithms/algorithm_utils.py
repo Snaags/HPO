@@ -137,11 +137,21 @@ class train_eval:
     return [],[],[]
 
   def update_async(self,config):
+    self.alive = [1] * self.num_worker
     for idx,i in enumerate(self.processes):
       if not i.is_alive():
+        self.alive[idx] = 0
+
         self.processes[idx] = Process(target = self.worker , args = (idx, self.config_queue , self.gpu_slots, self.results,self.JSON_CONFIG))
         self.processes[idx].start()
-
+      else:
+        self.alive[idx] = 1
+    #print("Number of Processes 'Alive': {}/{}".format(sum(self.alive)/len(self.alive)))
+    """
+    while len(self.processes) < self.num_worker:
+      self.processes[idx] = Process(target = self.worker , args = (idx, self.config_queue , self.gpu_slots, self.results,self.JSON_CONFIG))
+      self.processes[idx].start()
+    """
     if type(config) != dict:
       c = config.get_dictionary()
     else:

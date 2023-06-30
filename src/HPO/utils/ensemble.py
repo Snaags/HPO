@@ -102,6 +102,7 @@ class EnsembleManager:
             correct = np.sum(np.diag(self.confusion_matrix))
             total = np.sum(self.confusion_matrix)
             print("Accuracy: {}".format(correct / total))
+            return correct / total
 
 
         def get_ensemble(self,n_classifiers = 10):
@@ -118,7 +119,7 @@ class EnsembleManager:
                         m, sucess = self.try_build(index)
                         if sucess:
                           self.models.extend(m)
-                self.ensemble = Ensemble(self.models,self.num_classes)
+                self.ensemble = Ensemble(self.models,self.num_classes,self.cuda_device)
 
 
         def load_hps(self, PATH,FILENAME = "evaluations.csv"):
@@ -178,11 +179,11 @@ class EnsembleManager:
 
 
 class Ensemble(nn.Module):
-        def __init__( self, models,num_classes ):
+        def __init__( self, models,num_classes ,device):
                 super(Ensemble,self).__init__()
                 
                 self.num_classes = num_classes
-                self.classifiers = models.cuda(3)
+                self.classifiers = models.cuda(device)
 
         def soft_voting( self, prob ):
                 #SUM PROBABILITIES FROM ALL CLASSIFIERS THEN GET MAX PROBABILITY DENSITY

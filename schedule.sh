@@ -2,36 +2,36 @@
 
 # List of dataset names
 datasets=(
-#"ArticularyWordRecognition"
-#"AtrialFibrillation"
-#"BasicMotions"
-#"Cricket"
-#"DuckDuckGeese"
-#"EigenWorms"
-#"Epilepsy"
-#"EthanolConcentration"
-#"ERing"
-#"FaceDetection"
-#"FingerMovements"
-#"HandMovementDirection"
-#"Handwriting"
-#"Heartbeat"
-#"Libras"
-#"LSST"
-#"MotorImagery"
-#"NATOPS"
-#"PenDigits"
-#"PEMS-SF"
-#"PhonemeSpectra"
-#"RacketSports"
-#"SelfRegulationSCP1"
-#"SelfRegulationSCP2"
-#"StandWalkJump"
+"ArticularyWordRecognition"
+"AtrialFibrillation"
+"BasicMotions"
+"Cricket"
+"DuckDuckGeese"
+"EigenWorms"
+"Epilepsy"
+"EthanolConcentration"
+"ERing"
+"FaceDetection"
+"FingerMovements"
+"HandMovementDirection"
+"Handwriting"
+"Heartbeat"
+"Libras"
+"LSST"
+"MotorImagery"
+"NATOPS"
+"PenDigits"
+"PEMS-SF"
+"PhonemeSpectra"
+"RacketSports"
+"SelfRegulationSCP1"
+"SelfRegulationSCP2"
+"StandWalkJump"
 "UWaveGestureLibrary"
 )
 
 # Define experiment name prefix
-prefix="t2"
+prefix="BASELINE-3HR-FIX3"
 
 # List of GPUs
 gpus=(0 1 2 3)
@@ -41,10 +41,22 @@ for gpu in "${gpus[@]}"; do
     echo "token" > "gpu_${gpu}_tokens.txt"
 done
 
-# Function to run experiments
+
+
 run_experiment() {
     gpu=$1
     json_string=$2
+
+    # Define a cleanup function
+    cleanup() {
+        # Add token back to the gpu tokens file
+        echo "token" >> "gpu_${gpu}_tokens.txt"
+        # Delete the temp file
+        rm -f $tmpfile
+    }
+
+    # Set trap to ensure cleanup function is called on script exit
+    trap cleanup EXIT
 
     # Write the JSON string to a temp file
     tmpfile="tmp.$$.$gpu.json"
@@ -52,12 +64,6 @@ run_experiment() {
 
     # Run the Python script
     python main.py $tmpfile
-
-    # Delete the temp file
-    rm $tmpfile
-
-    # Add token back to the gpu tokens file
-    echo "token" >> "gpu_${gpu}_tokens.txt"
 }
 
 # Start experiments on each GPU

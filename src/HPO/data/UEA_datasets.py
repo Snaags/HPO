@@ -48,6 +48,10 @@ class UEA(Dataset):
       for f in self.augmentation:
         x,y = f(x,y)
     return x,y
+
+  def update_device(self,device):
+    self.x.to(device)
+    self.y.to(device)
   def __len__(self):
     return len(self.y)
   def enable_augmentation(self,augs):

@@ -61,7 +61,6 @@ def get_sorted_edges(edges):
   sorted_edges = []
   node_generate = nx.topological_sort(g)
   node_l = [n for n in node_generate]
-  print(node_l)
   node_generate = nx.topological_sort(g)
   while len(edges) > 0:
     for V in node_generate:
