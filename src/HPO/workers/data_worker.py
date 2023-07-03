@@ -85,7 +85,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
 
   if SETTINGS["RESAMPLES"]:
     dataset = get_dataset(name,train_args,None )
-    kfold = KFold(n_splits = 2, shuffle = True)
+    kfold = KFold(n_splits = 5, shuffle = True)
     splits = [(None,None)]*SETTINGS["RESAMPLES"]
     train_dataset = dataset
     test_dataset = dataset

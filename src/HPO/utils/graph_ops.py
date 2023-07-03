@@ -507,4 +507,3 @@ class MHA_pt(nn.Module):
         output = output.permute(0, 2, 1)
         return output
 
-

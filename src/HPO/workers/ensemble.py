@@ -215,6 +215,6 @@ class Ensemble(nn.Module):
 
 if __name__ == "__main__":
 	import sys
-	be = EnsembleManager(sys.argv[1],3)
+	be = EnsembleManager(sys.argv[1],1)
 	be.get_ensemble(3)
-	be.evaluate(256)
+	be.evaluate(2)

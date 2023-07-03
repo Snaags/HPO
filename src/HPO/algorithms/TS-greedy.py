@@ -128,7 +128,7 @@ def main(worker, configspace : ConfigurationSpace, json_config):
 
     #WAIT FOR NEW RESULTS
     while len(scores) == 0:
-      time.sleep(0.2)
+      time.sleep(0.05)
       scores ,recall , pop = train.get_async()
 
     
@@ -141,7 +141,7 @@ def main(worker, configspace : ConfigurationSpace, json_config):
     mean_best = max([i.sample_mu() for i in history])
     print("Best (Mean) Score: {}".format(mean_best))
 
-    while train.config_queue.qsize() < SETTINGS["CORES"]/2:
+    while train.config_queue.qsize() < SETTINGS["CORES"]:
       if history[max_index].get_ratio() > 4:
         train.update_async(history[max_index].get_config())
       else:

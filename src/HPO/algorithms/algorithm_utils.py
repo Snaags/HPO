@@ -141,7 +141,7 @@ class train_eval:
     for idx,i in enumerate(self.processes):
       if not i.is_alive():
         self.alive[idx] = 0
-
+        self.gpu_slots.put(random.choice(self.devices))\
         self.processes[idx] = Process(target = self.worker , args = (idx, self.config_queue , self.gpu_slots, self.results,self.JSON_CONFIG))
         self.processes[idx].start()
       else:
@@ -166,6 +166,15 @@ class train_eval:
     self.recall_list = []
     self.config_list = []
     self.write2file()
+    self.alive = [1] * self.num_worker
+    for idx,i in enumerate(self.processes):
+      if not i.is_alive():
+        self.alive[idx] = 0
+
+        self.processes[idx] = Process(target = self.worker , args = (idx, self.config_queue , self.gpu_slots, self.results,self.JSON_CONFIG))
+        self.processes[idx].start()
+      else:
+        self.alive[idx] = 1
     return self.acc_list, self.recall_list, self.config_list
 
   def kill_workers(self):
@@ -234,24 +243,22 @@ class train_eval:
       out_recall.append(self.recall_list[in_pop_dict_list.index(i)]) 
     return out_acc , out_recall , in_pop_dict_list
        
- 
   def write2file(self):
-    while not self.results.empty():
-      out = self.results.get()
-      self.acc_list.append(out[1])
-      self.recall_list.append(out[2])
-      self.param_list.append(out[3])
-      self.config_list.append(out[0])
-      self.acc_list_full.append(out[1])
-      self.recall_list_full.append(out[2])
-      self.param_list_full.append(out[3])
-      self.config_list_full.append(out[0])
-      print("Number of models evaluated: ", len(self.acc_list_full))
-      with open(self.filename, "w") as csvfile:
-        writer = csv.writer(csvfile)
-        for acc , recall , config , param in zip(self.acc_list_full , self.recall_list_full , self.config_list_full,self.param_list_full):
-          writer.writerow([acc, recall , config,param]) 
-  
+      while not self.results.empty():
+        out = self.results.get()
+        self.acc_list.append(out[1])
+        self.recall_list.append(out[2])
+        self.param_list.append(out[3])
+        self.config_list.append(out[0])
+        self.acc_list_full.append(out[1])
+        self.recall_list_full.append(out[2])
+        self.param_list_full.append(out[3])
+        self.config_list_full.append(out[0])
+        print("Number of models evaluated: ", len(self.acc_list_full))
+        with open(self.filename, "a") as csvfile:
+          writer = csv.writer(csvfile)
+          writer.writerow([out[1], out[2] , out[0], out[3]]) 
+
 
   
 
