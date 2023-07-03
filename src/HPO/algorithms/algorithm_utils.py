@@ -141,7 +141,7 @@ class train_eval:
     for idx,i in enumerate(self.processes):
       if not i.is_alive():
         self.alive[idx] = 0
-        self.gpu_slots.put(random.choice(self.devices))\
+        self.gpu_slots.put(random.choice(self.devices))
         self.processes[idx] = Process(target = self.worker , args = (idx, self.config_queue , self.gpu_slots, self.results,self.JSON_CONFIG))
         self.processes[idx].start()
       else:
@@ -170,7 +170,6 @@ class train_eval:
     for idx,i in enumerate(self.processes):
       if not i.is_alive():
         self.alive[idx] = 0
-
         self.processes[idx] = Process(target = self.worker , args = (idx, self.config_queue , self.gpu_slots, self.results,self.JSON_CONFIG))
         self.processes[idx].start()
       else:

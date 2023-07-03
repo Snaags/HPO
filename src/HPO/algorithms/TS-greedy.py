@@ -9,7 +9,7 @@ import random
 import time
 import pandas as pd
 import numpy as np
-from HPO.utils.ensemble import EnsembleManager
+from HPO.workers.ensemble import EnsembleManager
 import sys
 
 def full_eval(SETTINGS):

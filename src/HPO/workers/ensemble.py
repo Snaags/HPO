@@ -116,7 +116,7 @@ class EnsembleManager:
                 while len(self.models) < n_classifiers:
                         index = order.pop(-1)
                         print("Model acc: {}".format(self.accuracy[index]))
-                        m, sucess = self.try_build(index)
+                        m, sucess = self.try_build_max(index)
                         if sucess:
                           self.models.extend(m)
                 self.ensemble = Ensemble(self.models,self.num_classes,self.cuda_device)
@@ -176,6 +176,47 @@ class EnsembleManager:
           except:
             return None, False
 
+        def try_build_max(self,index):
+            try:
+                hyperparameter = self.configs[index]
+                print(hyperparameter)
+                ID = hyperparameter["ID"]
+                weights = os.listdir("{}weights/".format(self.path))
+                num_len = len(str(ID))
+                models = []
+                max_acc_for_fold = {}  # Dictionary to store max accuracy for each fold
+                best_weights_for_fold = {}  # Dictionary to store weight file with max accuracy for each fold
+                for inst in weights:
+                    if int(inst.split("-")[0]) == int(ID):
+                        print(inst,ID)
+                        fold = int(inst.split("-")[1])  # Assuming fold is second part of the filename
+                        acc = float(inst.split("-")[2])  # Assuming accuracy is third part of the filename
+                        # If this fold isn't in the dictionary yet or this acc is higher than the current max
+                        if fold not in max_acc_for_fold or acc > max_acc_for_fold[fold]:
+                            max_acc_for_fold[fold] = acc  # Update max acc for this fold
+                            best_weights_for_fold[fold] = inst  # Update weight file for this fold
+
+                for fold, weight_file in best_weights_for_fold.items():
+                    state = torch.load("{}weights/{}".format(self.path, weight_file))
+                    if "graph" in hyperparameter.keys():
+                            print("loading graph")
+                            models.append(ModelGraph(self.test_dataset.get_n_features(),self.channels,self.test_dataset.get_n_classes(),
+                              self.test_dataset.get_length(),hyperparameter["graph"],hyperparameter["ops"],device = self.cuda_device,
+                              binary = self.SETTINGS["BINARY"],dropout = self.SETTINGS["DROPOUT"],droppath = self.SETTINGS["DROPPATH"],
+                              raw_stem = self.SETTINGS["RAW_STEM"],embedding = self.SETTINGS["EMBEDDING"]))
+                            models[-1].load_state_dict(state)
+                    else: 
+                            print("loading cell")
+                            gen = config_space_2_DARTS(hyperparameter, reduction = True)
+                            models.append(NetworkMain(self.num_features,
+                                        2**hyperparameter["channels"], num_classes= self.num_classes,
+                                      layers = hyperparameter["layers"], auxiliary = False,
+                                      drop_prob = self.SETTINGS["P"],genotype = gen, 
+                                      binary = self.SETTINGS["BINARY"]).load_state_dict(state))
+                return models,True
+            except:
+                return None, False
+
 
         def load_state(path,ID):
                 state = torch.load("{}{}".format(path,ID))
@@ -216,5 +257,5 @@ class Ensemble(nn.Module):
 if __name__ == "__main__":
 	import sys
 	be = EnsembleManager(sys.argv[1],1)
-	be.get_ensemble(3)
-	be.evaluate(2)
+	be.get_ensemble(1)
+	be.evaluate(8)
