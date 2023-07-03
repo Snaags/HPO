@@ -224,6 +224,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
 
       params = sum(p.numel() for p in model.parameters() if p.requires_grad)
       #print("Size: {}".format(params))
+      #summary(model, ( train_dataset.get_n_features(), train_dataset.get_length()))
       train_model(model , SETTINGS, trainloader , cuda_device, evaluator = evaluator if SETTINGS["LIVE_EVAL"] else None, fold = fold, repeat = _) 
     #print(prof.key_averages().table(sort_by="self_cpu_time_total"))
       torch.cuda.empty_cache()

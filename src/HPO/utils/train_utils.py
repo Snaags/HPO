@@ -84,19 +84,12 @@ class BalancedBatchSampler(Sampler):
 
 
 def highest_power_of_two(N):
-    # Check if N is not 0
-    if N == 0:
-        return 2
+    power = 1
+    while N > 2**power:
+      power+=1
+    return 2**(power-1)
 
-    power = 0
-    while N % (2**(power+4)) == 0:
-        power += 1
 
-    # Check if N is not a power of 2
-    if power == 0:
-        return 2
-
-    return 2**power
 
 
 def collate_fn_padd(batch):

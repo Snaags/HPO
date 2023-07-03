@@ -3,6 +3,7 @@ import numpy as np
 import math
 import torch.nn as nn
 import torch.nn.functional as F
+from custom_transformers.time_series_positional_encoding import LEEM, TAPE,ERPE
 ACTIVATION = {
   "gelu" : lambda C, L: nn.GELU(),
   "relu" : lambda  C, L: nn.ReLU(),
@@ -31,6 +32,10 @@ OPS = {
   "MHA_2" : lambda C : MHA(C, 2),
   "MHA_4" : lambda C : MHA(C, 4),
   "MHA_8" : lambda C : MHA(C, 8),
+  "L_ERPE_4" : lambda C ,L: ERPE(C,L, 4),
+  "L_TAPE_4" : lambda C ,L: TAPE(C,L, 4),
+  "L_LEEM_4" : lambda C ,L: LEEM(C,L, 4),
+
   "SE_1" : lambda C : SE(C, 1),
   "SE_2" : lambda C : SE(C, 2),
   "SE_4" : lambda C : SE(C, 4),
@@ -241,13 +246,7 @@ class DownsampleResolution(nn.Module):
     self.stride = stride
     self.conv1 = nn.Conv1d(c_in,c_in, kernel_size = stride, stride = stride, bias = False, groups = c_in)
   def forward(self,x):
-    try:
       return self.conv1(x)
-    except RuntimeError:
-      print("Kernel Size Error")
-      print("Convolution Size: {}".format(self.conv1))
-      print("Input Size: {}".format(x.shape))
-      print("Stride Value : {}".format(self.stride))
 
 class ResampleChannels(nn.Module):
   """
@@ -509,147 +508,3 @@ class MHA_pt(nn.Module):
         return output
 
 
-
-import torch as T
-import torch.nn as nn
-import torch.nn.funcitonal as F
-
-from .positional_encoding import SinCosEncoding
-from attention import MultiheadAttention
-
-class LearnedEmbeddings(nn.Module):
-    '''
-     Add channel wise learned positional encodings (uses absolute encoding)
-    '''
-    
-    def __init__(self, *shape: int, dim: int = -1, dropout: float = 0.):
-        '''
-        Parameters
-        ----------
-        shape : int
-            Shape of input data.
-        channel_dim : int, optional
-            Dimension to positionally encode, -1 learns unique embedding for each position in each channel. The default is 1.
-        dropout: float
-            Dropout ratio. The default is 0.
-        '''
-        
-        self.dim = dim 
-        self.dropout = nn.Dropout(p = dropout)
-        
-        if dim == -1:
-            self.pos_emb = nn.Parameter(T.randn(shape))   
-        else:
-            self.pos_emb = nn.Parameter(T.randn(shape[dim]))   
-            
-            self.reshape = [1 for x in range(len(shape[dim]))]
-            self.reshape[dim] = shape[dim]
-        
-    def forward(self, x):
-        
-        if self.dim == -1:
-            x += self.pos_emb
-        else:
-            x += self.pos_emb.view(self.reshape)
-            
-        return self.dropout(x)
-
-
-class Tape(SinCosEncoding):
-    '''
-     Implementation of time series absolute positional encoding detailed in:
-         
-         https://arxiv.org/pdf/2305.16642.pdf
-         
-    '''
-    def get_w(self):
-        '''
-        w term in original positional embeddings:
-         w_original = 10000^(-2i/d_model)
-         
-         where i is dimension index
-         
-        w term in tape:
-            w = (w_original * d_model) / L
-        '''
-        return (super().get_w() * self.d_model) / self.length
-
-
-    
-class eRPELayer(MultiheadAttention):
-    '''
-     Implementation of time series absolute positional encoding detailed in:
-         
-         https://arxiv.org/pdf/2305.16642.pdf
-         
-     NOTE IMPLEMENTING WEIGHT MATRIX CACHING FOR INFERENCE PERFORMANCE GAINS
-    '''
-    def __init__(self, length: int, *args, **kwargs):
-        
-        super().__init__(*args, **kwargs)
-        self.length = length
-        
-        self.pos_weights = nn.Parameter( T.randn( (2*length) - 1) )
-    
-    def calc_attn(self, query, key, value, mask):
-        return erpe(query, key, value, self.length, mask = mask, weights = self.pos_weights, dropout = self.dropout)
-
-
-def erpe(query: T.Tensor, key: T.Tensor, value: T.Tensor, length: int, pos_weights: nn.Parameter, mask = None, dropout: float = 0.):
-    '''
-    Efficent relative attention for time series implementation
-
-    Parameters
-    ----------
-    query : T.Tensor
-        batch x channels x L query tensor.
-    key : T.Tensor
-        batch x channels x L key tensor.
-    value : T.Tensor
-        batch x channels x L value tensor.
-    length: int
-        Length of time series
-    pos_weights; nn.Parameter
-        positional attention weights.
-    mask, optional
-        attention mask. The default is None.
-    dropout : float, optional
-        dropout ratio. The default is 0..
-
-    Returns
-    -------
-    T.Tensor
-        Value tensor with attention applied.
-    p_attn : T.Tensor
-        Attention weights.
-    '''
-    
-    d_k = query.size(-1)
-    
-    '''
-    calculate scaled dot product attention
-    transpose sqaps last two diemensions of key 
-    '''
-    
-    scores = T.matmul(query, key.transpose(-2,-1)) * (d_k**(-1./2)) # calculate attention mask 
-    
-    # replace values in score vectore with -1e9 when mask is 0 
-    if mask is not None:
-        scores = scores.masked_fill(mask == 0, -1e9) # replaces values with second argument where first is true (mask is zer0) 
-    
-    p_attn = F.softmax(scores, dim = -1)  # softmax attnetion values
-    
-    # convert 2L-1 weight matrix to position wise LxL weight matrix
-    rows = T.arange(0, length).view(-1, 1).expand(-1, length) # expand to LxL
-    cols = T.arange(0, length).view(1, -1).expand(length, -1)  # expand to LxL 
-    relative_positions_matrix = rows - cols + length - 1  # compute relative positions matrix
-    relative_positions_matrix = relative_positions_matrix.long()
-    pos_matrix = pos_weights.index_select(0, relative_positions_matrix.view(-1)).view(length, length)  # positional emb matrix
-    
-    p_attn += pos_matrix  # apply encoding to attention weights
-    
-    if dropout is not None:
-        p_attn = dropout(p_attn) #apply dropout to attention map (will zero value vector)
-    
-    # return scaled value as well as attention map
-    return T.matmul(p_attn, value), p_attn  

@@ -241,7 +241,8 @@ class ModelGraph(nn.Module):
     self.cat_num_dict = propagate_cat_num(self.sorted_graph, self.ops_list)
     ##print(self.channel_dict)
     ##print(self.resolution_dict)
-    signal_length = signal_length//2
+    if not raw_stem:
+      signal_length = signal_length//2
     g = nx.DiGraph()
     g.add_edges_from(self.sorted_graph)
     for i in g.nodes():
@@ -304,7 +305,10 @@ class ModelGraph(nn.Module):
         C = self.nodes[edge[0]].channels
       
       #BUILD THE OPERATION
-      edge_container.append( OPS[curr_op](C).cuda(self.device))
+      if curr_op[:2] == "L_":
+        edge_container.append( OPS[curr_op](C,self.nodes[edge[0]].length).cuda(self.device))
+      else:
+        edge_container.append( OPS[curr_op](C).cuda(self.device))
       for i in node_ops:
         edge_container.append(i) 
        

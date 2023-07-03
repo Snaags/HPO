@@ -142,6 +142,7 @@ class EnsembleManager:
             return current_val
 
         def try_build(self,index):
+          try:
             hyperparameter = self.configs[index]
             print(hyperparameter)
             ID = hyperparameter["ID"]
@@ -172,6 +173,9 @@ class EnsembleManager:
                                   drop_prob = self.SETTINGS["P"],genotype = gen, 
                                   binary = self.SETTINGS["BINARY"]).load_state_dict(state))
             return models,True
+          except:
+            return None, False
+
 
         def load_state(path,ID):
                 state = torch.load("{}{}".format(path,ID))
@@ -212,5 +216,5 @@ class Ensemble(nn.Module):
 if __name__ == "__main__":
 	import sys
 	be = EnsembleManager(sys.argv[1],3)
-	be.get_ensemble(1)
-	be.evaluate(2)
+	be.get_ensemble(3)
+	be.evaluate(256)
