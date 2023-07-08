@@ -31,7 +31,7 @@ datasets=(
 )
 
 # Define experiment name prefix
-prefix="BASELINE-5Resample-3HR"
+prefix="SGD-5Resample-3HR"
 
 # List of GPUs
 gpus=(0 1 2 3)

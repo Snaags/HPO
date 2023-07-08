@@ -237,7 +237,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
       acc.append( evaluator.T_ACC())
       recall.append(evaluator.TPR(1))
       recall_total = evaluator.P(1)
-      print("Accuracy: ", "%.4f" % ((acc[-1])*100), "%")
+      #print("Accuracy: ", "%.4f" % ((acc[-1])*100), "%")
       #print("Recall: ", "%.4f" % ((recall[-1])*100), "%")
       if SETTINGS["SAVE_WEIGHTS"]:
         dp = 2

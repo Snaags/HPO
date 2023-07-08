@@ -228,6 +228,7 @@ def evaluate(config_path):
       j["WORKER_CONFIG"]["RESAMPLES"] = False
       j["WORKER_CONFIG"]["PRINT_RATE_TRAIN"] = 50
       j["WORKER_CONFIG"]["LIVE_EVAL"] = True
+      j["WORKER_CONFIG"]["BATCH_SIZE"] = 2
       if DATA["PARTITION_VAL_SET"]:
         j["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"] = "{}_Retrain".format(HP["DATASET_CONFIG"]["NAME"] )
       search = load( "{}/{}".format(DATA["SEARCH_CONFIG"]["PATH"],"evaluations.csv"))

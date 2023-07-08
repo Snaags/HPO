@@ -200,6 +200,7 @@ class EnsembleManager:
                     state = torch.load("{}weights/{}".format(self.path, weight_file))
                     if "graph" in hyperparameter.keys():
                             print("loading graph")
+                            print("Accuracy: {}".format(weight_file.split("-")[-1]))
                             models.append(ModelGraph(self.test_dataset.get_n_features(),self.channels,self.test_dataset.get_n_classes(),
                               self.test_dataset.get_length(),hyperparameter["graph"],hyperparameter["ops"],device = self.cuda_device,
                               binary = self.SETTINGS["BINARY"],dropout = self.SETTINGS["DROPOUT"],droppath = self.SETTINGS["DROPPATH"],

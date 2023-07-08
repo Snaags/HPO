@@ -96,7 +96,9 @@ def main(worker, configspace : ConfigurationSpace, json_config):
   #INITIALISATION
   M_FORMAT = model
   with open(json_config) as f:
-    SETTINGS = json.load(f)["SEARCH_CONFIG"]
+    data = json.load(f)
+    dataset_name = data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]
+    SETTINGS = data["SEARCH_CONFIG"]
   TIME_SINCE_IMPROVE = 0
   EARLY_STOP = SETTINGS["EARLY_STOP"]
   START_TIME = time.time()
@@ -109,7 +111,7 @@ def main(worker, configspace : ConfigurationSpace, json_config):
 
 
   if SETTINGS["RESUME"]:
-    data = load(SETTINGS["EXPERIMENT_NAME"])
+    data = load(data["EXPERIMENT_NAME"])
     history.extend([M_FORMAT(s,r,p,SETTINGS) for s,r,p in zip( data["scores"] ,data["recall"] , data["config"])])
     history_scores = data["scores"]
     history_conf = data["config"]
@@ -135,19 +137,19 @@ def main(worker, configspace : ConfigurationSpace, json_config):
 
     history.extend([M_FORMAT(s,r,p,SETTINGS) for s,r,p in zip(scores ,recall , pop)])
 
-    print("Generation: {}".format(iteration))
+    
     #Thompson Sampling
     max_index = np.argmax([i.sample() for i in history])
     mean_best = max([i.sample_mu() for i in history])
-    print("Best (Mean) Score: {}".format(mean_best))
+    
 
     while train.config_queue.qsize() < SETTINGS["CORES"]:
       if history[max_index].get_ratio() > 4:
         train.update_async(history[max_index].get_config())
       else:
         train.update_async(configspace.mutate_graph(history[max_index].get_config(),2))
-
-
+    if iteration % 10 ==0:
+      print("[{}] Generation: {}".format(dataset_name,iteration), " -- Best (Mean) Score: {}".format(mean_best))
     if time.time() > START_TIME + RUNTIME:
       print("Reached Total Alloted Time: {}".format(RUNTIME))
       break

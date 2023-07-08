@@ -1,6 +1,7 @@
 from multiprocessing import Queue, Process
 import time
 import csv
+import random
 import json
 from pynvml import *
 import cProfile
@@ -253,7 +254,7 @@ class train_eval:
         self.recall_list_full.append(out[2])
         self.param_list_full.append(out[3])
         self.config_list_full.append(out[0])
-        print("Number of models evaluated: ", len(self.acc_list_full))
+        #print("Number of models evaluated: ", len(self.acc_list_full))
         with open(self.filename, "a") as csvfile:
           writer = csv.writer(csvfile)
           writer.writerow([out[1], out[2] , out[0], out[3]]) 

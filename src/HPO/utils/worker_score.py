@@ -31,7 +31,8 @@ class StratifiedSampler(Sampler):
         try:
             from sklearn.model_selection import StratifiedShuffleSplit
         except:
-            print('Need scikit-learn for this functionality')
+           pass
+           #print('Need scikit-learn for this functionality')
         import numpy as np
         
         s = StratifiedShuffleSplit(n_splits=self.n_splits, test_size=0.5)
@@ -56,7 +57,7 @@ class StratifiedBatchSampler:
         if torch.is_tensor(y):
             y = y.cpu().numpy()
         assert len(y.shape) == 1, 'label array must be 1D'
-        print("Number of samples: {} -- Batch_Size: {}".format(len(y),batch_size))
+       #print("Number of samples: {} -- Batch_Size: {}".format(len(y),batch_size))
         n_batches = int(len(y) / batch_size)
         self.skf = StratifiedKFold(n_splits=n_batches, shuffle=shuffle)
         self.X = torch.randn(len(y),1).numpy()
@@ -168,7 +169,7 @@ class Evaluator:
         loss += lossFn(out,label.squeeze())
         outputs.append(out)
         outputs_raw.append(out_raw)
-    print("Validation loss: {}".format(loss)) 
+    #print("Validation loss: {}".format(loss)) 
     preds = torch.cat(outputs).detach().cpu().numpy()
     preds_raw = torch.cat(outputs_raw).detach().cpu().numpy()
     labels = torch.cat(labels).detach().cpu().numpy()
@@ -217,7 +218,8 @@ class Evaluator:
       c_matrix[l,p] += 1
 
     with np.printoptions(linewidth = (10*self.n_classes+20),precision=4, suppress=True):
-      print(c_matrix)
+      pass
+      #print(c_matrix)
     return c_matrix 
 
   def loss_over_sample_size(self,model,dataset):
@@ -251,7 +253,7 @@ class Evaluator:
   def loss_distribution(self, model, dataset, loss = "all", sample_per_class = 50):
       labels = dataset.get_labels()
       MAX_SIZE = 500
-      print(labels)
+     #print(labels)
       
       strat_sampler = StratifiedBatchSampler(y = labels , batch_size = sample_per_class*21)
 
@@ -269,9 +271,9 @@ class Evaluator:
         s_loss = self.sup_loss(model,subsample)
         s_loss_10 = self.sup_loss(model,subsample,n_augmment = 10)
         s_loss_20 = self.sup_loss(model,subsample,n_augmment = 20)
-        print("loss: {}".format(s_loss))
-        print("loss: {}".format(s_loss_10))
-        print("loss: {}".format(s_loss_20))
+       #print("loss: {}".format(s_loss))
+       #print("loss: {}".format(s_loss_10))
+       #print("loss: {}".format(s_loss_20))
         """
         u_loss = self.unsup_loss(model,subsample)
         u10_loss = self.unsup_loss(model,subsample, n_augment = 10)
@@ -398,7 +400,7 @@ class Evaluator:
       self.predictions(model_is_binary = model_is_binary, THRESHOLD = threshold)
       acc  =  self.T_ACC()
       recall = self.TPR(1)
-      print("Threshold: {} -- Accuracy: {} -- Recall: {}".format(threshold,acc,recall)) 
+     #print("Threshold: {} -- Accuracy: {} -- Recall: {}".format(threshold,acc,recall)) 
       self.reset_cm()
 
   def predictions(self, model_is_binary = False, THRESHOLD = None, no_print = True):
@@ -406,16 +408,18 @@ class Evaluator:
 
         self.prediction = np.where(self.model_prob > THRESHOLD, 1,0)
         #for m,p, l in zip(self.model_prob, self.prediction, self.labels):
-        #  print("Logit: {} -- Predicted: {} label: {}".format(m,p,l))
+        # #print("Logit: {} -- Predicted: {} label: {}".format(m,p,l))
         assert self.prediction.shape == (len(self.model_prob),1), "Shape of prediction is {} when it should be {}".format(self.prediction.shape, (len(self.model_prob),1))
       else:
         self.prediction = np.argmax(self.model_prob, axis = 1).reshape(-1,1)
         assert self.prediction.shape == (len(self.model_prob),1),  "Shape of prediction is {} when it should be {}".format(self.prediction.shape, (len(self.model_prob),1))
       self.correct = np.where(self.labels == self.prediction,1,0)
+
       self.update_CM()
       if not no_print:
           with np.printoptions(linewidth = (10*self.n_classes+20),precision=4, suppress=True):
-            print(self.confusion_matrix)
+            #print(self.confusion_matrix)
+            pass
 
   def calculate_loss(self,criterion,model_is_binary = False):
     if model_is_binary:
