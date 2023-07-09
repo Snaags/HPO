@@ -200,6 +200,8 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
                   #print('While copying the parameter named {}, whose dimensions in the model are {} and dimensions in the saved model are {}, ...'.format(name, own_state[name].size(), param.size()))
 
           #print('Finished loading weights.')
+      else:
+          SETTINGS["EPOCHS"] = SETTINGS["EPOCHS_INITIAL"]
       """
       if "parent" in hyperparameter["ops"]:
         print("LOADING PARENT ID", hyperparameter["ops"]["parent"])
@@ -280,4 +282,5 @@ if __name__ == "__main__":
       HP["ID"] = "val"
       HP["graph"] = search["config"][search["best"].index(min(search["best"]))]["graph"]
       HP["ops"] = search["config"][search["best"].index(min(search["best"]))]["ops"]
+    exit()
     _compute(HP,2,j)

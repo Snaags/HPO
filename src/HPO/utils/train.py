@@ -123,7 +123,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   n_iter = len(dataloader) 
 
   #CONFIGURATION OF OPTIMISER AND LOSS FUNCTION
-  optimizer = torch.optim.SGD(model.parameters(),lr = hyperparameter["LR"])
+  optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["LR"])
   if hyperparameter["SCHEDULE"] == True:
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,EPOCHS,eta_min = hyperparameter["LR_MIN"])
   if hyperparameter["BINARY"] == True:
