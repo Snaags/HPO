@@ -44,6 +44,7 @@ def compute(*args, **kwargs):
 
 
 def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_dataset):
+  start = time.time()
   ### Configuration 
   if type(JSON_CONFIG) != dict:
     with open(JSON_CONFIG) as f:
@@ -132,7 +133,10 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
          dataset.get_groups(train_ids,test_ids)
       elif SETTINGS["RESAMPLES"]:
         train_ids, test_ids = next(kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy()))
-        SETTINGS["BATCH_SIZE"] = min( [highest_power_of_two(len(test_ids)),  SETTINGS["BATCH_SIZE"]]  )
+        if SETTINGS["MAX_BATCH"]:
+          SETTINGS["BATCH_SIZE"] = len(train_ids)
+        else:
+          SETTINGS["BATCH_SIZE"] = min( [highest_power_of_two(len(test_ids)),  SETTINGS["BATCH_SIZE"]]  )
       if SETTINGS["CROSS_VALIDATION_FOLDS"] or SETTINGS["RESAMPLES"]: 
         # Sample elements randomly from a given list of ids, no replacement.
       
@@ -148,7 +152,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
         test_subsampler = torch.utils.data.SubsetRandomSampler(test_ids)
         testloader = torch.utils.data.DataLoader(
                               dataset,collate_fn = collate_fn_padd,sampler = test_subsampler,
-                              batch_size= SETTINGS["BATCH_SIZE"] ,drop_last = True)
+                              batch_size= len(test_ids) ,drop_last = True)
       else:
         trainloader = torch.utils.data.DataLoader(
                                 train_dataset,collate_fn = collate_fn_padd,shuffle = True,
@@ -159,7 +163,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
       if SETTINGS["RESAMPLES"] or SETTINGS["CROSS_VALIDATION_FOLDS"]:
         dataset.enable_augmentation(augs)
       n_classes = test_dataset.get_n_classes()
-      evaluator = Evaluator(SETTINGS["BATCH_SIZE"], test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
+      evaluator = Evaluator(len(test_ids), test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
       #print("classes: {} - name: {}".format(train_dataset.get_n_classes(),name))
       #g = GraphConfigSpace(50)
       #s = g.sample_configuration()
@@ -256,6 +260,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
     acc_ = np.mean(acc)
     recall_ = np.mean(recall)
     #print("Average Accuracy: ", "%.4f" % ((acc_)*100), "%")
+  print("Total run time for model {} with {} parameters: {}".format(hyperparameter["ID"],params,time.time()-start))
   return acc_, recall_,params
 
 

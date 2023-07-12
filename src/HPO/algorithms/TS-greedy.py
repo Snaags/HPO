@@ -35,6 +35,7 @@ class model_ts:
     self.config = config
     self.offspring = 0
     self.evals = 1
+
   def load_scores(self):
     path = "{}/{}/{}-bin.npy".format(self.SETTINGS["PATH"],"metrics",self.ID)
     x = np.load(path)
@@ -58,6 +59,7 @@ class model_ts:
     return self.offspring / self.evals
 
 
+
 class model:
   def __init__(self,acc ,recall , config,SETTINGS):
     self.SETTINGS = SETTINGS
@@ -66,6 +68,9 @@ class model:
     self.config = config
     self.offspring = 0
     self.evals = 1
+    self.record_evals = 0
+    self.cool = False
+    self.flag_need_reload = True
   def load_scores(self):
     path = "{}/{}/{}".format(self.SETTINGS["PATH"],"metrics",self.ID)
     try:
@@ -77,11 +82,17 @@ class model:
       self.mu = self.mean_acc
 
   def sample(self):
-    self.load_scores()
+    if self.flag_need_reload:
+      self.load_scores()
+      if not self.cooldown():
+        self.flag_need_reload = False
     return self.mu
 
   def sample_mu(self):
-    self.load_scores()
+    if self.flag_need_reload:
+      self.load_scores()
+      if not self.cooldown():
+        self.flag_need_reload = False
     return self.mu
 
   def get_config(self):
@@ -90,6 +101,11 @@ class model:
 
   def get_ratio(self):
     return self.offspring / self.evals
+  def set_cooldown(self):
+    self.record_evals = self.evals
+    self.flag_need_reload = True
+  def cooldown(self):
+    return self.record_evals == self.evals
 
 def main(worker, configspace : ConfigurationSpace, json_config):
 
@@ -144,7 +160,8 @@ def main(worker, configspace : ConfigurationSpace, json_config):
     
 
     while train.config_queue.qsize() < SETTINGS["CORES"]:
-      if history[max_index].get_ratio() > 4:
+      if history[max_index].get_ratio() > 4 and not history[max_index].cooldown():
+        history[max_index].set_cooldown()
         train.update_async(history[max_index].get_config())
       else:
         train.update_async(configspace.mutate_graph(history[max_index].get_config(),2))

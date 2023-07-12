@@ -123,7 +123,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   n_iter = len(dataloader) 
 
   #CONFIGURATION OF OPTIMISER AND LOSS FUNCTION
-  optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["LR"])
+  optimizer = torch.optim.SGD(model.parameters(),lr = hyperparameter["LR"],momentum = 0.9)
   if hyperparameter["SCHEDULE"] == True:
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,EPOCHS,eta_min = hyperparameter["LR_MIN"])
   if hyperparameter["BINARY"] == True:
@@ -166,7 +166,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
         loss = criterion(outputs, labels)
       loss.backward()
       optimizer.step()
-      if hyperparameter["WEIGHT_AVERAGING_RATE"] and epoch+1 == EPOCHS:
+      if hyperparameter["WEIGHT_AVERAGING_RATE"] and epoch > EPOCHS/2:
         weights.append(clone_state_dict(model.state_dict()))
       if hyperparameter["LOGGING"]:
         pred_tensor = torch.cat((pred_tensor, outputs.detach().cpu().flatten(end_dim = 0)))
