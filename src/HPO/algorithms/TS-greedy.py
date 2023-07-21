@@ -14,8 +14,8 @@ import sys
 
 def full_eval(SETTINGS):
   accuracy = {}
-  acc_best_single, recall,params = evaluate("{}/{}".format(SETTINGS["PATH"],"configuration.json"))
-  accuracy["single_model"] = acc_best_single
+  #acc_best_single, recall,params = evaluate("{}/{}".format(SETTINGS["PATH"],"configuration.json"))
+  accuracy["single_model"] = 0#acc_best_single
   for i in [1,3,5,10]:
     be = EnsembleManager("{}/{}".format(SETTINGS["PATH"],"configuration.json"),SETTINGS["DEVICES"][0])
     be.get_ensemble(i)

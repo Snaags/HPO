@@ -12,7 +12,7 @@ def initialise_augmentations(augmentation_data)->list:
   if augmentation_data:
     augs = []
     for i in augmentation_data:
-      augs.append(eval(i)(**augmentation_data[i]) )
+      augs.append(eval(i.split("_")[0])(**augmentation_data[i]) )
     return augs
   else:
     return False
@@ -49,7 +49,7 @@ class Scaling(Augmentation):
     return torch.mul(x, s),y
 
 class Crop(Augmentation):
-  def __init__(self, crop_min = 0.5,rate = 0.3, crop_max = 0.95, device = None):
+  def __init__(self, crop_min = 0.5,rate = 0.3, crop_max = 0.99, device = None):
     super(Crop,self).__init__(rate,device)
     self.__name__ = "crop"
     self.crop_min = crop_min

@@ -46,14 +46,16 @@ class EnsembleManager:
                         DS_PATH = self.SETTINGS["DATASET_CONFIG"]["DATASET_PATH"]
                 else:
                         DS_PATH = None
+
                 if "AUGMENTATIONS" in self.SETTINGS:
-                        augs = aug.initialise_augmentations(self.SETTINGS["AUGMENTATIONS"])
+                        augs = aug.initialise_augmentations({'Crop_1': {'rate': 0.5, 'crop_min': 0.8}})
                 else: 
                         augs = None
 
                 train_args = {"cuda_device":device,"augmentation" : augs, "binary" :self.SETTINGS["BINARY"],"path" : DS_PATH}
                 test_args = {"cuda_device":device,"augmentation" :None, "binary" :self.SETTINGS["BINARY"],"path" : DS_PATH}
                 train_dataset, self.test_dataset = get_dataset(name,train_args, test_args)
+                train_dataset, self.aug_test_dataset = get_dataset(name,train_args, train_args)
                 # = UEA_Test(name = self.SETTINGS["DATASET_CONFIG"]["NAME"],device = 0)
                 self.num_classes = self.test_dataset.get_n_classes()
                 self.num_features = self.test_dataset.get_n_features()
@@ -77,11 +79,48 @@ class EnsembleManager:
                 print("Accuracy: {}".format(correct/total))
 
 
+        def evaluate_aug(self, batch_size, n_iter=10):
+                    self.testloader = torch.utils.data.DataLoader(
+                        self.test_dataset, collate_fn=collate_fn_padd, shuffle=True, 
+                        batch_size=batch_size, drop_last=True)
+
+                    self.aug_testloader = torch.utils.data.DataLoader(
+                        self.aug_test_dataset, collate_fn=collate_fn_padd, shuffle=False, 
+                        batch_size=batch_size, drop_last=True)
+
+                    labels_list = []
+                    preds_list = []
+                    self.ensemble.eval()
+                    probs = torch.zeros((n_iter,len(self.aug_testloader)*batch_size,self.num_classes,len(self.ensemble.classifiers)))
+                    for i in range(n_iter):
+                        labels_list = []
+                        for index, (x, y) in enumerate(self.aug_testloader):
+                            labels_list.append(y.detach())  # append the tensor to the list directly
+                            x, y = x.float(), y  # moving to the device
+                            #if i == n_iter-1:
+
+                            probs[i,batch_size*index:batch_size*(index+1),:,:] = self.ensemble.forward_aug(x, y).detach()  # append the tensor to the list directly
+
+                            # Average predictions over the augmented samples and append to preds_list
+                            #preds_list.append(torch.mean(torch.stack(aug_preds_list), dim=0))
+                    print(probs.shape)
+                    preds = self.ensemble.soft_voting(torch.mean(probs,axis = 0))
+                    # concatenate all tensors along the 0-th dimension
+                    labels = torch.cat(labels_list).cpu().numpy()
+                    #preds = torch.cat(preds_list).cpu().numpy()
+
+                    self.confusion_matrix = confusion_matrix(labels, preds, labels=list(range(self.num_classes)))
+                    with np.printoptions(linewidth=(20 * self.num_classes + 20), precision=4, suppress=True):
+                        print(self.confusion_matrix)
+                    correct = np.sum(np.diag(self.confusion_matrix))
+                    total = np.sum(self.confusion_matrix)
+                    print("Accuracy: {}".format(correct / total))
+                    return correct / total
 
         def evaluate(self, batch_size):
             self.testloader = torch.utils.data.DataLoader(
                 self.test_dataset, collate_fn=collate_fn_padd, shuffle=True, 
-                batch_size=batch_size, drop_last=True)
+                batch_size=batch_size, drop_last=False)
 
             labels_list = []
             preds_list = []
@@ -95,6 +134,7 @@ class EnsembleManager:
             # concatenate all tensors along the 0-th dimension
             labels = torch.cat(labels_list).cpu().numpy()
             preds = torch.cat(preds_list).cpu().numpy()
+            print(labels.shape)
 
             self.confusion_matrix = confusion_matrix(labels, preds, labels=list(range(self.num_classes)))
             with np.printoptions(linewidth=(10 * self.num_classes + 20), precision=4, suppress=True):
@@ -241,6 +281,16 @@ class Ensemble(nn.Module):
                 preds = torch.argmax(prob , axis = 1)
                 return torch.mode(preds,dim = 1)[0] #Shape [batch_size]
 
+        def forward_aug( self, x ,y):
+                self.batch_size = x.shape[0]
+                probs = torch.zeros(size = (self.batch_size ,self.num_classes, len(self.classifiers) ))
+                for idx , model in enumerate(self.classifiers):
+                        probs[:, :, idx] = F.sigmoid(model(x))
+                #print(probs)
+                #print(F.sigmoid(probs))
+                #print(y)
+                return probs
+
         def forward( self, x ,y):
                 self.batch_size = x.shape[0]
                 probs = torch.zeros(size = (self.batch_size ,self.num_classes, len(self.classifiers) ))
@@ -256,7 +306,7 @@ class Ensemble(nn.Module):
                         i.eval()
 
 if __name__ == "__main__":
-	import sys
-	be = EnsembleManager(sys.argv[1],1)
-	be.get_ensemble(10)
-	be.evaluate(4)
+    import sys
+    be = EnsembleManager(sys.argv[1],1)
+    be.get_ensemble(10)
+    be.evaluate(256)
