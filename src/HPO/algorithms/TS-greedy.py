@@ -67,25 +67,21 @@ class model:
     self.mean_acc = acc
     self.config = config
     self.offspring = 0
-    self.evals = 1
     self.record_evals = 0
     self.cool = False
     self.flag_need_reload = True
+    self.evals = 5
   def load_scores(self):
     path = "{}/{}/{}".format(self.SETTINGS["PATH"],"metrics",self.ID)
     try:
       self.df = pd.read_csv(path)
       self.mu = self.df["accuracy"].mean()
       self.sigma = self.df["accuracy"].std()
-      self.evals = len(self.df["accuracy"])
     except:
       self.mu = self.mean_acc
 
   def sample(self):
-    if self.flag_need_reload:
-      self.load_scores()
-      if not self.cooldown():
-        self.flag_need_reload = False
+    self.load_scores()
     return self.mu
 
   def sample_mu(self):
@@ -106,6 +102,8 @@ class model:
     self.flag_need_reload = True
   def cooldown(self):
     return self.record_evals == self.evals
+  def update_eval(self):
+    self.evals+=1#BROKEN!!
 
 def main(worker, configspace : ConfigurationSpace, json_config):
 
@@ -156,12 +154,12 @@ def main(worker, configspace : ConfigurationSpace, json_config):
     
     #Thompson Sampling
     max_index = np.argmax([i.sample() for i in history])
-    mean_best = max([i.sample_mu() for i in history])
+    mean_best = max([i.sample() for i in history])
     
 
     while train.config_queue.qsize() < SETTINGS["CORES"]:
-      if history[max_index].get_ratio() > 4 and not history[max_index].cooldown():
-        history[max_index].set_cooldown()
+      if history[max_index].get_ratio() > 3:
+        history[max_index].update_eval()
         train.update_async(history[max_index].get_config())
       else:
         train.update_async(configspace.mutate_graph(history[max_index].get_config(),2))

@@ -128,8 +128,13 @@ class EnsembleManager:
             
             for index, (x, y) in enumerate(self.testloader):
                 x, y = x.float(), y  # moving to the device
-                labels_list.append(y.detach())  # append the tensor to the list directly
+
+                
                 preds_list.append(self.ensemble(x, y).detach())  # append the tensor to the list directly
+                if len(y.shape):
+                    labels_list.append(y.detach())  # append the tensor to the list directly
+                else:
+                    labels_list.append(y.detach().unsqueeze(0))  # append the tensor to the list directly
 
             # concatenate all tensors along the 0-th dimension
             labels = torch.cat(labels_list).cpu().numpy()
@@ -166,14 +171,22 @@ class EnsembleManager:
             scores = []
             recall = []
             config = []
+            IDS = []
             with open( "{}{}".format(PATH,FILENAME) , newline = "") as csvfile:
                     reader = csv.reader(csvfile, delimiter = ",")
                     for row in reader:
-                        scores.append(float(row[0]))
+                        #scores.append(float(row[0]))
                         recall.append(float(row[1]))
                         config.append(eval("".join(row[2])))
+                        IDS.append(config[-1]["ID"])
+            for ID in IDS:
+                path = "{}/{}/{}".format(PATH,"metrics",ID)
+                df = pd.read_csv(path)
+                mu = df["accuracy"].mean()
+                scores.append(mu)
             return scores, recall, config
-    
+
+        
         def find_all(self,acc):
             current_val = []
             for idx,i in enumerate(self.accuracy):
@@ -309,4 +322,4 @@ if __name__ == "__main__":
     import sys
     be = EnsembleManager(sys.argv[1],1)
     be.get_ensemble(10)
-    be.evaluate(256)
+    be.evaluate(1024)
