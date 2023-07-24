@@ -1,7 +1,10 @@
 src/HPO/model_zoo/*
 results/
+build/*
+dist/*
 experiments/*
 example/*
+HPO.egg-info/
 !experiements/example_experiment
 .ipynb_checkpoints/
 *.swp

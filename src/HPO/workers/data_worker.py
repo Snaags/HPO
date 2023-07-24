@@ -84,23 +84,6 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
   train_args = {"cuda_device":cuda_device,"augmentation" : augs, "binary" :SETTINGS["BINARY"],"path" : DS_PATH}
   test_args = {"cuda_device":cuda_device,"augmentation" :None, "binary" :SETTINGS["BINARY"],"path" : DS_PATH}
 
-  if SETTINGS["RESAMPLES"]:
-    dataset = get_dataset(name,train_args,None )
-    kfold = KFold(n_splits = 5, shuffle = True)
-    splits = [(None,None)]*SETTINGS["RESAMPLES"]
-    train_dataset = dataset
-    test_dataset = dataset
-  elif SETTINGS["CROSS_VALIDATION_FOLDS"] == False: 
-    train_dataset, test_dataset = get_dataset(name,train_args, test_args)
-    splits = [(None,None)]
-    #print(train_dataset, test_dataset)
-  elif SETTINGS["CROSS_VALIDATION_FOLDS"]:
-    dataset, test_dataset = get_dataset(name,train_args, test_args)
-    kfold = KFold(n_splits = SETTINGS["CROSS_VALIDATION_FOLDS"], shuffle = False)
-    splits = kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy())
-    train_dataset = dataset
-    test_dataset = dataset
-
   n_classes = train_dataset.get_n_classes()
   multibatch = False
   torch.cuda.empty_cache()
