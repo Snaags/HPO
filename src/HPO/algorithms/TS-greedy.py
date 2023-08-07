@@ -17,21 +17,25 @@ def clean_unused_weights(data,active, models):
   #IDENTIFY WEIGHTS THAT WILL NOT BE USED
   results = load("{}/{}/evaluations.csv".format("experiments",data["EXPERIMENT_NAME"]))
   scores = np.asarray(results["accuracy"])
-  if len(scores) > 100:
+  if len(scores) > 20:
     path = "experiments/{}/{}/".format(data["EXPERIMENT_NAME"],"weights")
     weights = os.listdir(path)
-    if len(weights) > 500:
+    if len(weights) > 100:
       model_id = {}
       for i in models:
         model_id[i.ID] = i
       ID = np.asarray(results["ID"])
       scores = [model_id[i].sample_robust() for i in ID]
+      safe_list = [model_id[i].resampled_list() for i in ID]
       score_mask = scores < np.nanquantile(scores,q = 0.90)
+      resampled = ID[safe_list]
       ID = ID[score_mask]
 
+      print("Models save via resample: {} ({})".format(len(resampled),sum(safe_list)))
+      print("Models in bottom 90%: {}".format(len(ID)))
       for i in weights:
         id_weight = int(i.split("-")[0])
-        if id_weight in ID and not (id_weight in active):
+        if id_weight in ID and not (id_weight in active) and (not id_weight in resampled):
           os.remove("{}{}".format(path,i))
         
         
@@ -85,29 +89,39 @@ class model_ts:
 
 
 class model:
-  def __init__(self,acc ,recall , config,SETTINGS):
+  def __init__(self,acc ,recall , config,SETTINGS,resamples):
     self.SETTINGS = SETTINGS
     self.ID = config["ID"]
+    self.n_resamples = resamples
     self.mean_acc = acc
     self.config = config
     self.offspring = 0
     self.record_evals = 0
     self.cool = False
     self.flag_need_reload = True
+    self.resampled = False
     self.evals = 5
 
   def load_scores_robust(self):
     path = "{}/{}/{}".format(self.SETTINGS["PATH"],"metrics",self.ID)
     try:
       self.df = pd.read_csv(path)
-      if len(self.df) % 5 != 0:
+      if len(self.df) > self.n_resamples:
+        self.resampled = True
+      else:
+        self.resampled = False
+
+      if len(self.df) % self.n_resamples != 0:
         self.mu = np.nan
       else:
         self.mu = self.df["accuracy"].mean()
       self.sigma = self.df["accuracy"].std()
     except:
+      self.resampled = True
       self.mu = np.nan
 
+  def resampled_list(self):
+    return self.resampled
 
   def load_scores(self):
     path = "{}/{}/{}".format(self.SETTINGS["PATH"],"metrics",self.ID)
@@ -154,6 +168,7 @@ def main(worker, configspace : ConfigurationSpace, json_config):
   with open(json_config) as f:
     data = json.load(f)
     dataset_name = data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]
+    resamples = data["WORKER_CONFIG"]["REPEAT"]
     SETTINGS = data["SEARCH_CONFIG"]
   TIME_SINCE_IMPROVE = 0
   EARLY_STOP = SETTINGS["EARLY_STOP"]
@@ -168,14 +183,14 @@ def main(worker, configspace : ConfigurationSpace, json_config):
 
   if SETTINGS["RESUME"]:
     data = load(data["EXPERIMENT_NAME"])
-    history.extend([M_FORMAT(s,r,p,SETTINGS) for s,r,p in zip( data["scores"] ,data["recall"] , data["config"])])
+    history.extend([M_FORMAT(s,r,p,SETTINGS,resamples) for s,r,p in zip( data["scores"] ,data["recall"] , data["config"])])
     history_scores = data["scores"]
     history_conf = data["config"]
   else:
     configs = configspace.sample_configuration(SETTINGS["INITIAL_POPULATION_SIZE"])
     scores , recall , pop= train.init_async(configs)
     
-    history = [M_FORMAT(s,r,p,SETTINGS) for s,r,p in zip(scores ,recall , pop)]
+    history = [M_FORMAT(s,r,p,SETTINGS,resamples) for s,r,p in zip(scores ,recall , pop)]
 
     last_mean_best = None
     iteration = 0
@@ -188,17 +203,16 @@ def main(worker, configspace : ConfigurationSpace, json_config):
     while len(scores) == 0:
       time.sleep(0.05)
       scores ,recall , pop = train.get_async()
-    for i in pop:
-      if "parent" in i["ops"]:
-        active_parents.remove(i["ops"]["parent"])
+    active_parents = list(set(active_parents))
     
 
-    history.extend([M_FORMAT(s,r,p,SETTINGS) for s,r,p in zip(scores ,recall , pop)])
+    history.extend([M_FORMAT(s,r,p,SETTINGS,resamples) for s,r,p in zip(scores ,recall , pop)])
 
     
     #Thompson Sampling
     max_index = np.argmax([i.sample() for i in history])
     mean_best = max([i.sample() for i in history])
+
     
 
     while train.config_queue.qsize() < SETTINGS["CORES"]:
@@ -213,6 +227,11 @@ def main(worker, configspace : ConfigurationSpace, json_config):
         train.update_async(configspace.mutate_graph(history[max_index].get_config(),2))
     if iteration % 10 ==0:
       print("[{}] Generation: {}".format(dataset_name,iteration), " -- Best (Mean) Score: {}".format(mean_best))
+      if len(history) > 10:
+        print("Top 10 best models:")
+        sorted_list = sorted(history, key=lambda obj: obj.sample(), reverse=True)
+        for i in range(10):
+          print("ID: {} -- ACC: {}".format(sorted_list[i].ID,sorted_list[i].sample()))
 
       clean_unused_weights(data,active_parents,history)
     if time.time() > START_TIME + RUNTIME:
