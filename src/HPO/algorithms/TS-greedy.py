@@ -11,6 +11,30 @@ import pandas as pd
 import numpy as np
 from HPO.workers.ensemble import EnsembleManager
 import sys
+import os 
+
+def clean_unused_weights(data,active, models):
+  #IDENTIFY WEIGHTS THAT WILL NOT BE USED
+  results = load("{}/{}/evaluations.csv".format("experiments",data["EXPERIMENT_NAME"]))
+  scores = np.asarray(results["accuracy"])
+  if len(scores) > 100:
+    path = "experiments/{}/{}/".format(data["EXPERIMENT_NAME"],"weights")
+    weights = os.listdir(path)
+    if len(weights) > 500:
+      model_id = {}
+      for i in models:
+        model_id[i.ID] = i
+      ID = np.asarray(results["ID"])
+      scores = [model_id[i].sample_robust() for i in ID]
+      score_mask = scores < np.nanquantile(scores,q = 0.90)
+      ID = ID[score_mask]
+
+      for i in weights:
+        id_weight = int(i.split("-")[0])
+        if id_weight in ID and not (id_weight in active):
+          os.remove("{}{}".format(path,i))
+        
+        
 
 def full_eval(SETTINGS):
   accuracy = {}
@@ -71,6 +95,20 @@ class model:
     self.cool = False
     self.flag_need_reload = True
     self.evals = 5
+
+  def load_scores_robust(self):
+    path = "{}/{}/{}".format(self.SETTINGS["PATH"],"metrics",self.ID)
+    try:
+      self.df = pd.read_csv(path)
+      if len(self.df) % 5 != 0:
+        self.mu = np.nan
+      else:
+        self.mu = self.df["accuracy"].mean()
+      self.sigma = self.df["accuracy"].std()
+    except:
+      self.mu = np.nan
+
+
   def load_scores(self):
     path = "{}/{}/{}".format(self.SETTINGS["PATH"],"metrics",self.ID)
     try:
@@ -82,6 +120,10 @@ class model:
 
   def sample(self):
     self.load_scores()
+    return self.mu
+
+  def sample_robust(self):
+    self.load_scores_robust()
     return self.mu
 
   def sample_mu(self):
@@ -118,7 +160,7 @@ def main(worker, configspace : ConfigurationSpace, json_config):
   START_TIME = time.time()
   RUNTIME = SETTINGS["RUNTIME"]
   last_print = time.time()
-
+  active_parents = []
   train = train_eval( worker , json_config)
 
 
@@ -146,7 +188,9 @@ def main(worker, configspace : ConfigurationSpace, json_config):
     while len(scores) == 0:
       time.sleep(0.05)
       scores ,recall , pop = train.get_async()
-
+    for i in pop:
+      if "parent" in i["ops"]:
+        active_parents.remove(i["ops"]["parent"])
     
 
     history.extend([M_FORMAT(s,r,p,SETTINGS) for s,r,p in zip(scores ,recall , pop)])
@@ -160,11 +204,17 @@ def main(worker, configspace : ConfigurationSpace, json_config):
     while train.config_queue.qsize() < SETTINGS["CORES"]:
       if history[max_index].get_ratio() > 3:
         history[max_index].update_eval()
-        train.update_async(history[max_index].get_config())
+        conf_reval = history[max_index].get_config()
+        if "parent" in conf_reval["ops"]:
+          active_parents.append(conf_reval["ops"]["parent"])
+        train.update_async(conf_reval)
       else:
+        active_parents.append(history[max_index].ID)
         train.update_async(configspace.mutate_graph(history[max_index].get_config(),2))
     if iteration % 10 ==0:
       print("[{}] Generation: {}".format(dataset_name,iteration), " -- Best (Mean) Score: {}".format(mean_best))
+
+      clean_unused_weights(data,active_parents,history)
     if time.time() > START_TIME + RUNTIME:
       print("Reached Total Alloted Time: {}".format(RUNTIME))
       break

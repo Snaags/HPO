@@ -31,7 +31,7 @@ datasets=(
 )
 
 # Define experiment name prefix
-prefix="final-experiment-2"
+prefix="final-experiment-3"
 
 # List of GPUs
 gpus=(0 1 2 3)

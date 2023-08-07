@@ -106,6 +106,9 @@ class GraphConfigSpace:
     self.n_operations = 32
     self.edge_options = self.data["N_EDGES"]
     self.init_state = [("S",1),(1,"T")]
+
+
+
   def sample_configuration(self,n_samples=1):
     samples = []
     while len(samples) < n_samples:

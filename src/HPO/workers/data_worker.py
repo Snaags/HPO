@@ -5,7 +5,7 @@ import numpy as np
 from HPO.data.UEA_datasets import UEA_Train, UEA_Test, UEA_Full
 import time
 import sys
-from HPO.utils.utils import MetricLogger, BernoulliLogger
+from HPO.utils.utils import MetricLogger, BernoulliLogger, print_file
 import os 
 import matplotlib.pyplot as plt
 from HPO.utils.model import NetworkMain
@@ -30,6 +30,7 @@ from queue import Empty
 from sklearn.model_selection import StratifiedKFold as KFold
 from collections import namedtuple
 from HPO.utils.worker_score import Evaluator 
+from scipy.stats import loguniform 
 from HPO.utils.worker_utils import LivePlot
 from HPO.workers.worker_wrapper import __compute
 from HPO.data.dataset import get_dataset
@@ -58,6 +59,14 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
   SETTINGS["experiment"] = data["EXPERIMENT_NAME"]
   ARCH_SETTINGS = data["ARCHITECTURE_CONFIG"]
   SAVE_PATH = data["SEARCH_CONFIG"]["PATH"]
+  if "RANDOMISE_HYPERPARAMETERS" in SETTINGS:
+    if SETTINGS["RANDOMISE_HYPERPARAMETERS"]:
+      for i in SETTINGS["RANDOMISE_SETTINGS"]:
+        if i == "EPOCHS":
+          SETTINGS[i] = random.randint(SETTINGS["RANDOMISE_SETTINGS"][i][0],SETTINGS["RANDOMISE_SETTINGS"][i][1])
+        else:
+          SETTINGS[i] = loguniform.rvs(float(SETTINGS["RANDOMISE_SETTINGS"][i][1]),float(SETTINGS["RANDOMISE_SETTINGS"][i][0]))
+
   acc = []
   metric_logger = MetricLogger(SAVE_PATH) 
   binary_logger = BernoulliLogger(SAVE_PATH,hyperparameter["ID"]) 
@@ -97,7 +106,10 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
 
 
     elif SETTINGS["RESAMPLES"]:
-      splits = min([dataset.min_samples_per_class(), 5])
+      if "MAX_REPEAT" in SETTINGS and SETTINGS["MAX_REPEAT"]:
+        splits = dataset.min_samples_per_class()
+      else:
+        splits = min([dataset.min_samples_per_class(), 5])
       kfold = KFold(n_splits = splits, shuffle = True,random_state = _)
       splits = [(None,None)]*SETTINGS["RESAMPLES"]
 
@@ -170,6 +182,9 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
             if ( int(splits[0]) == hyperparameter["ops"]["parent"]) and (int(splits[1]) == _):
               state_dict = torch.load("{}/weights/{}".format(SAVE_PATH,i))
               break
+          else:
+            print("Not found: {}".format(hyperparameter["ops"]["parent"]))
+            print_file("{}/log.txt".format(SAVE_PATH),"[{}] Not found: {}".format(time.time(),hyperparameter["ops"]["parent"]))
 
           own_state = model.state_dict()
           for name, param in state_dict.items():
@@ -188,7 +203,8 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
 
           #print('Finished loading weights.')
       else:
-          SETTINGS["EPOCHS"] = SETTINGS["EPOCHS_INITIAL"]
+          if SETTINGS["EPOCHS_INITIAL"]:
+            SETTINGS["EPOCHS"] = SETTINGS["EPOCHS_INITIAL"]
       """
       if "parent" in hyperparameter["ops"]:
         print("LOADING PARENT ID", hyperparameter["ops"]["parent"])
@@ -243,7 +259,6 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
     acc_ = np.mean(acc)
     recall_ = np.mean(recall)
     #print("Average Accuracy: ", "%.4f" % ((acc_)*100), "%")
-  print("Total run time for model {} with {} parameters: {}".format(hyperparameter["ID"],params,time.time()-start))
   return acc_, recall_,params
 
 

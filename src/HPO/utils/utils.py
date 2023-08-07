@@ -140,6 +140,25 @@ def create_exp_dir(path, scripts_to_save=None):
 import pandas as pd
 
 
+def print_file(path, content):
+    """
+    Write a string to a file.
+
+    Parameters:
+        path (str): The path to the file where the string will be written.
+        content (str): The string content to be written to the file.
+
+    Returns:
+        bool: True if the file was successfully written, False otherwise.
+    """
+    try:
+        with open(path, "w") as file:
+            file.write(content)
+        return True
+    except Exception as e:
+        print(f"An error occurred while writing to file: {e}")
+        return False
+
 class BernoulliLogger:
   def __init__(self,PATH,ID): 
     if not os.path.exists("{}/{}".format(PATH,"metrics")):
