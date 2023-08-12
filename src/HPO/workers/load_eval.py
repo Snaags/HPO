@@ -103,7 +103,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG):
   multibatch = False
   torch.cuda.empty_cache()
    
-  SETTINGS["BATCH_SIZE"] = min( [highest_power_of_two(len(test_dataset)*4),  SETTINGS["BATCH_SIZE"]]  )
+  SETTINGS["BATCH_SIZE"] =  2 # = min( [highest_power_of_two(len(test_dataset)*4),  SETTINGS["BATCH_SIZE"]]  )
   for _ in range(SETTINGS["REPEAT"]):
     
     if SETTINGS["GROUPED_RESAMPLES"]:

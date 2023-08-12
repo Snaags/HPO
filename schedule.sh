@@ -2,17 +2,17 @@
 
 # List of dataset names
 datasets=(
-"ArticularyWordRecognition"
-"AtrialFibrillation"
-"BasicMotions"
-"Cricket"
+
+"RacketSports"
+"FingerMovements"
+"SelfRegulationSCP1"
+"SelfRegulationSCP2"
 "DuckDuckGeese"
 "EigenWorms"
 "Epilepsy"
 "EthanolConcentration"
 "ERing"
 "FaceDetection"
-"FingerMovements"
 "HandMovementDirection"
 "Handwriting"
 "Heartbeat"
@@ -21,17 +21,18 @@ datasets=(
 "MotorImagery"
 "NATOPS"
 "PenDigits"
-"PEMS-SF"
 "PhonemeSpectra"
-"RacketSports"
-"SelfRegulationSCP1"
-"SelfRegulationSCP2"
+"PEMS-SF"
 "StandWalkJump"
 "UWaveGestureLibrary"
+"ArticularyWordRecognition"
+"AtrialFibrillation"
+"BasicMotions"
+"Cricket"
 )
 
 # Define experiment name prefix
-prefix="final-experiment-3"
+prefix="small-splits-experiment-1"
 
 # List of GPUs
 gpus=(0 1 2 3)

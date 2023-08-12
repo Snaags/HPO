@@ -13,6 +13,31 @@ from HPO.workers.ensemble import EnsembleManager
 import sys
 import os 
 
+
+
+def clean_up_weights_end(data,active, models):
+  #IDENTIFY WEIGHTS THAT WILL NOT BE USED
+
+  results = load("{}/{}/evaluations.csv".format("experiments",data["EXPERIMENT_NAME"]))
+  scores = np.asarray(results["accuracy"])
+  path = "experiments/{}/{}/".format(data["EXPERIMENT_NAME"],"weights")
+  weights = os.listdir(path)
+  model_id = {}
+  for i in models:
+    model_id[i.ID] = i
+  ID = np.asarray(results["ID"])
+  scores = [model_id[i].sample() for i in ID]
+  indexed_lst = [(value, index) for index, value in enumerate(scores)]
+  top_5_with_indices = sorted(indexed_lst, key=lambda x: x[0], reverse=True)[:5]
+  score_mask = [index for value, index in top_5_with_indices]
+  ID = ID[score_mask]
+
+  print("Models in bottom 90%: {}".format(len(ID)))
+  for i in weights:
+    id_weight = int(i.split("-")[0])
+    if not (id_weight in ID):
+      os.remove("{}{}".format(path,i))
+
 def clean_unused_weights(data,active, models):
   #IDENTIFY WEIGHTS THAT WILL NOT BE USED
   results = load("{}/{}/evaluations.csv".format("experiments",data["EXPERIMENT_NAME"]))
@@ -212,7 +237,8 @@ def main(worker, configspace : ConfigurationSpace, json_config):
     #Thompson Sampling
     max_index = np.argmax([i.sample() for i in history])
     mean_best = max([i.sample() for i in history])
-
+    if mean_best == 1:
+      break
     
 
     while train.config_queue.qsize() < SETTINGS["CORES"]:
@@ -233,7 +259,7 @@ def main(worker, configspace : ConfigurationSpace, json_config):
         for i in range(10):
           print("ID: {} -- ACC: {}".format(sorted_list[i].ID,sorted_list[i].sample()))
 
-      clean_unused_weights(data,active_parents,history)
+      #clean_unused_weights(data,active_parents,history)
     if time.time() > START_TIME + RUNTIME:
       print("Reached Total Alloted Time: {}".format(RUNTIME))
       break
@@ -252,6 +278,7 @@ def main(worker, configspace : ConfigurationSpace, json_config):
 
   train.kill_workers()
   full_eval(SETTINGS)
+  clean_up_weights_end(data,active_parents,history)
 if __name__ == "__main__":
   with open(sys.argv[1]) as f:
     DATA = json.load(f)

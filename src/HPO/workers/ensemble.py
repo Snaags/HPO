@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from HPO.utils.FCN import FCN 
 import pandas as pd
 import torch
+from HPO.utils.worker_score import Evaluator
+from HPO.utils.distill import train_distill
 from HPO.data.teps_datasets import Train_TEPS , Test_TEPS
 import torch.nn as nn
 from torch import Tensor
@@ -54,7 +56,7 @@ class EnsembleManager:
 
                 train_args = {"cuda_device":device,"augmentation" : augs, "binary" :self.SETTINGS["BINARY"],"path" : DS_PATH}
                 test_args = {"cuda_device":device,"augmentation" :None, "binary" :self.SETTINGS["BINARY"],"path" : DS_PATH}
-                train_dataset, self.test_dataset = get_dataset(name,train_args, test_args)
+                self.train_dataset, self.test_dataset = get_dataset(name,train_args, test_args)
                 train_dataset, self.aug_test_dataset = get_dataset(name,train_args, train_args)
                 # = UEA_Test(name = self.SETTINGS["DATASET_CONFIG"]["NAME"],device = 0)
                 self.num_classes = self.test_dataset.get_n_classes()
@@ -78,6 +80,40 @@ class EnsembleManager:
                 total = np.sum(self.confusion_matrix)
                 print("Accuracy: {}".format(correct/total))
 
+
+        def distill_model(self,batch_size):
+
+            hyperparameter = self.configs[list(np.argsort(self.accuracy)).pop(-1)]
+            model = ModelGraph(self.test_dataset.get_n_features(),self.channels,self.test_dataset.get_n_classes(),
+                          self.test_dataset.get_length(),hyperparameter["graph"],hyperparameter["ops"],device = self.cuda_device,
+                          binary = self.SETTINGS["BINARY"],dropout = self.SETTINGS["DROPOUT"],droppath = self.SETTINGS["DROPPATH"],
+                          raw_stem = self.SETTINGS["RAW_STEM"],embedding = self.SETTINGS["EMBEDDING"])
+            model.cuda(self.cuda_device)
+            self.trainloader = torch.utils.data.DataLoader(
+                      self.test_dataset,collate_fn = collate_fn_padd,shuffle = True,
+                      batch_size= batch_size ,drop_last = True)
+            self.testloader = torch.utils.data.DataLoader(
+                self.test_dataset, collate_fn=collate_fn_padd, shuffle=True, 
+                batch_size=1, drop_last=False)
+
+            evaluator = Evaluator(1, self.test_dataset.get_n_classes(),self.cuda_device,testloader = self.testloader)
+            self.SETTINGS["LIVE_EVAL"] = True
+            self.SETTINGS["MODEL_VALIDATION_RATE"] = 5
+            self.SETTINGS["PRINT_RATE_TRAIN"] = 5
+            self.SETTINGS["WEIGHT_AVERAGING_RATE"] = True
+            self.SETTINGS["SCHEDULE"] = True
+            self.SETTINGS["LR"] = 0.01
+            self.SETTINGS["LR_MIN"] = 0.0001
+            self.SETTINGS["EPOCHS"] = 150
+            train_distill(model, self.SETTINGS, self.trainloader,
+                cuda_device = self.cuda_device, teacher = self.ensemble,evaluator = evaluator)
+
+
+            
+            model.eval()      
+            evaluator.forward_pass(model, self.testloader,self.SETTINGS["BINARY"],n_iter = self.SETTINGS["TEST_ITERATION"])
+            evaluator.predictions(model_is_binary = self.SETTINGS["BINARY"] , THRESHOLD = self.SETTINGS["THRESHOLD"],no_print = self.SETTINGS["LIVE_EVAL"])
+            print("Distill ACC:",evaluator.T_ACC())
 
         def evaluate_aug(self, batch_size, n_iter=10):
                     self.testloader = torch.utils.data.DataLoader(
@@ -175,7 +211,7 @@ class EnsembleManager:
             with open( "{}{}".format(PATH,FILENAME) , newline = "") as csvfile:
                     reader = csv.reader(csvfile, delimiter = ",")
                     for row in reader:
-                        #scores.append(float(row[0]))
+                        scores.append(float(row[0]))
                         recall.append(float(row[1]))
                         config.append(eval("".join(row[2])))
                         IDS.append(config[-1]["ID"])
@@ -280,7 +316,8 @@ class EnsembleManager:
 class Ensemble(nn.Module):
         def __init__( self, models,num_classes ,device):
                 super(Ensemble,self).__init__()
-                
+                self.iter = 1
+                self.device = device
                 self.num_classes = num_classes
                 self.classifiers = models.cuda(device)
 
@@ -309,10 +346,53 @@ class Ensemble(nn.Module):
                 probs = torch.zeros(size = (self.batch_size ,self.num_classes, len(self.classifiers) ))
                 for idx , model in enumerate(self.classifiers):
                         probs[:, :, idx] = F.sigmoid(model(x))
-                #print(probs)
-                #print(F.sigmoid(probs))
-                #print(y)
-                return self.soft_voting(probs)
+                """
+                x = probs.detach().cpu().numpy()
+                y = y.detach().cpu().numpy()
+                num_samples = x.shape[0]
+                num_classes = x.shape[1]
+                num_models = x.shape[2]
+                bar_width = 0.1
+                true_label_width = bar_width * num_models  # Make the true label bar wider
+
+                # Create an array for the position of each bar along the x-axis
+                positions = np.arange(num_classes)
+
+                # Create a large vertical figure to accommodate all subplots
+                fig, axs = plt.subplots(num_samples, 1, figsize=(20, 4*num_samples))
+
+                # For each sample
+                for s in range(num_samples):
+                    # Plot the true label bar behind the probabilities
+                    axs[s].bar(positions[y[s]]+(bar_width*2), height=1, width=true_label_width, color='lightgray', label='True Label' if s == 0 else "")
+                    
+                    # For each model
+                    for i in range(num_models):
+                        axs[s].bar(positions + i*bar_width, height=x[s, :, i], width=bar_width, label=f'Model {i}' if s == 0 else "")
+                    
+                    axs[s].set_ylabel('Probability')
+                    axs[s].set_title(f'Sample {s}')
+                    axs[s].set_xticks(positions + bar_width * (num_models-1) / 2)
+                    axs[s].set_xticklabels([f"Class {i}" for i in range(num_classes)])
+                    if s == 0:  # Only show the legend for the first subplot to save space
+                        axs[s].legend()
+
+
+                plt.tight_layout()
+                plt.savefig("probs_{}".format(self.iter))
+                self.iter += 1
+                """
+
+                return self.hard_voting(probs)
+        def teachermean( self, x):
+                self.batch_size = x.shape[0]
+                probs = torch.zeros(size = (self.batch_size ,self.num_classes, len(self.classifiers) )).cuda(self.device)
+                for idx , model in enumerate(self.classifiers):
+                        probs[:, :, idx] = F.softmax(model(x),dim =1)
+                return torch.mean(probs,axis = -1)
+
+        def teacher( self, x):
+                return F.softmax(random.choice(self.classifiers)(x),dim =1)
 
         def eval(self):
                 for i in self.classifiers:
@@ -321,5 +401,6 @@ class Ensemble(nn.Module):
 if __name__ == "__main__":
     import sys
     be = EnsembleManager(sys.argv[1],1)
-    be.get_ensemble(2)
-    be.evaluate(1024)
+    be.get_ensemble(5)
+    be.distill_model(32)
+    be.evaluate(2)
