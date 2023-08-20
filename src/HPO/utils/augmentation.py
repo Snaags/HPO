@@ -8,11 +8,11 @@ from operator import itemgetter
 from scipy.interpolate import CubicSpline
 
 
-def initialise_augmentations(augmentation_data)->list:
+def initialise_augmentations(augmentation_data,device = None)->list:
   if augmentation_data:
     augs = []
     for i in augmentation_data:
-      augs.append(eval(i.split("_")[0])(**augmentation_data[i]) )
+      augs.append(eval(i.split("_")[0])(**augmentation_data[i], device =device) )
     return augs
   else:
     return False

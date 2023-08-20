@@ -239,6 +239,7 @@ class ModelGraph(nn.Module):
     self.resolution_dict = propagate_resolution(self.sorted_graph, self.ops_list)
     self.channel_dict = propagate_channels(self.sorted_graph, self.ops_list)
     self.cat_num_dict = propagate_cat_num(self.sorted_graph, self.ops_list)
+    self.dropout_active = True
     ##print(self.channel_dict)
     ##print(self.resolution_dict)
     if not raw_stem:
@@ -267,6 +268,9 @@ class ModelGraph(nn.Module):
       self.actfc = nn.Sigmoid()#nn.Softmax(dim =1)
     self.sigmoid = sigmoid
   
+  def disable_dropout(self):
+    self.dropout_active = False
+
   def _compile(self,size):
     """
     Builds the operations along edge paths, 
@@ -365,10 +369,12 @@ class ModelGraph(nn.Module):
       self.combine_index+=1
 
   def _forward(self, op,edge):
-    self.states[edge[0]] = self.dropout(self.states[edge[0]])
     ##print(edge,self.states[edge[0]].shape, op)
     ##print("Predicted channels: {} {}".format(self.channel_dict[edge[0]],self.channel_dict[edge[1]]))
-    h = op(self.states[edge[0]])
+    if self.dropout_active:
+      h = op(self.dropout(self.states[edge[0]]))
+    else:
+      h = op(self.states[edge[0]])
     #CASE 1 - 1 INPUT
     if not (edge[1] in self.states.keys()):
       self.states[edge[1]] = h

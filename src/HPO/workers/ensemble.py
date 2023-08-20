@@ -50,7 +50,7 @@ class EnsembleManager:
                         DS_PATH = None
 
                 if "AUGMENTATIONS" in self.SETTINGS:
-                        augs = aug.initialise_augmentations({'Crop_1': {'rate': 0.5, 'crop_min': 0.8}})
+                        augs = aug.initialise_augmentations({'Crop_1': {'rate': 0.2, 'crop_min': 0.8}, "Crop_2": {"rate":0.2, "crop_min": 0.5},"Jitter":{"rate":0.0, "sigma":0.00001}},self.cuda_device)
                 else: 
                         augs = None
 
@@ -81,30 +81,38 @@ class EnsembleManager:
                 print("Accuracy: {}".format(correct/total))
 
 
-        def distill_model(self,batch_size):
+        def distill_model(self):
 
             hyperparameter = self.configs[list(np.argsort(self.accuracy)).pop(-1)]
-            model = ModelGraph(self.test_dataset.get_n_features(),self.channels,self.test_dataset.get_n_classes(),
+            model = ModelGraph(self.test_dataset.get_n_features(),self.channels*8,self.test_dataset.get_n_classes(),
                           self.test_dataset.get_length(),hyperparameter["graph"],hyperparameter["ops"],device = self.cuda_device,
                           binary = self.SETTINGS["BINARY"],dropout = self.SETTINGS["DROPOUT"],droppath = self.SETTINGS["DROPPATH"],
                           raw_stem = self.SETTINGS["RAW_STEM"],embedding = self.SETTINGS["EMBEDDING"])
+            
+            if len(self.train_dataset) < 100:
+                batch_size = 2
+            elif len(self.train_dataset) < 1000:
+                batch_size = 8
+            else:
+                batch_size = 256
             model.cuda(self.cuda_device)
             self.trainloader = torch.utils.data.DataLoader(
-                      self.test_dataset,collate_fn = collate_fn_padd,shuffle = True,
+                      self.train_dataset,collate_fn = collate_fn_padd,shuffle = True,
                       batch_size= batch_size ,drop_last = True)
             self.testloader = torch.utils.data.DataLoader(
                 self.test_dataset, collate_fn=collate_fn_padd, shuffle=True, 
-                batch_size=1, drop_last=False)
+                batch_size=batch_size, drop_last=False)
 
-            evaluator = Evaluator(1, self.test_dataset.get_n_classes(),self.cuda_device,testloader = self.testloader)
+            evaluator = Evaluator(batch_size, self.test_dataset.get_n_classes(),self.cuda_device,testloader = self.testloader)
             self.SETTINGS["LIVE_EVAL"] = True
-            self.SETTINGS["MODEL_VALIDATION_RATE"] = 5
+            self.SETTINGS["T"] = 2
+            self.SETTINGS["MODEL_VALIDATION_RATE"] = 20
             self.SETTINGS["PRINT_RATE_TRAIN"] = 5
-            self.SETTINGS["WEIGHT_AVERAGING_RATE"] = True
+            self.SETTINGS["WEIGHT_AVERAGING_RATE"] = False
             self.SETTINGS["SCHEDULE"] = True
             self.SETTINGS["LR"] = 0.01
-            self.SETTINGS["LR_MIN"] = 0.0001
-            self.SETTINGS["EPOCHS"] = 150
+            self.SETTINGS["LR_MIN"] = 0.000001
+            self.SETTINGS["EPOCHS"] = 300
             train_distill(model, self.SETTINGS, self.trainloader,
                 cuda_device = self.cuda_device, teacher = self.ensemble,evaluator = evaluator)
 
@@ -114,6 +122,7 @@ class EnsembleManager:
             evaluator.forward_pass(model, self.testloader,self.SETTINGS["BINARY"],n_iter = self.SETTINGS["TEST_ITERATION"])
             evaluator.predictions(model_is_binary = self.SETTINGS["BINARY"] , THRESHOLD = self.SETTINGS["THRESHOLD"],no_print = self.SETTINGS["LIVE_EVAL"])
             print("Distill ACC:",evaluator.T_ACC())
+            return evaluator.T_ACC()
 
         def evaluate_aug(self, batch_size, n_iter=10):
                     self.testloader = torch.utils.data.DataLoader(
@@ -186,7 +195,7 @@ class EnsembleManager:
             return correct / total
 
 
-        def get_ensemble(self,n_classifiers = 10):
+        def get_ensemble(self,n_classifiers = 10,ID = None):
                 order = list(np.argsort(self.accuracy))
                 """
                 weights = os.listdir("{}weights/".format(self.path))
@@ -195,7 +204,10 @@ class EnsembleManager:
                 """
 
                 while len(self.models) < n_classifiers:
-                        index = order.pop(-1)
+                        if ID != None:
+                            index = self.IDS.index(ID)
+                        else:
+                            index = order.pop(-1)
                         print("Model acc: {}".format(self.accuracy[index]))
                         m, sucess = self.try_build_max(index)
                         if sucess:
@@ -207,15 +219,15 @@ class EnsembleManager:
             scores = []
             recall = []
             config = []
-            IDS = []
+            self.IDS = []
             with open( "{}{}".format(PATH,FILENAME) , newline = "") as csvfile:
                     reader = csv.reader(csvfile, delimiter = ",")
                     for row in reader:
-                        scores.append(float(row[0]))
+                        #scores.append(float(row[0]))
                         recall.append(float(row[1]))
                         config.append(eval("".join(row[2])))
-                        IDS.append(config[-1]["ID"])
-            for ID in IDS:
+                        self.IDS.append(config[-1]["ID"])
+            for ID in self.IDS:
                 path = "{}/{}/{}".format(PATH,"metrics",ID)
                 df = pd.read_csv(path)
                 mu = df["accuracy"].mean()
@@ -383,16 +395,16 @@ class Ensemble(nn.Module):
                 self.iter += 1
                 """
 
-                return self.hard_voting(probs)
-        def teachermean( self, x):
+                return self.soft_voting(probs)
+        def teachermean( self, x,T = 1):
                 self.batch_size = x.shape[0]
                 probs = torch.zeros(size = (self.batch_size ,self.num_classes, len(self.classifiers) )).cuda(self.device)
                 for idx , model in enumerate(self.classifiers):
-                        probs[:, :, idx] = F.softmax(model(x),dim =1)
+                        probs[:, :, idx] = F.softmax(model(x)/T,dim =1)
                 return torch.mean(probs,axis = -1)
 
-        def teacher( self, x):
-                return F.softmax(random.choice(self.classifiers)(x),dim =1)
+        def teacher( self, x,T = 1):
+                return F.softmax(random.choice(self.classifiers)(x)/T,dim =1)
 
         def eval(self):
                 for i in self.classifiers:
@@ -400,7 +412,7 @@ class Ensemble(nn.Module):
 
 if __name__ == "__main__":
     import sys
-    be = EnsembleManager(sys.argv[1],1)
-    be.get_ensemble(5)
-    be.distill_model(32)
-    be.evaluate(2)
+    be = EnsembleManager(sys.argv[1],2)
+    be.get_ensemble(1)
+    #be.distill_model()
+    be.evaluate(256)

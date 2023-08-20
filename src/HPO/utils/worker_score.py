@@ -353,36 +353,46 @@ class Evaluator:
     return fpr,tpr,thresholds, roc_auc
 
   def forward_pass(self, model , testloader = None, binary = False, subset = None,n_iter = 1):
-    if testloader != None:
-      self.testloader = testloader
-    elif self.testloader == None and testloader == None:
-      raise Exception("No dataloader passed at object initialisation or at forward pass")
+    if testloader:
+        self.testloader = testloader
+    elif not self.testloader and not testloader:
+        raise Exception("No dataloader passed at object initialisation or at forward pass")
 
-    if binary == True:
-      s = torch.nn.Sigmoid() #torch.nn.Identity()# torch.nn.Sigmoid()
-      self.model_prob = np.zeros(shape = (len(self.testloader)*self.batch_size*n_iter, 1)) # [sample , classes]
+    
+    #total_samples = sum(min(batch[1].shape[0], self.batch_size) for batch in self.testloader) * n_iter
+    total_samples = sum(min(batch[1].shape[0] if len(batch[1].shape) > 0 else 1, self.batch_size) for batch in self.testloader) * n_iter
+
+
+    if binary:
+        s = torch.nn.Sigmoid()
+        self.model_prob = np.zeros(shape=(total_samples, 1))
     else:
-      s = torch.nn.Identity()
-      self.model_prob = np.zeros(shape = (len(self.testloader)*self.batch_size*n_iter, self.n_classes)) # [sample , classes]
-    self.labels = np.zeros(shape = (len(self.testloader)*self.batch_size*n_iter,1))
-    #Pass validation set through model getting probabilities and labels
-    with torch.no_grad(): #disable back prop to test the model
-      for n in range(n_iter):
-        for i, (inputs, labels) in enumerate( self.testloader ):
-            start_index = i * self.batch_size + (n * len(self.testloader) * self.batch_size)
-            end_index = (i * self.batch_size + (n * len(self.testloader) * self.batch_size)) + self.batch_size
-            if self.cuda_device != None:
-                inputs = inputs.cuda(non_blocking=True, device = self.cuda_device).float()
-            else:
-                inputs = inputs.cpu()
-            self.labels[start_index:end_index , :] = labels.view(self.batch_size,1).cpu().numpy()
-            out = s(model(inputs)).cpu().numpy()
-            self.model_prob[start_index:end_index,:] = out
-            if subset != None:
-              if i > subset:
-                self.labels = self.labels[:end_index,:]
-                self.model_prob = self.model_prob[:end_index, :]
-                break
+        s = torch.nn.Identity()
+        self.model_prob = np.zeros(shape=(total_samples, self.n_classes))
+    
+    self.labels = np.zeros(shape=(total_samples, 1))
+
+    # Pass validation set through model getting probabilities and labels
+    with torch.no_grad():  # disable back prop to test the model
+        current_sample = 0
+        for n in range(n_iter):
+            for i, (inputs, labels) in enumerate(self.testloader):
+                if len(labels.shape) > 0:
+                  actual_batch_size = len(labels)  # determine the actual batch size
+                else:
+                  actual_batch_size = 1  # special case if tensor is of size 1 (i.e. 0-d)
+                
+                self.labels[current_sample:current_sample+actual_batch_size, :] = labels.view(actual_batch_size, 1).cpu().numpy()
+                out = s(model(inputs)).cpu().numpy()
+                self.model_prob[current_sample:current_sample+actual_batch_size, :] = out
+                
+                current_sample += actual_batch_size
+
+                if subset and i > subset:
+                    self.labels = self.labels[:current_sample, :]
+                    self.model_prob = self.model_prob[:current_sample, :]
+                    break
+
   def set_cm(self, prediction, labels):
     self.confusion_matrix = confusion_matrix(labels,prediction,labels = list(range(self.n_classes)))
   def update_CM(self):
@@ -418,7 +428,7 @@ class Evaluator:
       self.update_CM()
       if not no_print:
           with np.printoptions(linewidth = (10*self.n_classes+20),precision=4, suppress=True):
-            #print(self.confusion_matrix)
+            print(self.confusion_matrix)
             pass
 
   def calculate_loss(self,criterion,model_is_binary = False):

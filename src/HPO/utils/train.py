@@ -123,7 +123,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   n_iter = len(dataloader) 
 
   #CONFIGURATION OF OPTIMISER AND LOSS FUNCTION
-  optimizer = torch.optim.Adam(model.parameters(),lr = hyperparameter["LR"])
+  optimizer = torch.optim.AdamW(model.parameters(),lr = hyperparameter["LR"])
   if hyperparameter["SCHEDULE"] == True:
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,EPOCHS,eta_min = hyperparameter["LR_MIN"])
   if hyperparameter["BINARY"] == True:
@@ -187,7 +187,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
         if evaluator != None:
           model.eval()
           evaluator.forward_pass(model,binary = BINARY)
-          evaluator.predictions(model_is_binary = BINARY,THRESHOLD = hyperparameter["THRESHOLD"])
+          evaluator.predictions(model_is_binary = BINARY,THRESHOLD = hyperparameter["THRESHOLD"],no_print = False)
           val_loss = 0#evaluator.calculate_loss(criterion,BINARY)
           val_acc = evaluator.T_ACC()
           recall = evaluator.TPR(1)
@@ -217,6 +217,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
     if hyperparameter["SCHEDULE"] == True:
       scheduler.step()
     epoch += 1
+
   if hyperparameter["WEIGHT_AVERAGING_RATE"]:  
     model.load_state_dict(average_state_dicts(weights))
   #print()

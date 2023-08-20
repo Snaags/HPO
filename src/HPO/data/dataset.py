@@ -33,6 +33,7 @@ DATASETS = {
     "PenDigitsTest" : (Train_PenDigits,True_Test_PenDigits),
     "Full_FaceDetection" : (Full_FaceDetection,Full_FaceDetection),
     "Full_SpokenArabicDigits" : (Full_SpokenArabicDigits,Full_SpokenArabicDigits),
+    "Full_SpokenArabicDigits" : (Full_SpokenArabicDigits,Full_SpokenArabicDigits),
 
     "Full_LSST" : (Full_LSST,Full_LSST),
     "Full_EthanolConcentration" : (Full_EthanolConcentration,Full_EthanolConcentration),

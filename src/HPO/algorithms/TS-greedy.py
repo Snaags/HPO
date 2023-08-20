@@ -68,11 +68,12 @@ def clean_unused_weights(data,active, models):
 def full_eval(SETTINGS):
   accuracy = {}
   #acc_best_single, recall,params = evaluate("{}/{}".format(SETTINGS["PATH"],"configuration.json"))
-  accuracy["single_model"] = 0#acc_best_single
   for i in [1,3,5,10]:
     be = EnsembleManager("{}/{}".format(SETTINGS["PATH"],"configuration.json"),SETTINGS["DEVICES"][0])
     be.get_ensemble(i)
     accuracy["ensemble_{}".format(i)] = be.evaluate(2)
+  be.get_ensemble(10)
+  accuracy["distill"] = be.distill_model()
     
   # convert dictionary to dataframe
   df = pd.DataFrame(accuracy, index=[0])

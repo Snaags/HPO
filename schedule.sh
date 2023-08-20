@@ -32,7 +32,7 @@ datasets=(
 )
 
 # Define experiment name prefix
-prefix="small-splits-experiment-1"
+prefix="next-fix-experiment"
 
 # List of GPUs
 gpus=(0 1 2 3)

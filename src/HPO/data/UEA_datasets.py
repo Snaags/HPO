@@ -21,18 +21,21 @@ class UEA(Dataset):
     self.sizes = []
 
     for n in name:
+      if not os.path.exists("{}{}_samples.npy".format(self.PATH,n)):
+        print("WARNING ONE OF THE DATASETS (TRAIN OR TEST DOES NOT EXIST)")
+        continue
       x.append(np.load("{}{}_samples.npy".format(self.PATH,n)))
       self.sizes.append(x[-1].shape[0])
       y.append(np.load("{}{}_labels.npy".format(self.PATH,n)))
       
       if "{}_groups.npy".format(n) in os.listdir(self.PATH):
         self.groups = np.load("{}{}_groups.npy".format(self.PATH,n))
-    self.x = torch.from_numpy(np.concatenate(x,axis = 0)).to(device = device).float()
+    self.x = torch.from_numpy(np.concatenate(x,axis = 0)).to(non_blocking = True,device = device).float()
     self.x = torch.nan_to_num(self.x)
     self.y = np.concatenate(y,axis = 0)
     if kwargs["binary"]:
       self.y = np.where(self.y != 0, 1,0)
-    self.y = torch.from_numpy(self.y).to(device).long()
+    self.y = torch.from_numpy(self.y).to(non_blocking = True,device = device).long()
     
     if classes != None:
         """
@@ -74,6 +77,8 @@ class UEA(Dataset):
     return self.x.shape[2]
 
   def get_proportions(self):
+    if len(self.sizes) == 1:
+      return 0.1
     return self.sizes[1]/ sum(self.sizes)
 
 class UEA_Train(UEA):
@@ -263,6 +268,7 @@ class Test_N(UEA):
   def __init__(self,ds,cuda_device,**kwargs):
     name = "{}_{}".format(ds,"test")
     super(Test_N,self).__init__(name = [name], device = cuda_device,**kwargs)
+
 
 class Full_N(UEA):
   def __init__(self,ds, cuda_device,**kwargs):

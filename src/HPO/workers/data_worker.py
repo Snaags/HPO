@@ -90,11 +90,6 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
   else: 
     augs = None
 
-  ##CONFIGURE LOW DATA OR HIGH DATA CONFIGURATION
-  if len(train_dataset) > 500:
-    SETTINGS["REPEAT"] = 5
-  else:
-    SETTINGS["REPEAT"] = 5
 
   train_args = {"cuda_device":cuda_device,"augmentation" : augs, "binary" :SETTINGS["BINARY"],"path" : DS_PATH}
   test_args = {"cuda_device":cuda_device,"augmentation" :None, "binary" :SETTINGS["BINARY"],"path" : DS_PATH}
@@ -107,7 +102,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
     
     if SETTINGS["GROUPED_RESAMPLES"]:
       # Initialize GroupKFold cross-validator with desired number of splits
-      kfold = GroupKFold(n_splits=5, shuffle = True)
+      kfold = GroupKFold(n_splits=5)
       splits = [(None,None)]*SETTINGS["RESAMPLES"]
 
 
@@ -115,7 +110,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
       if "MAX_REPEAT" in SETTINGS and SETTINGS["MAX_REPEAT"]:
         splits = dataset.min_samples_per_class()
       else:
-        splits = min([dataset.min_samples_per_class(), 3])
+        splits = min([dataset.min_samples_per_class(), 5])
       kfold = KFold(n_splits = splits, shuffle = True,random_state = _)
       splits = [(None,None)]*SETTINGS["RESAMPLES"]
 
@@ -134,10 +129,16 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
          dataset.get_groups(train_ids,test_ids)
       elif SETTINGS["RESAMPLES"]:
         train_ids, test_ids = next(kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy()))
-        if SETTINGS["MAX_BATCH"]:
-          SETTINGS["BATCH_SIZE"] = len(train_ids)
-        else:
-          SETTINGS["BATCH_SIZE"] = min( [highest_power_of_two(len(test_ids)),  SETTINGS["BATCH_SIZE"]]  )
+
+      """
+      if len(dataset) < 100:
+          SETTINGS["BATCH_SIZE"] = 2
+      elif len(dataset) < 1000:
+          SETTINGS["BATCH_SIZE"] = 8
+      else:
+          SETTINGS["BATCH_SIZE"] = 256
+      """
+      SETTINGS["BATCH_SIZE"] = min( [highest_power_of_two(len(test_ids)),  SETTINGS["BATCH_SIZE"]]  )
       if SETTINGS["CROSS_VALIDATION_FOLDS"] or SETTINGS["RESAMPLES"]: 
         # Sample elements randomly from a given list of ids, no replacement.
       
@@ -153,18 +154,18 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
         test_subsampler = torch.utils.data.SubsetRandomSampler(test_ids)
         testloader = torch.utils.data.DataLoader(
                               dataset,collate_fn = collate_fn_padd,sampler = test_subsampler,
-                              batch_size= len(test_ids) ,drop_last = True)
+                              batch_size= SETTINGS["BATCH_SIZE"] ,drop_last = False)
       else:
         trainloader = torch.utils.data.DataLoader(
                                 train_dataset,collate_fn = collate_fn_padd,shuffle = True,
                                 batch_size=SETTINGS["BATCH_SIZE"], drop_last = True)
         testloader = torch.utils.data.DataLoader(
                             test_dataset,collate_fn = collate_fn_padd,shuffle = True,
-                            batch_size= SETTINGS["BATCH_SIZE"] ,drop_last = True)
+                            batch_size= SETTINGS["BATCH_SIZE"] ,drop_last = False)
       if SETTINGS["RESAMPLES"] or SETTINGS["CROSS_VALIDATION_FOLDS"]:
         dataset.enable_augmentation(augs)
       n_classes = test_dataset.get_n_classes()
-      evaluator = Evaluator(len(test_ids), test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
+      evaluator = Evaluator(SETTINGS["BATCH_SIZE"], test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
       #print("classes: {} - name: {}".format(train_dataset.get_n_classes(),name))
       #g = GraphConfigSpace(50)
       #s = g.sample_configuration()
@@ -245,7 +246,10 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
       evaluator.forward_pass(model, testloader,SETTINGS["BINARY"],n_iter = SETTINGS["TEST_ITERATION"])
       evaluator.predictions(model_is_binary = SETTINGS["BINARY"] , THRESHOLD = SETTINGS["THRESHOLD"],no_print = SETTINGS["LIVE_EVAL"])
       total = evaluator.T()
-      acc.append( evaluator.T_ACC())
+      if "BALANCED_ACC" in SETTINGS and SETTINGS["BALANCED_ACC"]:
+        acc.append(evaluator.balanced_acc())
+      else: 
+        acc.append( evaluator.T_ACC())
       recall.append(evaluator.TPR(1))
       recall_total = evaluator.P(1)
       #print("Accuracy: ", "%.4f" % ((acc[-1])*100), "%")
