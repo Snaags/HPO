@@ -130,6 +130,8 @@ class MixUp(Augmentation):
     else:
       return x,y
 
+
+
   def call(self,x,y):
     DEBUG = False
     #x = [batch, channels , length]
@@ -151,6 +153,68 @@ class MixUp(Augmentation):
     self.mix_sample = MTS_1
     self.mix_label = LAB_1
     return x ,y.long()
+
+
+
+class ChannelCutMix(Augmentation):
+    def __init__(self, perc=0.1, rate=0.3, device=None):
+        super(ChannelCutMix, self).__init__(rate,device=device)  # Assuming device is used in the parent class
+        self.perc = perc
+        self.rate = rate
+        self.mix_sample = None
+        self.mix_label = None
+
+    def __call__(self, x, y):
+        if random.random() < self.rate:
+            self.mix_sample, self.mix_label = self.dataset.x[random.choice(self.ids)], self.dataset.y[random.choice(self.ids)]
+            return self.call(x, y)
+        else:
+            return x, y
+
+    def call(self, x, y):
+        n_channels = x.shape[0]
+        n_drop = int(n_channels * self.perc)
+        channels_to_mix = np.random.choice(np.arange(n_channels),n_drop, replace=False)
+        x[channels_to_mix,:] = self.mix_sample[channels_to_mix,:]
+
+        # This assumes y is a one-hot encoded vector, and thus can be averaged
+        y = (y * (1-self.perc)) + (self.mix_label * self.perc)
+        return x, y.long()
+
+
+
+class CutMix(Augmentation):
+    def __init__(self, perc=0.1, rate=0.3, device=None):
+        super(CutMix, self).__init__(rate,device=device)  # Assuming device is used in the parent class
+        self.perc = perc
+        self.rate = rate
+        self.mix_sample = None
+        self.mix_label = None
+
+    def __call__(self, x, y):
+        if random.random() < self.rate:
+            self.mix_sample, self.mix_label = self.dataset.x[random.choice(self.ids)], self.dataset.y[random.choice(self.ids)]
+            return self.call(x, y)
+        else:
+            return x, y
+
+    def call(self, x, y):
+        seq_len = x.shape[1]
+        win_len = int(self.perc * seq_len)
+        start = np.random.randint(0, seq_len - win_len - 1)
+        end = start + win_len
+
+        # This assumes the data is in the shape [channels, length]
+        x[:, start:end] = self.mix_sample[:, start:end]
+        # This assumes y is a one-hot encoded vector, and thus can be averaged
+        y = (y * (1-self.perc)) + (self.mix_label * self.perc)
+        return x, y.long()
+
+
+
+
+
+
 
 def mix_up(x,y, m = 0.3, device = None):
     dist = torch.distributions.beta.Beta(m,m)
