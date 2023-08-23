@@ -110,7 +110,8 @@ class ChannelDrop(Augmentation):
     n_channels = x.shape[0]
     p_drop = random.uniform(self.crop_min,self.crop_max)
     n_drop = int(n_channels * p_drop)
-    return x[np.random.choice(np.arange(n_channels),n_channels-n_drop),:],y
+    x[np.random.choice(np.arange(n_channels),n_drop),:] = 0
+    return x,y
 
 
 class MixUp(Augmentation):
