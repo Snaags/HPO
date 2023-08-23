@@ -102,7 +102,7 @@ class CutOut(Augmentation):
 
 class ChannelDrop(Augmentation):
   def __init__(self, crop_min = 0.6,rate = 0.3, crop_max = 0.99, device = None):
-    super(Crop,self).__init__(rate,device)
+    super(ChannelDrop,self).__init__(rate,device)
     self.__name__ = "crop"
     self.crop_min = crop_min
     self.crop_max = crop_max
