@@ -13,7 +13,7 @@ def initialise_augmentations(augmentation_data,device = None)->list:
   if augmentation_data:
     augs = []
     for i in augmentation_data:
-      augs.append(eval(i.split("_")[0])(**augmentation_data[i], device = device) )
+      augs.append(eval(i.split("_")[0])(**augmentation_data[i],device = device) )
     return augs
   else:
     return False
@@ -22,6 +22,9 @@ class Augmentation(object):
   def __init__(self,rate,device):
     self.device = device
     self.rate = rate
+  def set_train_ids(self,train_ids,dataset):
+    self.ids = train_ids
+    self.dataset = dataset
   def __call__(self,x,y):
     rate = self.rate
     while random.random() < rate:
@@ -122,17 +125,8 @@ class MixUp(Augmentation):
     self.mix_label = None 
   def __call__(self,x,y):
     if random.random() < self.rate:
-      if self.mix_sample == None:
-        self.mix_sample = x
-        self.mix_label = y
-        return x,y
-      elif False and self.mix_sample.shape[1] != x.shape[1]:
-        print("switching to val size")
-        self.mix_sample = x
-        self.mix_label = y
-        return x,y
-      else: 
-        return self.call(x,y)
+      self.mix_sample,self.mix_label = self.dataset.x[random.choice(self.ids)],self.dataset.y[random.choice(self.ids)]
+      return self.call(x,y)
     else:
       return x,y
 
@@ -142,9 +136,9 @@ class MixUp(Augmentation):
     #y = [batch, 1]
     mix = self.dist.sample()
     MTS_1 = x.clone()
-    MTS_2 = self.mix_sample.clone()
+    MTS_2 = self.mix_sample
     LAB_1 = y.clone()
-    LAB_2 = self.mix_label.clone()
+    LAB_2 = self.mix_label
     x = (MTS_1 * mix)  + (MTS_2 *(1-mix))
     y = (LAB_1 * mix) + (LAB_2 * (1-mix))
     if DEBUG == True:

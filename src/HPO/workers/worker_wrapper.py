@@ -67,8 +67,8 @@ def load_dataset(JSON_CONFIG, cuda_device):
     DS_PATH = None
   if "AUGMENTATIONS" in SETTINGS:
     augs = aug.initialise_augmentations(SETTINGS["AUGMENTATIONS"])
-  else: 
-    augs = None
+
+  augs = None
 
   train_args = {"cuda_device":cuda_device,"augmentation" : augs, "binary" :SETTINGS["BINARY"],"path" : DS_PATH}
   test_args = {"cuda_device":cuda_device,"augmentation" :None, "binary" :SETTINGS["BINARY"],"path" : DS_PATH}

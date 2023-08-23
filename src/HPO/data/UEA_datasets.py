@@ -57,8 +57,10 @@ class UEA(Dataset):
     self.y.to(device)
   def __len__(self):
     return len(self.y)
-  def enable_augmentation(self,augs):
+  def enable_augmentation(self,augs,ids = None):
     self.augmentation = augs
+    for i in self.augmentation:
+      i.set_train_ids(ids,self)
   def min_samples_per_class(self):
     unique,counts = np.unique(self.y.cpu().numpy(), return_counts=True)
     return min(counts)

@@ -416,6 +416,6 @@ class Ensemble(nn.Module):
 if __name__ == "__main__":
     import sys
     be = EnsembleManager(sys.argv[1],1)
-    be.get_ensemble(15)
+    be.get_ensemble(5)
     #be.distill_model()
     be.evaluate(256)

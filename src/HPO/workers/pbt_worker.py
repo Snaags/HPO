@@ -128,7 +128,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
 
 
       if SETTINGS["RESAMPLES"] or SETTINGS["CROSS_VALIDATION_FOLDS"]:
-        dataset.enable_augmentation(augs)
+        dataset.enable_augmentation(augs,train_ids)
       evaluator = Evaluator(len(test_ids), test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
 
 

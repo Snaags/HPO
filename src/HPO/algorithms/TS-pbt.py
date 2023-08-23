@@ -233,7 +233,7 @@ def main(worker, configspace: ConfigurationSpace, json_config):
 
         # ---- THOMPSON SAMPLING ----
         scores = [i.sample() for i in history]
-        top_10_indices = np.argsort(scores)[-5:][::-1]
+        top_10_indices = np.argsort(scores)[-10:][::-1]
 
         mean_best = max([i.sample() for i in history])
         if mean_best == 1:
@@ -243,7 +243,7 @@ def main(worker, configspace: ConfigurationSpace, json_config):
         # ---- EXPLOIT & EXPLORE (PBT Principle) ----
         while train.config_queue.qsize() < SETTINGS["CORES"]:
                 # Here, we're considering the 'mutate_graph' as the method to slightly perturb the hyperparameters.
-                train.update_async(configspace.mutate_graph(history[random.choice(top_10_indices)].get_config(), random.randint(0,5)))
+                train.update_async(configspace.mutate_graph(history[random.choice(top_10_indices)].get_config(), random.randint(0,10)))
 
         # ---- VERBOSE OUTPUTS ----
         if iteration % 10 == 0:
