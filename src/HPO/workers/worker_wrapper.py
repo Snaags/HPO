@@ -41,6 +41,7 @@ def __compute( ID, configs , gpus , res   , JSON_CONFIG, _compute):
       elif device != train.x.get_device():
         train.update_device(device)
         test.update_device(device)
+      train, test = load_dataset(JSON_CONFIG,device)
       acc , rec, params =  _compute(hyperparameter = config , cuda_device = device,JSON_CONFIG = JSON_CONFIG,train_dataset = train, test_dataset= test)
       res.put([config , acc , rec ,params]) 
 

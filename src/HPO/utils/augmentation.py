@@ -3,6 +3,7 @@ import torch
 import random
 from torch.nn.functional import interpolate
 import time
+import math
 import numpy as np
 from operator import itemgetter
 from scipy.interpolate import CubicSpline
@@ -12,7 +13,7 @@ def initialise_augmentations(augmentation_data,device = None)->list:
   if augmentation_data:
     augs = []
     for i in augmentation_data:
-      augs.append(eval(i.split("_")[0])(**augmentation_data[i], device =device) )
+      augs.append(eval(i.split("_")[0])(**augmentation_data[i], device = device) )
     return augs
   else:
     return False
@@ -75,8 +76,8 @@ class WindowWarp(Augmentation):
     self.size = size
   def call(self,x,y):
     for i in range(self.num_warps):
-        start = random.randint(1, x.shape[1]-10) 
-        end = min([x.shape[1],start+random.randint(2, int(x.shape[1]*self.size))])
+        start = random.randint(1, x.shape[1]-3) 
+        end = min([x.shape[1],start+random.randint(2, math.ceil(x.shape[1]*self.size))])
         out= interpolate(x[:,start:end].unsqueeze(0), scale_factor = random.choice(self.ratios)).cuda(device = self.device).squeeze(0)
         x = torch.cat((x[:,:start],out,x[:,end:]),dim = 1)
     if x.shape[1] > 20000:
@@ -89,13 +90,28 @@ class CutOut(Augmentation):
     self.__name__ = "cut_out"
   def call(self,x,y):
     seq_len = x.shape[1]    
-    win_len = int(self.perc * seq_len)    
+    win_len = int(self.perc * seq_len)
+    if seq_len-win_len-1 < 1:
+      return x,y
     start = np.random.randint(0, seq_len-win_len-1)    
     end = start + win_len    
     start = max(0, start)    
     end = min(end, seq_len)    
     x[:,start:end] = 0    
     return x,y 
+
+class ChannelDrop(Augmentation):
+  def __init__(self, crop_min = 0.6,rate = 0.3, crop_max = 0.99, device = None):
+    super(Crop,self).__init__(rate,device)
+    self.__name__ = "crop"
+    self.crop_min = crop_min
+    self.crop_max = crop_max
+  def call(self,x,y):
+    n_channels = x.shape[0]
+    p_drop = random.uniform(self.crop_min,self.crop_max)
+    n_drop = int(n_channels * p_drop)
+    return x[np.random.choice(np.arange(n_channels),n_channels-n_drop),:],y
+
 
 class MixUp(Augmentation):
   def __init__(self, m = 0.3 , rate = 0.3 , device = None):
@@ -109,7 +125,7 @@ class MixUp(Augmentation):
         self.mix_sample = x
         self.mix_label = y
         return x,y
-      elif self.mix_sample.shape[1] != x.shape[1]:
+      elif False and self.mix_sample.shape[1] != x.shape[1]:
         print("switching to val size")
         self.mix_sample = x
         self.mix_label = y
@@ -137,7 +153,9 @@ class MixUp(Augmentation):
       plt.plot(x[26,:].cpu(),label = "Mix",alpha = 0.7)
       plt.legend()
       plt.show()
-    return x ,y
+    self.mix_sample = MTS_1
+    self.mix_label = LAB_1
+    return x ,y.long()
 
 def mix_up(x,y, m = 0.3, device = None):
     dist = torch.distributions.beta.Beta(m,m)

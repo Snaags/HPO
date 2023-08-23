@@ -109,24 +109,26 @@ def average_state_dicts(state_dicts):
                       for name in state_dicts[0] if state_dicts[0][name].dtype.is_floating_point}
     return avg_state_dict
 
-def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
-     cuda_device = None, evaluator= None,logger = None,run = None,fold = None, repeat = None):
+def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader, cuda_device = None,SETTINGS = None,
+      evaluator= None,logger = None,run = None,fold = None, repeat = None):
 
   params = sum(p.numel() for p in model.parameters() if p.requires_grad)
   #INITIALISATION
+  if SETTINGS == None:
+    SETTINGS = hyperparameter
   EPOCHS = hyperparameter["EPOCHS"]
   BATCH_SIZE = hyperparameter["BATCH_SIZE"] 
-  BINARY = hyperparameter["BINARY"]
-  PRINT_RATE_TRAIN = hyperparameter["PRINT_RATE_TRAIN"]
+  BINARY = SETTINGS["BINARY"]
+  PRINT_RATE_TRAIN = SETTINGS["PRINT_RATE_TRAIN"]
   if cuda_device == None:
     cuda_device = torch.cuda.current_device()
   n_iter = len(dataloader) 
 
   #CONFIGURATION OF OPTIMISER AND LOSS FUNCTION
-  optimizer = torch.optim.AdamW(model.parameters(),lr = hyperparameter["LR"])
+  optimizer = torch.optim.AdamW(model.parameters(),lr = hyperparameter["LR"],weight_decay = hyperparameter["WEIGHT_DECAY"])
   if hyperparameter["SCHEDULE"] == True:
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,EPOCHS,eta_min = hyperparameter["LR_MIN"])
-  if hyperparameter["BINARY"] == True:
+  if SETTINGS["BINARY"] == True:
     criterion = nn.BCEWithLogitsLoss().cuda(device = cuda_device)
   else:
     criterion = nn.CrossEntropyLoss().cuda(device = cuda_device)
@@ -142,7 +144,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
   val_loss = torch.Tensor([0])
   recall = 0
   val_acc = 0
-  if hyperparameter["LOGGING"]:
+  if SETTINGS["LOGGING"]:
     logger = Logger(hyperparameter["database"],hyperparameter["experiment"],hyperparameter["DATASET_CONFIG"]["NAME"],fold,repeat,params)
   else:
     logger = None
@@ -166,16 +168,16 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
         loss = criterion(outputs, labels)
       loss.backward()
       optimizer.step()
-      if hyperparameter["WEIGHT_AVERAGING_RATE"] and epoch > EPOCHS/2:
+      if SETTINGS["WEIGHT_AVERAGING_RATE"] and epoch > EPOCHS/2:
         weights.append(clone_state_dict(model.state_dict()))
-      if hyperparameter["LOGGING"]:
+      if SETTINGS["LOGGING"]:
         pred_tensor = torch.cat((pred_tensor, outputs.detach().cpu().flatten(end_dim = 0)))
         gt_tensor = torch.cat((gt_tensor, labels.detach().cpu().flatten()))
 
       if PRINT_RATE_TRAIN and i % PRINT_RATE_TRAIN == 0:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,EPOCHS , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = BINARY)
 
-    if hyperparameter["LOGGING"]:
+    if SETTINGS["LOGGING"]:
       cm_train, train_acc = calculate_train_vals(pred_tensor,gt_tensor)
       if PRINT_RATE_TRAIN:
         pred_labels = torch.argmax(pred_tensor, dim=1).numpy()
@@ -183,11 +185,11 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
         with np.printoptions(linewidth = (10*len(np.unique(gt_labels))+20),precision=4, suppress=True):
           print(confusion_matrix(gt_labels,pred_labels))
 
-    if hyperparameter["MODEL_VALIDATION_RATE"] and epoch % hyperparameter["MODEL_VALIDATION_RATE"] == 0:
+    if SETTINGS["MODEL_VALIDATION_RATE"] and epoch % SETTINGS["MODEL_VALIDATION_RATE"] == 0:
         if evaluator != None:
           model.eval()
           evaluator.forward_pass(model,binary = BINARY)
-          evaluator.predictions(model_is_binary = BINARY,THRESHOLD = hyperparameter["THRESHOLD"],no_print = False)
+          evaluator.predictions(model_is_binary = BINARY,THRESHOLD = SETTINGS["THRESHOLD"],no_print = False)
           val_loss = 0#evaluator.calculate_loss(criterion,BINARY)
           val_acc = evaluator.T_ACC()
           recall = evaluator.TPR(1)
@@ -199,7 +201,7 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
           print("Validation set Accuracy: {} -- Balanced Accuracy: {} -- loss: {}".format(val_acc, bal_acc ,val_loss))
           print("")
 
-    if hyperparameter["LOGGING"]:
+    if SETTINGS["LOGGING"]:
       cm_test = json.dumps(cm_test.tolist())
       logger.update({
         "loss": loss.item(), 
@@ -214,15 +216,15 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader ,
         })
 
 
-    if hyperparameter["SCHEDULE"] == True:
+    if SETTINGS["SCHEDULE"] == True:
       scheduler.step()
     epoch += 1
 
-  if hyperparameter["WEIGHT_AVERAGING_RATE"]:  
+  if SETTINGS["WEIGHT_AVERAGING_RATE"]:  
     model.load_state_dict(average_state_dicts(weights))
   #print()
   #print("Num epochs: {}".format(epoch))
-  if hyperparameter["LOGGING"]:
+  if SETTINGS["LOGGING"]:
     logger.close()
   return logger
 

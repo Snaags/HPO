@@ -35,12 +35,12 @@ from HPO.data.dataset import get_dataset
 import HPO.utils.augmentation as aug
 
 class EnsembleManager:
-        def __init__(self , JSON_CONFIG,device):
+        def __init__(self , JSON_CONFIG,device,ID_limit = None):
                 with open(JSON_CONFIG,"r") as f:
                         data = json.load(f)
                 self.path = JSON_CONFIG[:-18]
                 self.cuda_device =device
-                self.accuracy,  self.recall, self.configs = self.load_hps(self.path)
+                self.accuracy,  self.recall, self.configs = self.load_hps(self.path,ID_limit = ID_limit)
                 self.SETTINGS = data["WORKER_CONFIG"]
                 self.channels = data["ARCHITECTURE_CONFIG"]["STEM_SIZE"][0]
                 name = self.SETTINGS["DATASET_CONFIG"]["NAME"]
@@ -106,7 +106,7 @@ class EnsembleManager:
             evaluator = Evaluator(batch_size, self.test_dataset.get_n_classes(),self.cuda_device,testloader = self.testloader)
             self.SETTINGS["LIVE_EVAL"] = True
             self.SETTINGS["T"] = 2
-            self.SETTINGS["MODEL_VALIDATION_RATE"] = 20
+            self.SETTINGS["MODEL_VALIDATION_RATE"] = 5
             self.SETTINGS["PRINT_RATE_TRAIN"] = 5
             self.SETTINGS["WEIGHT_AVERAGING_RATE"] = False
             self.SETTINGS["SCHEDULE"] = True
@@ -192,6 +192,7 @@ class EnsembleManager:
             correct = np.sum(np.diag(self.confusion_matrix))
             total = np.sum(self.confusion_matrix)
             print("Accuracy: {}".format(correct / total))
+            #print("Balanced Accuracy: {}".format(evaluator.balanced_acc()))
             return correct / total
 
 
@@ -215,7 +216,7 @@ class EnsembleManager:
                 self.ensemble = Ensemble(self.models,self.num_classes,self.cuda_device)
 
 
-        def load_hps(self, PATH,FILENAME = "evaluations.csv"):
+        def load_hps(self, PATH,FILENAME = "evaluations.csv",ID_limit = None):
             scores = []
             recall = []
             config = []
@@ -228,6 +229,8 @@ class EnsembleManager:
                         config.append(eval("".join(row[2])))
                         self.IDS.append(config[-1]["ID"])
             for ID in self.IDS:
+                if ID_limit != None and ID > ID_limit:
+                    continue
                 path = "{}/{}/{}".format(PATH,"metrics",ID)
                 df = pd.read_csv(path)
                 mu = df["accuracy"].mean()
@@ -412,7 +415,7 @@ class Ensemble(nn.Module):
 
 if __name__ == "__main__":
     import sys
-    be = EnsembleManager(sys.argv[1],2)
-    be.get_ensemble(1)
+    be = EnsembleManager(sys.argv[1],1)
+    be.get_ensemble(15)
     #be.distill_model()
     be.evaluate(256)

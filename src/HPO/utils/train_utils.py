@@ -2,6 +2,7 @@ import random
 import torch
 import torch.nn as nn
 import numpy as np
+import math
 from torch import Tensor
 from HPO.utils.model_constructor import Model
 from torch.utils.data import Dataset, DataLoader, Sampler
@@ -90,6 +91,12 @@ def highest_power_of_two(N):
     return 2**(power-1)
 
 
+def get_batch_size_from_n_batches(n_batches : int, samples : int):
+    raw_batch_size = samples / n_batches
+    if raw_batch_size <= 2:
+      return 2
+    return 2**int(math.log(raw_batch_size)/math.log(2))
+
 
 
 def collate_fn_padd(batch):
@@ -131,3 +138,39 @@ def collate_fn_padd_x(batch):
 
     batch = torch.transpose(batch_samples , 1 , 2 )
     return batch
+
+
+def test_get_batch_size_from_n_batches():
+    # Helper function to check if a number is a power of 2
+    def is_power_of_2(num):
+        return num != 0 and ((num & (num - 1)) == 0)
+    
+    # Test 1: Basic functionality check
+    batch_size = get_batch_size_from_n_batches(4, 32)
+    assert batch_size == 8, f"Expected 8 but got {batch_size}"
+
+    # Test 2: Check if returned batch size is a power of 2
+    batch_size = get_batch_size_from_n_batches(5, 64)
+    assert is_power_of_2(batch_size), f"{batch_size} is not a power of 2"
+
+    # Test 3: The function should divide samples into batches without remainder
+    n, s = 3, 32
+    batch_size = get_batch_size_from_n_batches(n, s)
+    assert s % batch_size == 0, f"{batch_size} does not divide {s} without remainder"
+    
+    # Test 4: Edge cases - n = 2
+    batch_size = get_batch_size_from_n_batches(1, 64)
+    assert batch_size == 64, f"Expected 64 but got {batch_size}"
+
+    # Test 5: Edge cases - s = 2
+    batch_size = get_batch_size_from_n_batches(5, 1)
+    assert batch_size == 2, f"Expected 2 but got {batch_size}"
+
+    # Test 6: Edge cases - n = s
+    batch_size = get_batch_size_from_n_batches(64, 64)
+    assert batch_size == 2, f"Expected 2 but got {batch_size}"
+
+    print("All tests passed!")
+
+if __name__ == "__main__":
+  test_get_batch_size_from_n_batches()

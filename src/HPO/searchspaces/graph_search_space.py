@@ -100,12 +100,15 @@ def get_ops(n_ops = 30):
 class GraphConfigSpace:
   def __init__(self,JSON):
     with open(JSON) as conf:
-      self.data = json.load(conf)["ARCHITECTURE_CONFIG"]
+      _data = json.load(conf)
+      self.data = _data["ARCHITECTURE_CONFIG"]
+      self.hp_opt = _data["WORKER_CONFIG"]["OPTIMISE"]
     #self.data = JSON["ARCHITECTURE_CONFIG"]
     self.g = nx.DiGraph
     self.n_operations = 32
     self.edge_options = self.data["N_EDGES"]
     self.init_state = [("S",1),(1,"T")]
+    self.hyperparameters = Hyperparameters(self.hp_opt)
 
 
 
@@ -140,20 +143,25 @@ class GraphConfigSpace:
       #ops["s_rate"] = model_stride
       #ops["s_c_ratio"] = model_stride_channel_ratio
       #ops["stem"] = random.choice(self.data["STEM_SIZE"])
-      samples.append(Graph(graph, self.g.nodes,copy.copy(ops),self.data))
+      hp = self.hyperparameters.initialise()
+      samples.append(Graph(graph, self.g.nodes,copy.copy(ops),self.data,hyperparameter = hp))
     return samples
   
   def mutate_graph(self,m,steps = 1):
     edges = m["graph"]
     ops = m["ops"]
+    if "hyperparameter" in m:
+      hp = m["hyperparameter"]
+    else:
+      hp = None
     g = nx.DiGraph()
     g.add_edges_from(edges )
     if "ID" in m:
-      model = Graph(edges,g.nodes,ops,self.data,parent = m["ID"])
+      model = Graph(edges,g.nodes,ops,self.data,hyperparameter = hp,parent = m["ID"])
     elif "parent" in m["ops"]:
-      model = Graph(edges,g.nodes,ops,self.data,parent = m["ops"]["parent"])
+      model = Graph(edges,g.nodes,ops,self.data,hyperparameter = hp,parent = m["ops"]["parent"])
     else:
-      model = Graph(edges,g.nodes,ops,self.data)
+      model = Graph(edges,g.nodes,ops,self.data,hyperparameter = hp)
     result = False
     while result == False:
       result = self.check_valid(copy.deepcopy(model))
@@ -164,7 +172,10 @@ class GraphConfigSpace:
 
   def check_valid(self,model):
     #MAKE RANDOM EDIT AND GENERATE NX GRAPH
-    model.get_random_edit()()
+    if random.random() > 0.05:
+      model.get_random_edit()()
+    else:
+      model.hyperparameter = self.hyperparameters.mutate(model.hyperparameter)
     graph = model()["graph"]
     g = nx.DiGraph()
     g.add_edges_from(graph)
@@ -248,12 +259,58 @@ class Vertex:
     if type(self.id) == int:
       self.id += value
 
+class Hyperparameters:
+    def __init__(self, data):
+        self.data = data
+        # List of all keys including those inside "AUGMENTATIONS"
+        self.all_keys = list(data.keys()) + [('AUGMENTATIONS', k1, k2) for k1 in data['AUGMENTATIONS'] for k2 in data['AUGMENTATIONS'][k1]]
+
+    def mutate(self,config):
+        # Randomly select a key from the flattened list of keys
+        key = random.choice(self.all_keys)
+        while key == 'AUGMENTATIONS':
+          key = random.choice(self.all_keys)
+           
+
+        # Check if the selected key is inside "AUGMENTATIONS"
+        if isinstance(key, tuple):
+            _, aug_key, nested_key = key
+            # Replace the chosen nested key's value with a random value from its list
+            config['AUGMENTATIONS'][aug_key][nested_key] = random.choice(self.data['AUGMENTATIONS'][aug_key][nested_key])
+        else:
+            # If it's a top-level key, mutate its value
+            config[key] = random.choice(self.data[key])
+        return config
+
+    def __str__(self):
+        # Useful for printing the hyperparameters
+        return str(self.data)
+
+    def initialise(self):
+        config = {'AUGMENTATIONS': {}}        
+
+        for key in self.all_keys:
+          if key == 'AUGMENTATIONS':
+            continue  
+
+          # Check if the selected key is inside "AUGMENTATIONS"
+          if isinstance(key, tuple):
+              _, aug_key, nested_key = key
+              # Replace the chosen nested key's value with a random value from its list
+              if not (aug_key in config['AUGMENTATIONS']):
+                config['AUGMENTATIONS'][aug_key] = {}
+              config['AUGMENTATIONS'][aug_key][nested_key] = random.choice(self.data['AUGMENTATIONS'][aug_key][nested_key])
+          else:
+              # If it's a top-level key, mutate its value
+              config[key] = random.choice(self.data[key])
+        return config
 
 class Graph:
-    def __init__(self,edges,nodes,ops,data,parent = None):
+    def __init__(self,edges,nodes,ops,data,hyperparameter = None,parent = None):
         self.vertices = {}
         self.data = data
         self.edges = {}
+        self.hyperparameter = hyperparameter
         self.parent = parent
         self.max_vertex = 1
         for e in edges:
@@ -271,7 +328,7 @@ class Graph:
       if self.parent != None:
         ops["parent"] = self.parent
       graph = [ self.edges[e].get_edge() for e in self.edges]
-      return { "graph":graph,"ops":ops}
+      return { "graph":graph,"ops":ops,"hyperparameter":self.hyperparameter}
 
 
     def rename_vertices(self,value):

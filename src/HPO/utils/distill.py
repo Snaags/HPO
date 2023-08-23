@@ -35,7 +35,7 @@ def train_distill(model : Model , hyperparameter : dict, dataloader : DataLoader
   n_iter = len(dataloader) 
 
   #CONFIGURATION OF OPTIMISER AND LOSS FUNCTION
-  optimizer = torch.optim.AdamW(model.parameters(),lr = hyperparameter["LR"],weight_decay = 0.04)
+  optimizer = torch.optim.AdamW(model.parameters(),lr = hyperparameter["LR"],weight_decay = 0.01)
   if hyperparameter["SCHEDULE"] == True:
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,EPOCHS,eta_min = hyperparameter["LR_MIN"])
   if hyperparameter["BINARY"] == True:
@@ -134,10 +134,6 @@ def train_distill(model : Model , hyperparameter : dict, dataloader : DataLoader
     if hyperparameter["SCHEDULE"] == True:
       scheduler.step()
     epoch += 1
-    if epoch > EPOCHS/2:
-      model.disable_dropout()
-      alpha -= 0.4/EPOCHS
-      beta += 0.4/EPOCHS
     if hyperparameter["WEIGHT_AVERAGING_RATE"] and epoch > EPOCHS/2:  
       model.load_state_dict(average_state_dicts(weights))
   #print()

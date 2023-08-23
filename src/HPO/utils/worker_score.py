@@ -7,6 +7,7 @@ from HPO.utils.time_series_augmentation_torch import  jitter, scaling, window_wa
 from HPO.utils.train_utils import collate_fn_padd, collate_fn_padd_x
 import random
 import copy
+import torch.nn as nn
 from torch.utils.data import Sampler
 from sklearn.model_selection import StratifiedKFold
 import pandas as pd
@@ -403,6 +404,18 @@ class Evaluator:
 
   def reset_cm(self):
     self.confusion_matrix = np.zeros(shape = (self.n_classes,self.n_classes)) #Matrix of prediction vs true values
+  def compute_loss(self):
+      LossF = nn.CrossEntropyLoss().cuda(device = self.cuda_device)
+      # Multi-class classification
+      # Convert to PyTorch tensors
+      with torch.no_grad():
+        probs = torch.tensor(self.model_prob).cuda(device = self.cuda_device)
+        labels = torch.tensor(self.labels).squeeze().long().cuda(device = self.cuda_device)
+        
+        # Compute loss
+        loss =LossF(probs, labels)
+  
+      return loss.item()
 
   def predictions_threshold_matrix(self, model_is_binary):
     for i in range(1,20):
