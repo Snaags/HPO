@@ -46,12 +46,12 @@ class EnsembleManager:
                         DS_PATH = self.SETTINGS["DATASET_CONFIG"]["DATASET_PATH"]
                 else:
                         DS_PATH = None
-                if "AUGMENTATIONS" in self.SETTINGS:
-                        augs = aug.initialise_augmentations(self.SETTINGS["AUGMENTATIONS"])
-                else: 
-                        augs = None
+                #if "AUGMENTATIONS" in self.SETTINGS:
+                #        augs = aug.initialise_augmentations(self.SETTINGS["AUGMENTATIONS"])
+                #else: 
+                augs = None
 
-                train_args = {"cuda_device":device,"augmentation" : augs, "binary" :self.SETTINGS["BINARY"],"path" : DS_PATH}
+                train_args = {"cuda_device":device,"augmentation" : None, "binary" :self.SETTINGS["BINARY"],"path" : DS_PATH}
                 test_args = {"cuda_device":device,"augmentation" :None, "binary" :self.SETTINGS["BINARY"],"path" : DS_PATH}
                 train_dataset, self.test_dataset = get_dataset(name,train_args, test_args)
                 # = UEA_Test(name = self.SETTINGS["DATASET_CONFIG"]["NAME"],device = 0)
@@ -211,6 +211,6 @@ class Ensemble(nn.Module):
 
 if __name__ == "__main__":
 	import sys
-	be = EnsembleManager(sys.argv[1],1)
+	be = EnsembleManager(sys.argv[1],0)
 	be.get_ensemble(1)
 	be.evaluate(2)

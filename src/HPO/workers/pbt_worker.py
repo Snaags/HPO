@@ -14,7 +14,7 @@ from HPO.utils.DARTS_utils import config_space_2_DARTS
 from HPO.utils.FCN import FCN 
 import pandas as pd
 import torch
-from sklearn.model_selection import GroupKFold
+from sklearn.model_selection import GroupKFold,GroupShuffleSplit
 from HPO.data.teps_datasets import Train_TEPS , Test_TEPS
 import torch.nn as nn
 from torch import Tensor
@@ -78,13 +78,9 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
    
   for _ in range(SETTINGS["REPEAT"]):
     
-    if SETTINGS["GROUPED_RESAMPLES"]:
-      # Initialize GroupKFold cross-validator with desired number of splits
-      kfold = GroupKFold(n_splits=5)
-      splits = [(None,None)]*SETTINGS["RESAMPLES"]
 
 
-    elif SETTINGS["RESAMPLES"]:
+    if SETTINGS["RESAMPLES"]:
       if "MAX_REPEAT" in SETTINGS and SETTINGS["MAX_REPEAT"]:
         splits = dataset.min_samples_per_class()
       else:
@@ -103,7 +99,8 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
       #print('---Fold No.--{}--------------------'.format(fold))
       torch.cuda.empty_cache()
       if SETTINGS["GROUPED_RESAMPLES"]:
-         train_ids, test_ids = next(kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy(),groups =dataset.groups))
+         gss = GroupShuffleSplit(n_splits = 1 ,test_size=0.2,random_state = _)
+         train_ids , test_ids  = next(gss.split(dataset.x, dataset.y, dataset.groups))
          dataset.get_groups(train_ids,test_ids)
       elif SETTINGS["RESAMPLES"]:
         train_ids, test_ids = next(kfold.split(dataset.x.cpu().numpy(),y = dataset.y.cpu().numpy()))
@@ -124,12 +121,12 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
         test_subsampler = torch.utils.data.SubsetRandomSampler(test_ids)
         testloader = torch.utils.data.DataLoader(
                               dataset,collate_fn = collate_fn_padd,sampler = test_subsampler,
-                              batch_size= len(test_ids) ,drop_last = False)
+                              batch_size= 32,drop_last = False)
 
 
       if SETTINGS["RESAMPLES"] or SETTINGS["CROSS_VALIDATION_FOLDS"]:
         dataset.enable_augmentation(augs,train_ids)
-      evaluator = Evaluator(len(test_ids), test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
+      evaluator = Evaluator(32, test_dataset.get_n_classes(),cuda_device,testloader = testloader)   
 
 
       if "stem" in hyperparameter["ops"]:
@@ -139,7 +136,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
       model = ModelGraph(train_dataset.get_n_features(),stem_size,train_dataset.get_n_classes(),
           train_dataset.get_length(),hyperparameter["graph"],hyperparameter["ops"],device = cuda_device,
           binary = SETTINGS["BINARY"],dropout = hyperparameter["hyperparameter"]["DROPOUT"],droppath = SETTINGS["DROPPATH"],
-          raw_stem = SETTINGS["RAW_STEM"],embedding = SETTINGS["EMBEDDING"])
+          raw_stem = SETTINGS["RAW_STEM"],embedding = SETTINGS["EMBEDDING"],auxiliary_head = True)
 
 
       if SETTINGS["EFFICIENT_WEIGHTS"] and "parent" in hyperparameter["ops"]:
@@ -216,8 +213,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
       evaluator.predictions(model_is_binary = SETTINGS["BINARY"] , THRESHOLD = SETTINGS["THRESHOLD"],no_print = not SETTINGS["LIVE_EVAL"])
       total = evaluator.T()
       if "BALANCED_ACC" in SETTINGS and SETTINGS["BALANCED_ACC"]:
-        loss = evaluator.compute_loss()
-        acc.append(100-loss)
+        acc.append(evaluator.balanced_acc())
       else: 
         acc.append( evaluator.T_ACC())
 
@@ -259,11 +255,10 @@ if __name__ == "__main__":
       j["WORKER_CONFIG"]["EPOCHS"] = 50
       j["WORKER_CONFIG"]["PRINT_RATE_TRAIN"] = 50
       j["WORKER_CONFIG"]["LIVE_EVAL"] = True
-      j["WORKER_CONFIG"]["EFFICIENT_WEIGHTS"] = False
+      j["WORKER_CONFIG"]["EFFICIENT_WEIGHTS"] = True
       #j["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"] = "{}_Retrain".format(HP["DATASET_CONFIG"]["NAME"] )
       search = load( "{}/{}".format(DATA["SEARCH_CONFIG"]["PATH"],"evaluations.csv"))
       HP["ID"] = "val"
       HP["graph"] = search["config"][search["best"].index(min(search["best"]))]["graph"]
       HP["ops"] = search["config"][search["best"].index(min(search["best"]))]["ops"]
-    exit()
-    _compute(HP,2,j)
+    _compute(HP,0,j)

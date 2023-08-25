@@ -49,10 +49,10 @@ class EnsembleManager:
                 else:
                         DS_PATH = None
 
-                if "AUGMENTATIONS" in self.SETTINGS:
-                        augs = aug.initialise_augmentations({'Crop_1': {'rate': 0.2, 'crop_min': 0.8}, "Crop_2": {"rate":0.2, "crop_min": 0.5},"Jitter":{"rate":0.0, "sigma":0.00001}},self.cuda_device)
-                else: 
-                        augs = None
+                #if "AUGMENTATIONS" in self.SETTINGS:
+                #        augs = aug.initialise_augmentations({'Crop_1': {'rate': 0.2, 'crop_min': 0.8}, "Crop_2": {"rate":0.2, "crop_min": 0.5},"Jitter":{"rate":0.0, "sigma":0.00001}},self.cuda_device)
+                #else: 
+                augs = None
 
                 train_args = {"cuda_device":device,"augmentation" : augs, "binary" :self.SETTINGS["BINARY"],"path" : DS_PATH}
                 test_args = {"cuda_device":device,"augmentation" :None, "binary" :self.SETTINGS["BINARY"],"path" : DS_PATH}
@@ -168,22 +168,30 @@ class EnsembleManager:
                 batch_size=batch_size, drop_last=False)
 
             labels_list = []
+            auxlabels_list = []
             preds_list = []
+            reg_list= []
             self.ensemble.eval()
             
-            for index, (x, y) in enumerate(self.testloader):
+            for index, (x, y,auxy) in enumerate(self.testloader):
                 x, y = x.float(), y  # moving to the device
 
-                
-                preds_list.append(self.ensemble(x, y).detach())  # append the tensor to the list directly
+                pred, soft_pred = self.ensemble(x, y)
+                pred, soft_pred =pred.detach(), soft_pred.detach()
+                preds_list.append(pred)  # append the tensor to the list directly
+                reg_list.append(soft_pred)
                 if len(y.shape):
                     labels_list.append(y.detach())  # append the tensor to the list directly
+                    auxlabels_list.append(auxy.detach())  # append the tensor to the list directly
                 else:
                     labels_list.append(y.detach().unsqueeze(0))  # append the tensor to the list directly
+                    auxlabels_list.append(auxy.detach().unsqueeze(0))  # append the tensor to the list directly
 
             # concatenate all tensors along the 0-th dimension
             labels = torch.cat(labels_list).cpu().numpy()
+            auxlabels = torch.cat(auxlabels_list).cpu().numpy()
             preds = torch.cat(preds_list).cpu().numpy()
+            reg = torch.cat(reg_list).cpu().numpy()
             print(labels.shape)
 
             self.confusion_matrix = confusion_matrix(labels, preds, labels=list(range(self.num_classes)))
@@ -191,6 +199,13 @@ class EnsembleManager:
                 print(self.confusion_matrix)
             correct = np.sum(np.diag(self.confusion_matrix))
             total = np.sum(self.confusion_matrix)
+            plt.scatter(auxlabels,reg)
+            plt.savefig("MMSE")
+            reg = np.clip(reg,0,30)
+            self.confusion_matrix = confusion_matrix(auxlabels, np.round(reg), labels=list(range(31)))
+            with np.printoptions(linewidth=(10 * 35 + 40), precision=4, suppress=True):
+                print(self.confusion_matrix)
+
             print("Accuracy: {}".format(correct / total))
             #print("Balanced Accuracy: {}".format(evaluator.balanced_acc()))
             return correct / total
@@ -308,7 +323,7 @@ class EnsembleManager:
                             models.append(ModelGraph(self.test_dataset.get_n_features(),self.channels,self.test_dataset.get_n_classes(),
                               self.test_dataset.get_length(),hyperparameter["graph"],hyperparameter["ops"],device = self.cuda_device,
                               binary = self.SETTINGS["BINARY"],dropout = self.SETTINGS["DROPOUT"],droppath = self.SETTINGS["DROPPATH"],
-                              raw_stem = self.SETTINGS["RAW_STEM"],embedding = self.SETTINGS["EMBEDDING"]))
+                              raw_stem = self.SETTINGS["RAW_STEM"],embedding = self.SETTINGS["EMBEDDING"] , auxiliary_head = True))
                             models[-1].load_state_dict(state)
                     else: 
                             print("loading cell")
@@ -359,8 +374,11 @@ class Ensemble(nn.Module):
         def forward( self, x ,y):
                 self.batch_size = x.shape[0]
                 probs = torch.zeros(size = (self.batch_size ,self.num_classes, len(self.classifiers) ))
+                reg_probs = torch.zeros(size = (self.batch_size , len(self.classifiers) ))
                 for idx , model in enumerate(self.classifiers):
-                        probs[:, :, idx] = F.sigmoid(model(x))
+                        pred, soft_pred = model(x)
+                        reg_probs[:,  idx] = soft_pred.squeeze()
+                        probs[:, :, idx] = F.sigmoid(pred)
                 """
                 x = probs.detach().cpu().numpy()
                 y = y.detach().cpu().numpy()
@@ -398,7 +416,7 @@ class Ensemble(nn.Module):
                 self.iter += 1
                 """
 
-                return self.soft_voting(probs)
+                return self.soft_voting(probs),torch.mean(reg_probs,axis = 1)
         def teachermean( self, x,T = 1):
                 self.batch_size = x.shape[0]
                 probs = torch.zeros(size = (self.batch_size ,self.num_classes, len(self.classifiers) )).cuda(self.device)
@@ -415,7 +433,7 @@ class Ensemble(nn.Module):
 
 if __name__ == "__main__":
     import sys
-    be = EnsembleManager(sys.argv[1],2)
-    be.get_ensemble(15)
+    be = EnsembleManager(sys.argv[1],0)
+    be.get_ensemble(1)
     #be.distill_model()
     be.evaluate(256)

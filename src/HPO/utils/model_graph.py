@@ -181,10 +181,19 @@ def transform_idx(original_list,original_list_permuted,new_list):
   transform_idx = [original_list_permuted.index(i) for i in original_list]
   return list(np.asarray(new_list)[transform_idx])
 
+class CustomClippedActivation(nn.Module):
+    def __init__(self, min_val=0, max_val=30):
+        super(CustomClippedActivation, self).__init__()
+        self.min_val = min_val
+        self.max_val = max_val
+
+    def forward(self, x):
+        return torch.clamp(x, self.min_val, self.max_val)
+
 class ModelGraph(nn.Module):
   def __init__(self,n_features, n_channels, n_classes,signal_length, 
     graph : list, ops : list, device,binary = False,data_dim = 1,sigmoid = False,
-    dropout = 0.3,droppath = False,raw_stem = False,embedding = False):
+    dropout = 0.3,droppath = False,raw_stem = False,embedding = False,auxiliary_head = False):
     super(ModelGraph,self).__init__()
     #INITIALISING MODEL VARIABLES
     self.DEBUG = False
@@ -196,6 +205,7 @@ class ModelGraph(nn.Module):
     self.current_iteration = -1
     self.n_channels = n_channels
     self.ops_list = ops
+
 
     #STRUCTURES FOR HOLDING DATA STATES AND OPERATIONS
     self.states = {}
@@ -226,7 +236,7 @@ class ModelGraph(nn.Module):
         if raw_stem == True:
           self.stem = nn.Conv1d(n_features,n_channels,1,stride = 1)
         else:
-          self.stem = nn.Conv1d(n_features,n_channels,2,stride = 2) #Will just leave this at defaults for now
+          self.stem = nn.Conv1d(n_features,n_channels,16,stride = 16) #Will just leave this at defaults for now
     self.stem = self.stem.cuda(device)
 
     #DEFINE OP_MODULE BASED ON DATA_DIM
@@ -267,6 +277,9 @@ class ModelGraph(nn.Module):
     if sigmoid:
       self.actfc = nn.Sigmoid()#nn.Softmax(dim =1)
     self.sigmoid = sigmoid
+    if auxiliary_head:
+      self.auxiliary_classifier = nn.Linear(C, 1)
+      self.auxiliary_activation = CustomClippedActivation()
   
   def disable_dropout(self):
     self.dropout_active = False
@@ -399,7 +412,7 @@ class ModelGraph(nn.Module):
     self.combine_index = 0
     self.states = {}
     if self.embedding:
-      x = x.squeeze().long()
+      x = x.squeeze()#.long()
       self.states["S"] = self.stem(x).permute(0,2,1)
     else: 
       self.states["S"] = self.stem(x)
@@ -411,10 +424,13 @@ class ModelGraph(nn.Module):
       self._forward(op,edge)
     #FC LAYER
     x = self.global_pooling(self.states["T"])
+    aux_x = self.auxiliary_classifier(x.squeeze())
+    aux_x = self.auxiliary_activation(aux_x)
     x = self.classifier(x.squeeze())
+
     if self.sigmoid:
       x = self.actfc(x)
-    return x
+    return x,aux_x
 
 class DropPath(nn.Module):
   def __init__(self, drop_prob,device):

@@ -11,6 +11,8 @@ from HPO.utils.model_constructor import Model
 from torch.utils.data import DataLoader
 from HPO.utils.train_utils import stdio_print_training_data
 from sklearn.metrics import confusion_matrix
+from torch.cuda.amp import autocast, GradScaler
+
 
 def stdio_print_training_data( iteration : int , outputs : Tensor, labels : Tensor , epoch : int, epochs : int, correct :int , total : int , peak_acc : float , loss : Tensor, n_iter, loss_list = None, binary = True):
   def cal_acc(y,t):
@@ -84,6 +86,8 @@ def train_model_triplet(model : Model , hyperparameter : dict, dataloader : Data
         torch.save(model.state_dict() ,"triplet-{}".format(epoch))
         if evaluator != None:
           model.eval()
+          dataloader.dataset.disable_augmentation()
+
           evaluator.forward_pass(model,binary = binary)
           evaluator.predictions(model_is_binary = binary,THRESHOLD = 0.4)
           if binary:
@@ -95,6 +99,7 @@ def train_model_triplet(model : Model , hyperparameter : dict, dataloader : Data
           print("")
           print("Validation set Accuracy: {} -- Recall: {}".format(acc,recall))
           print("")
+          dataloader.dataset.enable_augmentation()
     scheduler.step()
     epoch += 1
   print()
@@ -119,20 +124,22 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader, 
   EPOCHS = hyperparameter["EPOCHS"]
   BATCH_SIZE = hyperparameter["BATCH_SIZE"] 
   BINARY = SETTINGS["BINARY"]
+  hyperparameter["SCHEDULE"] = True 
+  scaler = GradScaler()
   PRINT_RATE_TRAIN = SETTINGS["PRINT_RATE_TRAIN"]
   if cuda_device == None:
     cuda_device = torch.cuda.current_device()
   n_iter = len(dataloader) 
 
   #CONFIGURATION OF OPTIMISER AND LOSS FUNCTION
-  optimizer = torch.optim.AdamW(model.parameters(),lr = hyperparameter["LR"],weight_decay = hyperparameter["WEIGHT_DECAY"])
+  optimizer = torch.optim.AdamW(model.parameters(),lr = 0.01,weight_decay = hyperparameter["WEIGHT_DECAY"])
   if hyperparameter["SCHEDULE"] == True:
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,EPOCHS,eta_min = hyperparameter["LR_MIN"])
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,EPOCHS,eta_min =0.000001)
   if SETTINGS["BINARY"] == True:
     criterion = nn.BCEWithLogitsLoss().cuda(device = cuda_device)
   else:
     criterion = nn.CrossEntropyLoss().cuda(device = cuda_device)
-
+    aux_criterion = nn.MSELoss().cuda(device = cuda_device)
   #INITIALISE TRAINING VARIABLES
   epoch = 0
   peak_acc = 0
@@ -158,26 +165,33 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader, 
       gt_tensor = torch.Tensor()
       correct = 0
     weights =[]
-    for i, (samples, labels) in enumerate( dataloader ):
-      optimizer.zero_grad()
-      #samples, labels = samples.cuda(cuda_device).float(), labels.cuda(cuda_device).long()
-      outputs = model(samples)
-      if BINARY == True:
-        loss = criterion(outputs.view(BATCH_SIZE), labels.float())
-      else:
-        loss = criterion(outputs, labels)
-      loss.backward()
-      optimizer.step()
+    for i, (samples, labels,auxlabels) in enumerate( dataloader ):
+      with autocast():
+        optimizer.zero_grad()
+        #samples, labels = samples.cuda(cuda_device).float(), labels.cuda(cuda_device).long()
+        outputs,aux_output = model(samples)
+        if BINARY == True:
+          loss = criterion(outputs.view(BATCH_SIZE), labels.float())
+        else:
+          hard_loss = criterion(outputs, labels.long())
+          aux_loss = aux_criterion(aux_output.squeeze(), auxlabels)
+          loss =0.5*hard_loss + 0.5*aux_loss
+      #loss = loss.to(dtype=torch.float32)
+
+      scaler.scale(loss).backward()
+      scaler.step(optimizer)
+      scaler.update()
+
       if SETTINGS["WEIGHT_AVERAGING_RATE"] and epoch > EPOCHS/2:
         weights.append(clone_state_dict(model.state_dict()))
-      if SETTINGS["LOGGING"]:
+      if False:
         pred_tensor = torch.cat((pred_tensor, outputs.detach().cpu().flatten(end_dim = 0)))
         gt_tensor = torch.cat((gt_tensor, labels.detach().cpu().flatten()))
 
       if PRINT_RATE_TRAIN and i % PRINT_RATE_TRAIN == 0:
         correct , total, peak_acc = stdio_print_training_data(i , outputs , labels, epoch,EPOCHS , correct , total, peak_acc, loss.item(), n_iter, loss_list,binary = BINARY)
 
-    if SETTINGS["LOGGING"]:
+    if False:
       cm_train, train_acc = calculate_train_vals(pred_tensor,gt_tensor)
       if PRINT_RATE_TRAIN:
         pred_labels = torch.argmax(pred_tensor, dim=1).numpy()
@@ -188,15 +202,17 @@ def train_model(model : Model , hyperparameter : dict, dataloader : DataLoader, 
     if SETTINGS["MODEL_VALIDATION_RATE"] and epoch % SETTINGS["MODEL_VALIDATION_RATE"] == 0:
         if evaluator != None:
           model.eval()
+          dataloader.dataset.disable_augmentation()
           evaluator.forward_pass(model,binary = BINARY)
           evaluator.predictions(model_is_binary = BINARY,THRESHOLD = SETTINGS["THRESHOLD"],no_print = False)
-          val_loss = 0#evaluator.calculate_loss(criterion,BINARY)
+          val_loss = evaluator.calculate_loss(aux_criterion,BINARY)
           val_acc = evaluator.T_ACC()
           recall = evaluator.TPR(1)
           cm_test = evaluator.confusion_matrix.copy()
           bal_acc = evaluator.balanced_acc()
           evaluator.reset_cm()
           model.train()
+          dataloader.dataset.enable_augmentation()
           print("")
           print("Validation set Accuracy: {} -- Balanced Accuracy: {} -- loss: {}".format(val_acc, bal_acc ,val_loss))
           print("")
