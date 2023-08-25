@@ -31,7 +31,7 @@ datasets=(
 )
 
 # Define experiment name prefix
-prefix="PBT-2"
+prefix="PBT-AUG"
 
 run_experiment() {
     json_string=$1
@@ -51,7 +51,7 @@ run_experiment() {
 for dataset in "${datasets[@]}"; do
     # Update experiment name and dataset name in the JSON file
     json_string=$(jq --arg experiment_name "${prefix}-${dataset}" --arg dataset_name "$dataset" \
-        '.EXPERIMENT_NAME = $experiment_name | .WORKER_CONFIG.DATASET_CONFIG.NAME = $dataset_name' config.json)
+        '.EXPERIMENT_NAME = $experiment_name | .WORKER_CONFIG.DATASET_CONFIG.NAME = $dataset_name' config_aug.json)
     echo "RUNNING DATASET: $dataset" 
 
     # Execute the Python script for the current dataset and wait for completion

@@ -15,7 +15,7 @@ import os
 
 
 
-def clean_up_weights_end(data,active, models):
+def clean_up_weights_end(data, models):
   #IDENTIFY WEIGHTS THAT WILL NOT BE USED
 
   results = load("{}/{}/evaluations.csv".format("experiments",data["EXPERIMENT_NAME"]))
@@ -280,7 +280,7 @@ def main(worker, configspace: ConfigurationSpace, json_config):
     
     train.kill_workers()
     full_eval(SETTINGS)
-    clean_up_weights_end(data, active_parents, history)
+    clean_up_weights_end(data, history)
    
 
 if __name__ == "__main__":
