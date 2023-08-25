@@ -110,16 +110,19 @@ def collate_fn_padd(batch):
     lengths = torch.tensor([ t[0].shape[1] for t in batch ])    ## padd
     batch_samples = [ torch.transpose(t[0],0,1) for t in batch ]
     batch_samples = torch.nn.utils.rnn.pad_sequence(batch_samples ,batch_first = True)
+    auxlabels = []
     ## compute mask
     mask = (batch != 0)
     labels = []
     for pair in batch:
       one_hot_label = pair[1]
       labels.append(one_hot_label)
+      auxlabels.append(pair[2])
     labels = torch.stack(labels).squeeze()
+    auxlabels = torch.stack(auxlabels).squeeze()
     #labels = torch.Tensor([t[1] for t in batch])
     batch = torch.transpose(batch_samples , 1 , 2 )
-    return batch, labels
+    return batch, labels, auxlabels
 
 def collate_fn_padd_x(batch):
     '''

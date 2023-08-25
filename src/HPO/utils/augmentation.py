@@ -31,7 +31,8 @@ class Augmentation(object):
       x,y = self.call(x,y)
       rate -= 1
     else:
-      return x,y
+      return x.half(),y
+
   def call(self,x,y):
     print("called parent class function :(")
 
@@ -123,16 +124,16 @@ class MixUp(Augmentation):
     self.dist = torch.distributions.beta.Beta(m,m)
     self.mix_sample = None
     self.mix_label = None 
-  def __call__(self,x,y):
+  def __call__(self,x,y,auxy):
     if random.random() < self.rate:
-      self.mix_sample,self.mix_label = self.dataset.x[random.choice(self.ids)],self.dataset.y[random.choice(self.ids)]
-      return self.call(x,y)
+      self.mix_sample,self.mix_label,self.mix_auxlabel = self.dataset.x[random.choice(self.ids)],self.dataset.y[random.choice(self.ids)],self.dataset.auxy[random.choice(self.ids)]
+      return self.call(x,y,auxy)
     else:
-      return x,y
+      return x,y,auxy
 
 
 
-  def call(self,x,y):
+  def call(self,x,y,auxy):
     DEBUG = False
     #x = [batch, channels , length]
     #y = [batch, 1]
@@ -141,8 +142,11 @@ class MixUp(Augmentation):
     MTS_2 = self.mix_sample
     LAB_1 = y.clone()
     LAB_2 = self.mix_label
+    LAB_3 = auxy.clone()
+    LAB_4 = self.mix_auxlabel
     x = (MTS_1 * mix)  + (MTS_2 *(1-mix))
     y = (LAB_1 * mix) + (LAB_2 * (1-mix))
+    auxy = (LAB_3 * mix) + (LAB_4 * (1-mix))
     if DEBUG == True:
       print("mix value is {} and label value is {}".format(mix,y))
       plt.plot(MTS_1[26,:].cpu(),label = "series 1",alpha = 0.7)
@@ -150,9 +154,8 @@ class MixUp(Augmentation):
       plt.plot(x[26,:].cpu(),label = "Mix",alpha = 0.7)
       plt.legend()
       plt.show()
-    self.mix_sample = MTS_1
-    self.mix_label = LAB_1
-    return x ,y.long()
+
+    return x.half() ,y, auxy
 
 
 
@@ -179,7 +182,7 @@ class ChannelCutMix(Augmentation):
 
         # This assumes y is a one-hot encoded vector, and thus can be averaged
         y = (y * (1-self.perc)) + (self.mix_label * self.perc)
-        return x, y.long()
+        return x.half(), y.long()
 
 
 
@@ -208,7 +211,7 @@ class CutMix(Augmentation):
         x[:, start:end] = self.mix_sample[:, start:end]
         # This assumes y is a one-hot encoded vector, and thus can be averaged
         y = (y * (1-self.perc)) + (self.mix_label * self.perc)
-        return x, y.long()
+        return x.half(), y.long()
 
 
 

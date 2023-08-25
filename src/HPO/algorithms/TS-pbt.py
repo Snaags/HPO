@@ -209,7 +209,7 @@ def main(worker, configspace: ConfigurationSpace, json_config):
 
     history = []
     if SETTINGS["RESUME"]:
-        data = load(data["EXPERIMENT_NAME"])
+        data = load("experments/"+data["EXPERIMENT_NAME"])
         history.extend([M_FORMAT(s, r, p, SETTINGS, resamples) for s, r, p in zip(data["scores"], data["recall"], data["config"])])
     else:
         configs = configspace.sample_configuration(SETTINGS["INITIAL_POPULATION_SIZE"])
@@ -233,7 +233,7 @@ def main(worker, configspace: ConfigurationSpace, json_config):
 
         # ---- THOMPSON SAMPLING ----
         scores = [i.sample() for i in history]
-        top_10_indices = np.argsort(scores)[-10:][::-1]
+        top_10_indices = np.argsort(scores)[-1:][::-1]
 
         mean_best = max([i.sample() for i in history])
         if mean_best == 1:

@@ -24,10 +24,9 @@ def partition_dataset(JSON_CONFIG):
   #generate random split
   # Assuming 'X' is your features and 'y' is your target variable
   if data["GROUPED_PARTITION"]:
-    gss = GroupShuffleSplit(n_splits = 1 ,test_size=dataset.get_proportions())
+    gss = GroupShuffleSplit(n_splits = 1 ,test_size=dataset.get_proportions(), random_state=data["SEED"])
     train_idx , test_idx  = next(gss.split(dataset.x, dataset.y, dataset.groups))
     X_train, X_test, y_train, y_test,  = dataset.x[train_idx], dataset.x[test_idx], dataset.y[train_idx], dataset.y[test_idx]
-    auxy_train,auxy_test =  dataset.auxy[train_idx], dataset.auxy[test_idx]
     groups_train = dataset.groups[train_idx]
     groups_test = dataset.groups[test_idx]
 
@@ -45,13 +44,11 @@ def partition_dataset(JSON_CONFIG):
       X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=data["SEED"],stratify = y_test)
   #save datasets
 
-  stride_count = int(math.log(dataset.x.shape[-1],2)-1 ) - 3
+  stride_count = int(math.log(dataset.x.shape[-1],2)-1 )
   np.save('{}{}_train_samples.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), X_train.cpu().numpy())
   np.save('{}{}_train_labels.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), y_train.cpu().numpy())
   np.save('{}{}_test_samples.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), X_test.cpu().numpy())
   np.save('{}{}_test_labels.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), y_test.cpu().numpy())
-  np.save('{}{}_test_auxlabels.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), auxy_test)
-  np.save('{}{}_train_auxlabels.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), auxy_train)
 
   if data["PARTITION_VAL_SET"]:
     np.save('{}{}_validation_samples.npy'.format(PATH,data["WORKER_CONFIG"]["DATASET_CONFIG"]["NAME"]), X_val.cpu().numpy())

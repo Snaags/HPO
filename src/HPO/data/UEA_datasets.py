@@ -13,29 +13,34 @@ class UEA(Dataset):
     if "path" in kwargs and kwargs["path"] != None:
       self.PATH = kwargs["path"]
     else:
-      self.PATH = "/home/cmackinnon/scripts/datasets/UEA_NPY/"
+      self.PATH = "/home/snaags/scripts/datasets/UEA_NPY/"
     self.augmentation = augmentation
     ##LOAD SAMPLES AND LABELS FROM .npy FILE
     x = []
     y = []
+    auxy = []
     self.sizes = []
 
     for n in name:
       if not os.path.exists("{}{}_samples.npy".format(self.PATH,n)):
         print("WARNING ONE OF THE DATASETS (TRAIN OR TEST DOES NOT EXIST)")
+        print("{}{}_samples.npy".format(self.PATH,n))
         continue
       x.append(np.load("{}{}_samples.npy".format(self.PATH,n)))
+      x[-1] = np.nan_to_num(x[-1])
       self.sizes.append(x[-1].shape[0])
       y.append(np.load("{}{}_labels.npy".format(self.PATH,n)))
+      auxy.append(np.load("{}{}_auxlabels.npy".format(self.PATH,n)))
       
       if "{}_groups.npy".format(n) in os.listdir(self.PATH):
         self.groups = np.load("{}{}_groups.npy".format(self.PATH,n))
-    self.x = torch.from_numpy(np.concatenate(x,axis = 0)).to(non_blocking = True,device = device).float()
-    self.x = torch.nan_to_num(self.x)
+    self.x = torch.from_numpy(np.concatenate(x,axis = 0)).to(device = device,dtype = torch.float16,non_blocking = True)
     self.y = np.concatenate(y,axis = 0)
+    self.auxy = np.concatenate(auxy,axis = 0)
     if kwargs["binary"]:
       self.y = np.where(self.y != 0, 1,0)
     self.y = torch.from_numpy(self.y).to(non_blocking = True,device = device).long()
+    self.auxy = torch.from_numpy(self.auxy).to(non_blocking = True,device = device).long()
     
     if classes != None:
         """
@@ -46,26 +51,29 @@ class UEA(Dataset):
     
     self.n_features = self.x.shape[1]
   def __getitem__(self,index):
-    x ,y = self.x[index], self.y[index]
-    if self.augmentation:
+    x ,y,auxy = self.x[index], self.y[index],self.auxy[index]
+    if self.augmentation and self.aug_active:
       for f in self.augmentation:
-        x,y = f(x,y)
-    return x,y
+        x,y,auxy = f(x,y,auxy)
+    return x.float(),y.float(),auxy.float()
 
   def update_device(self,device):
     self.x.to(device)
     self.y.to(device)
   def __len__(self):
     return len(self.y)
-  def enable_augmentation(self,augs,ids = None):
-    self.augmentation = augs
-    for i in self.augmentation:
-      i.set_train_ids(ids,self)
+  def enable_augmentation(self,augs = None,ids = None):
+
+    self.aug_active = True 
+    if augs != None:
+      self.augmentation = augs
+      for i in self.augmentation:
+        i.set_train_ids(ids,self)
   def min_samples_per_class(self):
     unique,counts = np.unique(self.y.cpu().numpy(), return_counts=True)
     return min(counts)
   def disable_augmentation(self):
-    self.augmentation = False 
+    self.aug_active = False 
   def get_groups(self, train_id, test_id):
       train_groups = self.groups[train_id]
       test_groups = self.groups[test_id]

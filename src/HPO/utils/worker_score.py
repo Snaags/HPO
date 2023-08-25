@@ -372,25 +372,30 @@ class Evaluator:
         self.model_prob = np.zeros(shape=(total_samples, self.n_classes))
     
     self.labels = np.zeros(shape=(total_samples, 1))
-
+    self.auxlabels = np.zeros(shape=(total_samples, 1))
+    self.reg_score = np.zeros(shape=(total_samples, 1))
     # Pass validation set through model getting probabilities and labels
     with torch.no_grad():  # disable back prop to test the model
         current_sample = 0
         for n in range(n_iter):
-            for i, (inputs, labels) in enumerate(self.testloader):
+            for i, (inputs, labels, auxlabels) in enumerate(self.testloader):
                 if len(labels.shape) > 0:
                   actual_batch_size = len(labels)  # determine the actual batch size
                 else:
                   actual_batch_size = 1  # special case if tensor is of size 1 (i.e. 0-d)
                 
                 self.labels[current_sample:current_sample+actual_batch_size, :] = labels.view(actual_batch_size, 1).cpu().numpy()
-                out = s(model(inputs)).cpu().numpy()
+                self.auxlabels[current_sample:current_sample+actual_batch_size, :] = auxlabels.view(actual_batch_size, 1).cpu().numpy()
+                out,reg_out = model(inputs)
+                out = s(out).cpu().numpy()
                 self.model_prob[current_sample:current_sample+actual_batch_size, :] = out
+                self.reg_score[current_sample:current_sample+actual_batch_size, :] = reg_out.cpu().numpy()
                 
                 current_sample += actual_batch_size
 
                 if subset and i > subset:
                     self.labels = self.labels[:current_sample, :]
+                    self.auxlabels = self.auxlabels[:current_sample, :]
                     self.model_prob = self.model_prob[:current_sample, :]
                     break
 
@@ -448,7 +453,11 @@ class Evaluator:
     if model_is_binary:
       return criterion(torch.Tensor(self.model_prob).squeeze(), torch.Tensor(self.labels).squeeze().float())
     else:
-      return criterion(torch.Tensor(self.model_prob), torch.Tensor(self.labels).squeeze().long())
+      
+      with np.printoptions(linewidth = (15*35+50),precision=4, suppress=True):
+        print(np.unique(self.auxlabels))
+        print(confusion_matrix( torch.Tensor(self.auxlabels).squeeze(), np.round(torch.Tensor(self.reg_score).squeeze()),labels = np.arange(31)))
+      return criterion(torch.Tensor(self.reg_score).squeeze(), torch.Tensor(self.auxlabels).squeeze())
 
   def TP(self, value):
     TP = self.confusion_matrix[value,value]
