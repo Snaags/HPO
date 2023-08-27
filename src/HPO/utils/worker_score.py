@@ -450,6 +450,7 @@ class Evaluator:
             pass
 
   def calculate_loss(self,criterion,model_is_binary = False):
+    self.reg_score = np.nan_to_num(self.reg_score)
     if model_is_binary:
       return criterion(torch.Tensor(self.model_prob).squeeze(), torch.Tensor(self.labels).squeeze().float())
     else:

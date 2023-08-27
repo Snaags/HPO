@@ -173,7 +173,7 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
           #print('Finished loading weights.')
       else:
           if SETTINGS["EPOCHS_INITIAL"]:
-            SETTINGS["EPOCHS"] = SETTINGS["EPOCHS_INITIAL"]
+            hyperparameter["hyperparameter"]["EPOCHS"] = SETTINGS["EPOCHS_INITIAL"]
       """
       if "parent" in hyperparameter["ops"]:
         print("LOADING PARENT ID", hyperparameter["ops"]["parent"])
@@ -213,6 +213,8 @@ def _compute(hyperparameter,cuda_device, JSON_CONFIG, train_dataset, test_datase
       evaluator.predictions(model_is_binary = SETTINGS["BINARY"] , THRESHOLD = SETTINGS["THRESHOLD"],no_print = not SETTINGS["LIVE_EVAL"])
       total = evaluator.T()
       if "BALANCED_ACC" in SETTINGS and SETTINGS["BALANCED_ACC"]:
+        aux_criterion = nn.MSELoss().cuda(device = cuda_device)
+        loss = min([evaluator.calculate_loss(aux_criterion).item(),980])
         acc.append(evaluator.balanced_acc())
       else: 
         acc.append( evaluator.T_ACC())

@@ -233,7 +233,7 @@ def main(worker, configspace: ConfigurationSpace, json_config):
 
         # ---- THOMPSON SAMPLING ----
         scores = [i.sample() for i in history]
-        top_10_indices = np.argsort(scores)[-1:][::-1]
+        top_10_indices = np.argsort(scores)[-10:][::-1]
 
         mean_best = max([i.sample() for i in history])
         if mean_best == 1:

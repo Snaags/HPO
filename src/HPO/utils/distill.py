@@ -43,6 +43,7 @@ def train_distill(model : Model , hyperparameter : dict, dataloader : DataLoader
   else:
     criterion = nn.CrossEntropyLoss().cuda(device = cuda_device)
     dist_loss = nn.KLDivLoss(reduction="batchmean").cuda(device = cuda_device)
+    aux_criterion = nn.MSELoss().cuda(device = cuda_device)
 
   #INITIALISE TRAINING VARIABLES
   epoch = 0
@@ -71,16 +72,16 @@ def train_distill(model : Model , hyperparameter : dict, dataloader : DataLoader
       gt_tensor = torch.Tensor()
       correct = 0
     weights =[]
-    for i, (samples, labels) in enumerate( dataloader ):
+    for i, (samples, labels,auxy) in enumerate( dataloader ):
       optimizer.zero_grad()
       #samples, labels = samples.cuda(cuda_device).float(), labels.cuda(cuda_device).long()
-      outputs = model(samples)
-      if BINARY == True:
-        loss = criterion(outputs.view(BATCH_SIZE), teacher.teacher(samples))
-      else:
-        loss1 = hyperparameter["T"]**2 * dist_loss(F.log_softmax(outputs, dim=1),  teacher.teacher(samples,hyperparameter["T"]))
-        loss2 = criterion(outputs,  labels)
-        loss = alpha*loss1+beta*loss2
+      outputs,aux_output = model(samples)
+      t_pred, t_aux = teacher.teacher(samples,hyperparameter["T"])
+      loss1 = hyperparameter["T"]**2 * dist_loss(F.log_softmax(outputs, dim=1),t_pred )
+      loss2 = criterion(outputs,  labels.long())
+      loss3 = aux_criterion(aux_output,  t_aux)
+      loss4 = aux_criterion(aux_output,  auxy)
+      loss = (alpha*loss1+beta*loss2)*0.5 + (alpha*loss3+beta*loss4)*0.5
       loss.backward()
       optimizer.step()
       if hyperparameter["WEIGHT_AVERAGING_RATE"] and epoch > EPOCHS/2:
@@ -104,10 +105,10 @@ def train_distill(model : Model , hyperparameter : dict, dataloader : DataLoader
         if evaluator != None:
           model.eval()
           evaluator.forward_pass(model,binary = BINARY)
-          evaluator.predictions(model_is_binary = BINARY,THRESHOLD = hyperparameter["THRESHOLD"])
-          val_loss = 0#evaluator.calculate_loss(criterion,BINARY)
+          evaluator.predictions(model_is_binary = BINARY,THRESHOLD = hyperparameter["THRESHOLD"], no_print = False)
           val_acc = evaluator.T_ACC()
           recall = evaluator.TPR(1)
+          val_loss = evaluator.calculate_loss(aux_criterion,BINARY)
           cm_test = evaluator.confusion_matrix.copy()
           bal_acc = evaluator.balanced_acc()
           evaluator.reset_cm()

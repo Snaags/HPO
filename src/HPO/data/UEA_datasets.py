@@ -13,11 +13,12 @@ class UEA(Dataset):
     if "path" in kwargs and kwargs["path"] != None:
       self.PATH = kwargs["path"]
     else:
-      self.PATH = "/home/snaags/scripts/datasets/UEA_NPY/"
+      self.PATH = "/home/cmackinnon/scripts/datasets/UEA_NPY/"
     self.augmentation = augmentation
     ##LOAD SAMPLES AND LABELS FROM .npy FILE
     x = []
     y = []
+    groups = []
     auxy = []
     self.sizes = []
 
@@ -33,12 +34,12 @@ class UEA(Dataset):
       auxy.append(np.load("{}{}_auxlabels.npy".format(self.PATH,n)))
       
       if "{}_groups.npy".format(n) in os.listdir(self.PATH):
-        self.groups = np.load("{}{}_groups.npy".format(self.PATH,n))
-    self.x = torch.from_numpy(np.concatenate(x,axis = 0)).to(device = device,dtype = torch.float16,non_blocking = True)
+        groups.append(np.load("{}{}_groups.npy".format(self.PATH,n)))
+    self.x = torch.from_numpy(np.concatenate(x,axis = 0)).to(device = device,non_blocking = True)
     self.y = np.concatenate(y,axis = 0)
+    self.groups = np.concatenate(groups,axis = 0)
     self.auxy = np.concatenate(auxy,axis = 0)
-    if kwargs["binary"]:
-      self.y = np.where(self.y != 0, 1,0)
+    self.y = np.where(self.y != 1, 0,1)
     self.y = torch.from_numpy(self.y).to(non_blocking = True,device = device).long()
     self.auxy = torch.from_numpy(self.auxy).to(non_blocking = True,device = device).long()
     

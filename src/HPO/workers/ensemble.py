@@ -87,7 +87,7 @@ class EnsembleManager:
             model = ModelGraph(self.test_dataset.get_n_features(),self.channels*8,self.test_dataset.get_n_classes(),
                           self.test_dataset.get_length(),hyperparameter["graph"],hyperparameter["ops"],device = self.cuda_device,
                           binary = self.SETTINGS["BINARY"],dropout = self.SETTINGS["DROPOUT"],droppath = self.SETTINGS["DROPPATH"],
-                          raw_stem = self.SETTINGS["RAW_STEM"],embedding = self.SETTINGS["EMBEDDING"])
+                          raw_stem = self.SETTINGS["RAW_STEM"],embedding = self.SETTINGS["EMBEDDING"],auxiliary_head = True)
             
             if len(self.train_dataset) < 100:
                 batch_size = 2
@@ -239,7 +239,7 @@ class EnsembleManager:
             with open( "{}{}".format(PATH,FILENAME) , newline = "") as csvfile:
                     reader = csv.reader(csvfile, delimiter = ",")
                     for row in reader:
-                        #scores.append(float(row[0]))
+                        scores.append(float(row[0]))
                         recall.append(float(row[1]))
                         config.append(eval("".join(row[2])))
                         self.IDS.append(config[-1]["ID"])
@@ -248,8 +248,8 @@ class EnsembleManager:
                     continue
                 path = "{}/{}/{}".format(PATH,"metrics",ID)
                 df = pd.read_csv(path)
-                mu = df["accuracy"].mean()
-                scores.append(mu)
+                #mu = df["accuracy"].mean()
+                #scores.append(mu)
             return scores, recall, config
 
         
@@ -425,7 +425,8 @@ class Ensemble(nn.Module):
                 return torch.mean(probs,axis = -1)
 
         def teacher( self, x,T = 1):
-                return F.softmax(random.choice(self.classifiers)(x)/T,dim =1)
+                p, p_aux = random.choice(self.classifiers)(x)
+                return F.softmax(p/T,dim =1), p_aux
 
         def eval(self):
                 for i in self.classifiers:
