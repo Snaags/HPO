@@ -24,7 +24,7 @@ def partition_dataset(JSON_CONFIG):
   #generate random split
   # Assuming 'X' is your features and 'y' is your target variable
   if data["GROUPED_PARTITION"]:
-    gss = GroupShuffleSplit(n_splits = 1 ,test_size=dataset.get_proportions(), random_state=data["SEED"])
+    gss = GroupShuffleSplit(n_splits = 1 ,test_size=dataset.get_proportions())
     train_idx , test_idx  = next(gss.split(dataset.x, dataset.y, dataset.groups))
     X_train, X_test, y_train, y_test,  = dataset.x[train_idx], dataset.x[test_idx], dataset.y[train_idx], dataset.y[test_idx]
     groups_train = dataset.groups[train_idx]
@@ -39,9 +39,9 @@ def partition_dataset(JSON_CONFIG):
 
 
   else:
-    X_train, X_test, y_train, y_test = train_test_split(dataset.x, dataset.y, test_size=dataset.get_proportions(), random_state=data["SEED"],stratify =dataset.y)
+    X_train, X_test, y_train, y_test = train_test_split(dataset.x, dataset.y, test_size=dataset.get_proportions(),stratify =dataset.y)
     if data["PARTITION_VAL_SET"]:
-      X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=data["SEED"],stratify = y_test)
+      X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5,stratify = y_test)
   #save datasets
 
   stride_count = int(math.log(dataset.x.shape[-1],2)-1 )
