@@ -365,10 +365,9 @@ class ModelGraph(nn.Module):
       self.combine_index+=1
 
   def _forward(self, op,edge):
-    self.states[edge[0]] = self.dropout(self.states[edge[0]])
     ##print(edge,self.states[edge[0]].shape, op)
     ##print("Predicted channels: {} {}".format(self.channel_dict[edge[0]],self.channel_dict[edge[1]]))
-    h = op(self.states[edge[0]])
+    h = self.dropout(op(self.states[edge[0]]))
     #CASE 1 - 1 INPUT
     if not (edge[1] in self.states.keys()):
       self.states[edge[1]] = h
@@ -389,6 +388,7 @@ class ModelGraph(nn.Module):
     ##print(edge,self.states[edge[1]].shape)
     else:
       self.states[edge[1]] = self.states[edge[1]] + h
+      
   def forward(self,x):
     self.combine_index = 0
     self.states = {}
