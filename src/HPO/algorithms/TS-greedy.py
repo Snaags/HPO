@@ -12,6 +12,24 @@ import numpy as np
 from HPO.workers.ensemble import EnsembleManager
 import sys
 
+def clean_up_weights_end(data, models):
+  #IDENTIFY WEIGHTS THAT WILL NOT BE USED
+
+  results = load("{}/{}/evaluations.csv".format("experiments",data["EXPERIMENT_NAME"]))
+  scores = np.asarray(results["accuracy"])
+  path = "experiments/{}/{}/".format(data["EXPERIMENT_NAME"],"weights")
+  weights = os.listdir(path)
+  model_id = {}
+  for i in models:
+    model_id[i.ID] = i
+  ID = np.asarray(results["ID"])
+  scores = [model_id[i].sample() for i in ID]
+  indexed_lst = [(value, index) for index, value in enumerate(scores)]
+  top_5_with_indices = sorted(indexed_lst, key=lambda x: x[0], reverse=True)[:5]
+  score_mask = [index for value, index in top_5_with_indices]
+  ID = ID[score_mask]
+
+
 def full_eval(SETTINGS):
   accuracy = {}
   #acc_best_single, recall,params = evaluate("{}/{}".format(SETTINGS["PATH"],"configuration.json"))
@@ -183,6 +201,8 @@ def main(worker, configspace : ConfigurationSpace, json_config):
 
   train.kill_workers()
   full_eval(SETTINGS)
+  clean_up_weights_end(data, history)
+
 if __name__ == "__main__":
   with open(sys.argv[1]) as f:
     DATA = json.load(f)
