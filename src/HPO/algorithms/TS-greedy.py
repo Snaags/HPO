@@ -12,6 +12,8 @@ import numpy as np
 from HPO.workers.ensemble import EnsembleManager
 import sys
 
+
+
 def clean_up_weights_end(data, models):
   #IDENTIFY WEIGHTS THAT WILL NOT BE USED
 
@@ -28,6 +30,12 @@ def clean_up_weights_end(data, models):
   top_5_with_indices = sorted(indexed_lst, key=lambda x: x[0], reverse=True)[:5]
   score_mask = [index for value, index in top_5_with_indices]
   ID = ID[score_mask]
+  print("Models in bottom 90%: {}".format(len(ID)))
+  for i in weights:
+    id_weight = int(i.split("-")[0])
+    if not (id_weight in ID):
+      os.remove("{}{}".format(path,i))
+
 
 
 def full_eval(SETTINGS):
