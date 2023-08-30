@@ -31,10 +31,10 @@ datasets=(
 )
 
 # Define experiment name prefix
-prefix="paper-experiment-1"
+prefix="paper-experiment-2"
 
 # List of GPUs
-gpus=(0 1 2 3)
+gpus=(0 1 2 )
 
 # Create a token file for each GPU with one token
 for gpu in "${gpus[@]}"; do
