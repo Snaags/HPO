@@ -99,25 +99,19 @@ class BTC(Dataset):
 """
 
 class BTC(Dataset):
-  def __init__(self,window_size,split,augmentation,device,_set,window_step = 1):
-    self.x = np.load("/home/cmackinnon/scripts/datasets/BTC/BTC_x.npy")
-    self.y = np.load("/home/cmackinnon/scripts/datasets/BTC/BTC_y.npy")
-    self.n_classes = 1
-    print(self.x.shape,split)
-    if _set == "train":
-        self.x,self.y = self.x[:int(split*self.x.shape[0])], self.y[:int(split*self.y.shape[0])]
-    else:
-        self.x,self.y = self.x[int((1-split)*self.x.shape[0]):], self.y[int((1-split)*self.y.shape[0]):]
-    self.n_samples = int((self.x.shape[0] - window_size) / window_step)
-    self.window_size = window_size
+  def __init__(self,window_size,augmentation,device,_set,samples = None):
+    self.x = np.load("/home/cmackinnon/scripts/datasets/BTC/train_x.npy").reshape(1,-1)
+    self.y = np.load("/home/cmackinnon/scripts/datasets/BTC/train_y.npy")
+    self.n_classes = 2
+    self.samples = samples
+    if samples == None:
+      self.n_samples = len(self.x) - window_size
+    self.n_samples = samples
     self.augmentation = augmentation
     self.x ,self.y = torch.from_numpy(self.x).cuda(device), torch.from_numpy(self.y).cuda(device)
-    print(self.x.shape)
-    self.window_step = window_step
-    self.x = torch.swapaxes(self.x,0,1).float()
-    self.n_features = self.x.shape[0]
   def __getitem__(self, index):
-    index *=self.window_step
+    if self.samples != None:
+      index = random.randint(0,self.x.shape[-1]-self.window_size)
     x = self.x[:,index:self.window_size+index]
     y = self.y[index+self.window_size]
     if self.augmentation:
@@ -135,12 +129,11 @@ class BTC(Dataset):
     return self.n_samples
 
 class Train(BTC):
-
-  def __init__(self, window_size = 500, split = 0.95 , augmentation = False, device = None,window_step = 10): 
-    super().__init__(window_size, split = split, augmentation = augmentation, device =device, _set = "train",window_step = window_step)
+  def __init__(self, window_size = 500, augmentation = False, device = None): 
+    super().__init__(window_size, split = split, augmentation = augmentation, device =device, _set = "train",window_step = window_step,samples = 10000)
 
 class Test(BTC):
-  def __init__(self, window_size = 500, split = 0.05, augmentation = False,device = None): 
+  def __init__(self, window_size = 500, augmentation = False,device = None): 
     super().__init__(window_size, split = split, augmentation = augmentation , device =device, _set = "test")
 
 

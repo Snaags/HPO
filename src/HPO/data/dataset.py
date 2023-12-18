@@ -4,11 +4,11 @@ from HPO.data.TEPS import *
 from HPO.data.EEG import *
 from HPO.data.FORDB import *
 from HPO.data.UEA_datasets import *
-from Transformers.datasets.androzoo_dl import *
-from Transformers.datasets import *
+from HPO.data.btc_dataset import *
 DATASETS = {
     "teps" : (Train_TEPS,Test_TEPS),
     "HAR" : (Train_HAR,Test_HAR),
+    "BTC" : (Train,Test),
     #"Full_SHAR" : (Full_SHAR, Full_SHAR),
     "EEG" : (Train_EEG,Test_EEG),
     "EEG_Retrain" : (Train_EEG,Test_EEG),
@@ -26,7 +26,6 @@ DATASETS = {
     "EthanolConcentration" : (Train_EthanolConcentration,Test_EthanolConcentration),
     
     "LSST_Retrain" : (Train_LSST,Validation_LSST),
-    "Hex" : (Train_Hex,Test_Hex),
     "FaceDetectionVal" : (Train_FaceDetection,Validation_FaceDetection),
     "FaceDetectionTest" : (Train_FaceDetection,True_Test_FaceDetection),
     "PenDigitsVal" : (Train_PenDigits,Validation_PenDigits),

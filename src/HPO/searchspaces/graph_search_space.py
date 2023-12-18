@@ -102,13 +102,11 @@ class GraphConfigSpace:
     with open(JSON) as conf:
       _data = json.load(conf)
       self.data = _data["ARCHITECTURE_CONFIG"]
-      self.hp_opt = _data["WORKER_CONFIG"]["OPTIMISE"]
     #self.data = JSON["ARCHITECTURE_CONFIG"]
     self.g = nx.DiGraph
     self.n_operations = 32
     self.edge_options = self.data["N_EDGES"]
     self.init_state = [("S",1),(1,"T")]
-    self.hyperparameters = Hyperparameters(self.hp_opt)
 
 
 
@@ -143,7 +141,6 @@ class GraphConfigSpace:
       #ops["s_rate"] = model_stride
       #ops["s_c_ratio"] = model_stride_channel_ratio
       #ops["stem"] = random.choice(self.data["STEM_SIZE"])
-      hp = self.hyperparameters.initialise()
       samples.append(Graph(graph, self.g.nodes,copy.copy(ops),self.data,hyperparameter = hp))
     return samples
   
